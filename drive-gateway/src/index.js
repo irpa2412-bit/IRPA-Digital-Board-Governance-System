@@ -1,4 +1,4 @@
-const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
+import { createRemoteJWKSet, jwtVerify } from "jose";\nconst DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
 const MAX_BYTES = 10 * 1024 * 1024;
 const ALLOWED_CONTENT_TYPES = new Set([
   "application/pdf","application/msword","application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -9,7 +9,7 @@ const ALLOWED_CONTENT_TYPES = new Set([
   "application/epub+zip","application/json","application/xml","text/xml","image/png","image/jpeg","image/webp","image/svg+xml",
   "image/gif","image/bmp","image/tiff","image/avif","application/zip","video/mp4","video/webm","video/quicktime","video/x-msvideo","video/x-matroska","audio/mpeg","audio/wav","audio/x-wav","audio/webm","audio/mp4","audio/x-m4a","audio/aac","audio/ogg","audio/flac"
 ]);
-const OAUTH_STATE_TTL = 600;
+const OAUTH_STATE_TTL = 600;\nconst FIREBASE_SECURE_TOKEN_JWKS = createRemoteJWKSet(new URL("https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com"));
 import { buildMailMimeMessage, escapeHtml as escapeMailHtml, normalizeRecipientEmail, recipientDomain, safeMailError, sendWithRetry, validateMailHeader } from "./mailDelivery.js";
 
 import { classifySmtpReplyCategory } from "./invitationEmail.mjs";
@@ -3519,53 +3519,43 @@ async function driveFetch(env, accessToken, path, options = {}) {
 
 async function authenticateFirebaseRequest(request, env, options = {}) {
   const header = request.headers.get("Authorization") || "";
-  const match = header.match(/^Bearer\s+(.+)$/i);
-  if (!match) throw new Error("Firebase authentication is required.");
+  const match = header.match(/^Bearer\\s+([^\\s]+)$/i);
+  if (!match) {
+    const error = new Error("Firebase authentication is required.");
+    error.status = 401;
+    throw error;
+  }
 
-  const token = match[1];
-  const parts = token.split(".");
-  if (parts.length !== 3) throw new Error("Invalid Firebase ID token.");
-
-  const headerPart = JSON.parse(base64UrlDecode(parts[0]));
-  const payload = JSON.parse(base64UrlDecode(parts[1]));
-  const now = Math.floor(Date.now() / 1000);
-  if (payload.iss !== `https://securetoken.google.com/${getFirebaseProjectId(env)}`) throw new Error("Invalid Firebase token issuer.");
-  if (payload.aud !== getFirebaseProjectId(env)) throw new Error("Invalid Firebase token audience.");
-  if (!payload.sub || Number(payload.exp || 0) <= now) throw new Error("Firebase token is expired.");
-
-  const jwks = await getFirebaseJwks();
-  const jwk = jwks[headerPart.kid];
-  if (!jwk) throw new Error("Firebase token signing key not found.");
-
-  const key = await crypto.subtle.importKey(
-    "jwk",
-    jwk,
-    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
-    false,
-    ["verify"]
-  );
-  const valid = await crypto.subtle.verify(
-    "RSASSA-PKCS1-v1_5",
-    key,
-    base64UrlBytes(parts[2]),
-    new TextEncoder().encode(`${parts[0]}.${parts[1]}`)
-  );
-  if (!valid) throw new Error("Invalid Firebase ID token signature.");
-
-  const claims = {
-    token,
-    user_id: payload.user_id || payload.sub,
-    email: payload.email || null,
-    firebaseClaims: {
-      admin: payload.admin === true,
-      irpaRoles: Array.isArray(payload.irpaRoles) ? payload.irpaRoles : [],
-      name: payload.name || "",
-      phoneNumber: payload.phone_number || "",
-      emailDeliveryService: payload.irpaEmailDeliveryService === true
-    }
-  };
-  if (options.skipActivation !== true) await assertActivatedPortalUser(claims, env);
-  return claims;
+  try {
+    const { payload } = await jwtVerify(match[1], FIREBASE_SECURE_TOKEN_JWKS, {
+      issuer: `https://securetoken.google.com/${getFirebaseProjectId(env)}`,
+      audience: getFirebaseProjectId(env),
+      algorithms: ["RS256"],
+      requiredClaims: ["exp", "iat", "sub", "aud", "iss"],
+      clockTolerance: 5
+    });
+    const uid = String(payload.user_id || payload.sub || "").trim();
+    if (!uid || uid !== String(payload.sub || "").trim()) throw new Error("Firebase token subject is invalid.");
+    const claims = {
+      token: match[1],
+      user_id: uid,
+      email: typeof payload.email === "string" ? payload.email : null,
+      firebaseClaims: {
+        admin: payload.admin === true,
+        irpaRoles: Array.isArray(payload.irpaRoles) ? payload.irpaRoles : [],
+        name: payload.name || "",
+        phoneNumber: payload.phone_number || "",
+        emailDeliveryService: payload.irpaEmailDeliveryService === true
+      }
+    };
+    if (options.skipActivation !== true) await assertActivatedPortalUser(claims, env);
+    return claims;
+  } catch (cause) {
+    const error = new Error("Firebase ID token is invalid, expired, or not issued for this production project.");
+    error.status = 401;
+    error.cause = cause;
+    throw error;
+  }
 }
 
 async function assertActivatedPortalUser(claims, env) {
@@ -4060,7 +4050,7 @@ function escapeHtml(value) {
 
 function corsHeaders(request) {
   const origin = request.headers.get("Origin") || "";
-  const allowed = origin === "https://irpa-digital-board-governance-frontend.irpa-governance.workers.dev" || origin === "https://irpa.or.tz" || origin === "https://www.irpa.or.tz" || origin === "https://irpa-digital-board-governance.web.app" || origin === "https://irpa-digital-board-governance.firebaseapp.com" || origin === "http://localhost:5173" || origin === "https://staging.irpa.or.tz" || origin === "https://irpa-dgb-meeting-room-staging.irpa-governance.workers.dev" || origin === "https://irpa-dbg-staging-a73ec.web.app" || origin === "https://irpa-dbg-staging-a73ec.firebaseapp.com";
+  const allowed = origin === "https://irpa-digital-board-governance-frontend.irpa-governance.workers.dev" || origin === "https://irpa.or.tz" || origin === "https://www.irpa.or.tz" || origin === "https://irpa-digital-board-governance.web.app" || origin === "https://irpa-digital-board-governance.firebaseapp.com";
   return {
     "Access-Control-Allow-Origin": allowed ? origin : "https://irpa.or.tz",
     "Access-Control-Allow-Headers": "Authorization, Content-Type, X-IRPA-Invitation-Version, x-signing-token",
