@@ -125,7 +125,7 @@ test("formal proceedings cannot begin until all three meeting-specific appointme
   }));
 });
 
-test("only the meeting-specific Administrator can create invitations and participant records", async () => {
+test("meeting initiators can create invitations and participant records before proceedings; unassigned users cannot", async () => {
   await testEnv.withSecurityRulesDisabled(async context => {
     await context.firestore().doc("meetings/admin-controlled-meeting").set(meeting({
       meetingCategory: "GENERAL",
@@ -137,7 +137,8 @@ test("only the meeting-specific Administrator can create invitations and partici
   });
   const initiatorDb = testEnv.authenticatedContext("staff-user", { email: "staff@example.test" }).firestore();
   const administratorDb = testEnv.authenticatedContext("meeting-admin", { email: "admin@example.test" }).firestore();
-  await assertFails(initiatorDb.doc("participants/initiator-added").set({
+  const unassignedDb = testEnv.authenticatedContext("unassigned-user", { email: "unassigned@example.test" }).firestore();
+  await assertSucceeds(initiatorDb.doc("participants/initiator-added").set({
     meetingId: "admin-controlled-meeting",
     participantUid: "external-1",
     participantName: "External Participant"
@@ -147,7 +148,7 @@ test("only the meeting-specific Administrator can create invitations and partici
     participantUid: "external-1",
     participantName: "External Participant"
   }));
-  await assertFails(initiatorDb.doc("invitations/initiator-invite").set({
+  await assertSucceeds(initiatorDb.doc("invitations/initiator-invite").set({
     meetingId: "admin-controlled-meeting",
     email: "external@example.test",
     status: "Pending"
@@ -155,6 +156,16 @@ test("only the meeting-specific Administrator can create invitations and partici
   await assertSucceeds(administratorDb.doc("invitations/admin-invite").set({
     meetingId: "admin-controlled-meeting",
     email: "external@example.test",
+    status: "Pending"
+  }));
+  await assertFails(unassignedDb.doc("participants/unassigned-added").set({
+    meetingId: "admin-controlled-meeting",
+    participantUid: "external-2",
+    participantName: "Unassigned User"
+  }));
+  await assertFails(unassignedDb.doc("invitations/unassigned-invite").set({
+    meetingId: "admin-controlled-meeting",
+    email: "unassigned-external@example.test",
     status: "Pending"
   }));
 });
