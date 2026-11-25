@@ -140,6 +140,40 @@ test("everyone in IRPA can read all meeting categories while meeting writes rema
   await assertSucceeds(staffDb.doc("meetings/staff-record").get());
 });
 
+test("real meetings and their participant records cannot be deleted directly", async () => {
+  await testEnv.withSecurityRulesDisabled(async context => {
+    await context.firestore().doc("meetings/real-protected-meeting").set(meeting({
+      meetingCategory: "GENERAL",
+      meetingPolicyId: "GENERAL",
+      meetingType: "General Meeting",
+      recordOrigin: "REAL",
+      environment: "REAL"
+    }));
+    await context.firestore().doc("participants/real-protected-participant").set({
+      meetingId: "real-protected-meeting",
+      participantName: "Protected Participant",
+      recordOrigin: "REAL"
+    });
+  });
+  const db = testEnv.authenticatedContext("admin-user", { admin: true }).firestore();
+  await assertFails(db.doc("meetings/real-protected-meeting").delete());
+  await assertFails(db.doc("participants/real-protected-participant").delete());
+});
+
+test("explicitly trial meetings may be deleted by the system administrator", async () => {
+  await testEnv.withSecurityRulesDisabled(async context => {
+    await context.firestore().doc("meetings/trial-meeting").set(meeting({
+      meetingCategory: "OTHER",
+      meetingPolicyId: "OTHER",
+      meetingType: "Trial Meeting",
+      recordOrigin: "TRIAL",
+      environment: "TRIAL"
+    }));
+  });
+  const db = testEnv.authenticatedContext("admin-user", { admin: true }).firestore();
+  await assertSucceeds(db.doc("meetings/trial-meeting").delete());
+});
+
 test("IRPA employees are not denied Meeting Portal access by inactive employment status", async () => {
   await testEnv.withSecurityRulesDisabled(async context => {
     await context.firestore().doc("meetings/inactive-staff-meeting").set(meeting({
