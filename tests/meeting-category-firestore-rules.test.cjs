@@ -342,10 +342,12 @@ test("invitee can check in only their own participant record", async () => {
 
 
 test("meeting initiator can register an invitee and create the linked invitation", async () => {
-  await testEnv.withSecurityRulesDisabled(async context => {const db=context.firestore();await db.doc("meetings/organizer-meeting").set(meeting({initiatorUid:"departmental-director",initiatorEmail:"director@example.test",registerStatus:"Registered"}));});
+  await testEnv.withSecurityRulesDisabled(async context => {const db=context.firestore();await db.doc("meetings/organizer-meeting").set(meeting({initiatorUid:"departmental-director",initiatorEmail:"director@example.test",registerStatus:"Registered"}));await db.doc("meetings/proceedings-meeting").set(meeting({initiatorUid:"departmental-director",initiatorEmail:"director@example.test",status:"In Progress",proceedingsStatus:"In Progress",registerStatus:"Registered"}));});
   const db=testEnv.authenticatedContext("departmental-director",{email:"director@example.test"}).firestore();
   await assertSucceeds(db.doc("participants/new-invitee").set({meetingId:"organizer-meeting",participantEmail:"guest@example.test",participantName:"Guest",participantRole:"Invited Guest",attendanceStatus:"Invited"}));
   await assertSucceeds(db.doc("invitations/guest-invitation").set({meetingId:"organizer-meeting",participantId:"new-invitee",email:"guest@example.test",name:"Guest",status:"Pending"}));
+  await assertFails(db.doc("participants/proceedings-invitee").set({meetingId:"proceedings-meeting",participantEmail:"late-guest@example.test",participantName:"Late Guest",participantRole:"Invited Guest",attendanceStatus:"Invited"}));
+  await assertFails(db.doc("invitations/proceedings-invitation").set({meetingId:"proceedings-meeting",participantId:"proceedings-invitee",email:"late-guest@example.test",name:"Late Guest",status:"Pending"}));
 });
 
 
