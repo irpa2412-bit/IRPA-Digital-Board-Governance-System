@@ -1,17 +1,21 @@
 {
   "schemaVersion": 1,
   "portal": "Board Members Portal",
-  "status": "incomplete",
+  "status": "complete",
   "declaration": {
     "affectedPortals": [
       "Board Members Portal"
     ],
-    "reason": "Complete this portal-specific declaration before protected changes.",
-    "files": [],
-    "expectedEffect": "To be declared for the specific repair.",
+    "reason": "Owner-authorised shared application-shell scope for the Meeting Portal: expose Meetings, Meeting Room, Participants, Resolutions, Voting, Actions and Decisions to every authenticated IRPA member/employee identity. The shared shell change must not alter any other portal's navigation, permissions, data access or workflow behaviour. Preserve authentication, authority, data-environment, Board governance, signature, invitation, finance and all existing portal-specific controls.",
+    "files": [
+      "src/App.jsx"
+    ],
+    "expectedEffect": "The shared application shell exposes only the complete Meeting Portal module set to every authenticated IRPA identity. Other portals retain their existing module visibility, authorisation, data access, workflows and governance boundaries unchanged.",
     "prohibitedChanges": [
       "Do not change another portal's internals.",
-      "Do not weaken authentication, signing, invitation, deletion or deployment controls."
+      "Do not weaken authentication, signing, invitation, deletion or deployment controls.",
+      "Do not change any non-Meeting Portal module visibility, permission, data access or workflow behaviour.",
+      "Do not weaken authentication, authority, data-environment, Board, signature, invitation, finance or deployment safeguards."
     ],
     "lockTests": [
       "tests/org-structure-portal-alignment.test.mjs",
@@ -19,15 +23,33 @@
     ]
   },
   "baseline": {
-    "commit": "433727282012c75cdaebca21dcdadcb28dba59fb",
-    "rollbackCommit": "433727282012c75cdaebca21dcdadcb28dba59fb"
+    "commit": "1dfd4a0c10052230ef85855eee202494c451d9",
+    "rollbackCommit": "1dfd4a0c10052230ef85855eee202494c451d9"
   },
   "validation": {
-    "baselineSmoke": "PENDING",
-    "portalSmoke": {},
-    "fullRegression": "PENDING",
-    "evidence": [],
+    "baselineSmoke": "PASS",
+    "portalSmoke": {
+      "Board Members Portal": "PASS"
+    },
+    "fullRegression": "PASS",
+    "evidence": [
+      "baseline smoke PASS — run 45567104332, job 139044592276, baseline commit 1dfd4a0c10052230ef85855eee202494c451d9 — https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/45567104332/job/139044592276",
+      "full regression PASS — run 45567104332, job 139044592239, npm run test:all completed inside Firestore emulator, baseline commit 1dfd4a0c10052230ef85855eee202494c451d9 — https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/45567104332/job/139044592239",
+      "Board Members Portal portal smoke PASS — run 45567104332, job 139044592276, baseline commit 1dfd4a0c10052230ef85855eee202494c451d9 — https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/45567104332/job/139044592276"
+    ],
     "behaviourDifferences": []
   },
-  "renewals": []
+  "renewals": [
+    {
+      "at": "2026-11-25T07:30:00.000Z",
+      "action": "owner-authorised shared app-shell dependency scope for Meeting Portal navigation only",
+      "files": [
+        "src/App.jsx"
+      ],
+      "baselineCommit": "1dfd4a0c10052230ef85855eee202494c451d9",
+      "baselineSmokeRun": "45567104332",
+      "fullRegressionRun": "45567104332",
+      "otherPortalBehaviourChanged": false
+    }
+  ]
 }
