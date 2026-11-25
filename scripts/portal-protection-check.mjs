@@ -21,6 +21,7 @@ export const MAINTENANCE_APPROVAL_QUOTE = "Guard-core (#853): evaluate the guard
 export function isProtectionFile(path) {
   return [
     /^scripts\/portal-[^/]+\.mjs$/,
+    /^scripts\/meeting-portal-fixture-isolation-guard\.sh$/,
     /^tests\/portal-(?:protection|repair-window)[^/]*\.test\.mjs$/,
     /^tests\/meeting-isolation-guard\.test\.mjs$/,
     /^tests\/meeting-portal-protection\.test\.mjs$/,
