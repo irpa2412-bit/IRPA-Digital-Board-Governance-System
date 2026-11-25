@@ -551,3 +551,17 @@ test("baseline evidence jobs execute protected smoke and full regression on the 
   assert.ok(workflow.includes("baseline-protection-smoke:"));
   assert.ok(workflow.includes("baseline-full-regression:") && workflow.includes("BASELINE_SOURCE_SHA="));
 });
+
+
+test("universal Meeting Portal repair uses an exact, enumerated cross-suite regression allowlist", () => {
+  assert.ok(guard.includes('"drive-gateway/tests/meeting-translation-cloudflare.test.mjs"'));
+  assert.ok(guard.includes('"firestore.staging.rules"'));
+  assert.ok(guard.includes('"functions/meetingAttendanceRegister.js"'));
+  assert.ok(guard.includes('"scripts/firestore-rules-approval.mjs"'));
+  assert.ok(guard.includes('"src/meeting/IRPADGBSMeetingRoomMedia.jsx"'));
+  assert.ok(guard.includes('"src/meeting/MeetingAccessControl.jsx"'));
+  assert.ok(guard.includes('"tests/firestore-rules-approval.test.mjs"'));
+  assert.ok(guard.includes('"tests/org-structure-access-preservation.test.cjs"'));
+  assert.ok(guard.includes('"tests/policies-strategic-plan-portal.test.mjs"'));
+  assert.ok(guard.includes('"tests/staging-admin-access-preservation.test.cjs"'));
+});
