@@ -106,9 +106,9 @@ export async function getAccessibleMeetingRecords(){
     ...(Array.isArray(token?.claims?.irpaRoles)?token.claims.irpaRoles:[])
   ]).map(v=>String(v||"").trim()).filter(Boolean))];
   const identity={...(member||employee||{}),uid:user.uid,email,active:activeMember||activeEmployee,isAdmin,activeMember,activeEmployee,roles};
-  // Never issue an unscoped collection read: Firestore rules cannot safely prove access
-  // to every meeting in a collection. Use category-authorized and explicit-invitation
-  // queries, then apply the same policy filter to the merged records.
+  // Meeting Portal access is universal for IRPA identities. Query each supported
+  // category explicitly (Firestore does not safely support an unscoped collection read),
+  // then merge initiator and invitation queries for legacy records.
   const ref=collection(db,COLLECTIONS.meetings);
   const jobs=[];
   for(const policy of Object.values(MEETING_CATEGORIES)){

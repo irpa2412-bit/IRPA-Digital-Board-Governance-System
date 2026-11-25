@@ -5,6 +5,7 @@ const media=fs.readFileSync("src/meeting/IRPADGBSMeetingRoomMedia.jsx","utf8");
 const gateway=fs.readFileSync("functions/meetingGateway.js","utf8");
 const room=fs.readFileSync("src/pages/MeetingRoom.jsx","utf8");
 const meetingsCentre=fs.readFileSync("src/pages/Meetings.jsx","utf8");
+const appShell=fs.readFileSync("src/App.jsx","utf8");
 const policy=fs.readFileSync("src/firebase/meetingPolicy.js","utf8");
 const records=fs.readFileSync("functions/meetingRecords.js","utf8");
 const liveMeeting=fs.readFileSync("functions/liveMeeting.js","utf8");
@@ -30,9 +31,11 @@ const livekitCaddy=fs.readFileSync("infra/livekit/caddy.yaml.template","utf8");
 const livekitDeploy=fs.readFileSync("infra/livekit/deploy-staging.sh","utf8");
 const livekitWorkflow=fs.readFileSync(".github/workflows/deploy-livekit-staging.yml","utf8");
 const checks=[
- ["Registration buttons use the authoritative active-role policy",meetingsCentre.includes('{canRegisterMeeting({...actorIdentity,isAdmin:admin})&&<button type="button" onClick={startCreate}>+ Register Meeting</button>}')&&meetingsCentre.includes('{canRegisterMeeting({...actorIdentity,isAdmin:admin})&&<button className="secondary-button" onClick={startCreate}>+ New Meeting</button>}')],
- ["Released meeting edits remain administrator-only",meetingsCentre.includes("if(editing&&!canEditMeeting(editing,{...actorIdentity,isAdmin:admin}))")&&meetingsCentre.includes("function edit(m){if(!canEditMeeting(m,{...actorIdentity,isAdmin:admin}))")&&meetingsCentre.includes("released. Only an authorised administrator may edit it.")],
- ["Firestore create permits active IRPA members and employees while binding the initiator and validating meeting category",(()=>{const rules=fs.readFileSync("firestore.rules","utf8");const meetingRule=rules.split("match /meetings/{id}")[1]?.split("match /")[0]||"";return meetingRule.includes('allow create:if (meetingUser()&&request.resource.data.get("initiatorUid","")==request.auth.uid&&validMeetingCategory(request.resource.data))&&actualCreateAllowed()');})()],
+ ["Registration buttons expose universal Meeting Portal initiation",meetingsCentre.includes('{canRegisterMeeting({...actorIdentity,isAdmin:admin})&&<button type="button" onClick={startCreate}>+ Register Meeting</button>}')&&meetingsCentre.includes('{canRegisterMeeting({...actorIdentity,isAdmin:admin})&&<button className="secondary-button" onClick={startCreate}>+ New Meeting</button>}')],
+ ["Every IRPA identity receives the complete Meeting Portal without selecting an organisational role",appShell.includes('const UNIVERSAL_MEETING_MODULES=["Meetings","Meeting Room","Participants","Resolutions","Voting","Actions","Decisions"]')&&appShell.includes('if(!selected)return["Dashboard",...UNIVERSAL_MEETING_MODULES]')&&appShell.includes('const meetingPortalModules=hasIRPAIdentity?["Dashboard",...UNIVERSAL_MEETING_MODULES]')&&appShell.includes('!hasIRPAIdentity&&authorityCategories.length>0&&!selectedAuthority')],
+ ["Shared meeting policy does not gate portal access by category or role",policy.includes('return Boolean(identity.uid||identity.authenticated===true||identity.active===true)')],
+ ["Meeting edits follow initiator lifecycle and meeting-specific Chair/Secretary authority",meetingsCentre.includes("if(editing&&!canEditMeeting(editing,{...actorIdentity,isAdmin:admin}))")&&meetingsCentre.includes("function edit(m){if(!canEditMeeting(m,{...actorIdentity,isAdmin:admin}))")&&meetingsCentre.includes("Only the meeting initiator before proceedings or the appointed Chairperson/Secretary may edit this meeting.")],
+ ["Firestore create permits every IRPA member or employee identity while binding the initiator and validating meeting category",(()=>{const rules=fs.readFileSync("firestore.rules","utf8");const meetingRule=rules.split("match /meetings/{id}")[1]?.split("match /")[0]||"";return meetingRule.includes('allow create:if (meetingUser()&&request.resource.data.get("initiatorUid","")==request.auth.uid&&validMeetingCategory(request.resource.data))&&actualCreateAllowed()');})()],
  ["Meeting media client exists",fs.existsSync("src/meeting/IRPADGBSMeetingRoomMedia.jsx")],
  ["Participant invitation creates a meeting access pass",participantPage.includes("createMeetingAccessInvitation")&&participantPage.includes("meetingAccess")],
  ["Meeting access pass is dispatched through the independent Meeting Worker API",participantPage.includes("dispatchMeetingInvitation")&&meetingApi.includes("/api/meeting-invitations/dispatch")],
@@ -113,7 +116,7 @@ const checks=[
  ["Record integrity hash stored and checked",records.includes('integrityAlgorithm:"SHA-256"')&&records.includes('actual!==record.contentHash')],
  ["Retrieval is audited",records.includes('MEETING_RECORD_RETRIEVED')],
  ["Integrity failure blocks retrieval and audits",records.includes('MEETING_RECORD_INTEGRITY_FAILURE')&&records.includes('data-loss')],
- ["Retention periods are category-defined",records.includes("GOVERNANCE:7")&&records.includes("ADMINISTRATIVE:5")&&records.includes("STAFF:3")&&records.includes("GENERAL:3")&&records.includes("OTHER:3")],
+ ["Retention periods are category-defined",records.includes("GOVERNANCE:10")&&records.includes("ADMINISTRATIVE:10")&&records.includes("STAFF:10")&&records.includes("GENERAL:10")&&records.includes("OTHER:10")],
  ["Legal hold prevents purge",records.includes('if(record.legalHold===true)throw new HttpsError("failed-precondition","A legal hold prevents deletion.")')],
  ["Purge requires retention expiry and reviewed request",records.includes('record.deletionStatus!=="PENDING_REVIEW"')&&records.includes("retainUntil>new Date()")],
  ["Purge restricted to primary administrator",records.includes('if(!admin(req))throw new HttpsError("permission-denied","Only the primary administrator may execute a final purge.")')],

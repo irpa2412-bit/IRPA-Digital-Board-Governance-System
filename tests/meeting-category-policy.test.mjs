@@ -18,10 +18,16 @@ const governance = {
   initiatorUid: "secretary-1"
 };
 
-test("governance category denies an unrelated active staff identity", () => {
+test("every IRPA identity has full Meeting Portal access across governance categories", () => {
   assert.equal(canAccessMeetingCategory(governance, {
     uid: "staff-1", active: true, activeEmployee: true, role: "Staff"
-  }), false);
+  }), true);
+  assert.equal(canAccessMeetingCategory(governance, {
+    uid: "member-2", active: false, activeMember: false, role: "Member"
+  }), true);
+  assert.equal(canAccessMeetingCategory({ meetingCategory: "ADMINISTRATIVE" }, {
+    uid: "employee-2", active: true, activeEmployee: true, role: "Field Officer"
+  }), true);
 });
 
 test("governance category allows authorised board roles and administrators", () => {
@@ -43,9 +49,61 @@ test("explicitly invited participants can access their meeting regardless of ins
   }, { isInvited: true }), true);
 });
 
-test("any active registered member or employee may initiate a meeting", () => {
+test("production and staging Firestore rules apply universal IRPA Meeting Portal access", () => {
+  const production = readFileSync(new URL("../firestore.rules", import.meta.url), "utf8");
+  const staging = readFileSync(new URL("../firestore.staging.rules", import.meta.url), "utf8");
+  for (const rules of [production, staging]) {
+    assert.match(rules, /function meetingUser\(\)\{return admin\(\)\|\|memberProfileExists\(\)\|\|employeeProfileExists\(\);\}/);
+    assert.match(rules, /function meetingRegistrar\(\)\{return meetingUser\(\);\}/);
+    assert.match(rules, /function meetingCategoryReadAllowed\(data\)\{return meetingUser\(\)\|\|meetingParticipant\(data\);\}/);
+    assert.match(rules, /function meetingInvitationManager\(data\)\{/);
+    assert.match(rules, /match \/participants\/\{id\}.*allow create:if meetingInvitationManager\(request\.resource\.data\)/);
+    assert.match(rules, /function meetingSessionUpdateAllowed\(data\).*meetingSecretaryUid.*meetingAdministratorUid/);
+  }
+});
+
+test("meeting archive access is universal for IRPA identities except Board-restricted records", () => {
+  const gateway = readFileSync(new URL("../drive-gateway/src/index.js", import.meta.url), "utf8");
+  assert.match(gateway, /if\(confidentiality==="BOARD_RESTRICTED"&&!governanceReader\)/);
+  assert.match(gateway, /if\(memberDoc\|\|employeeDoc\)return \{meeting,category,uid,email,privilegedToken\}/);
+  assert.match(gateway, /This account is not an IRPA identity or a verified invitee for the selected meeting/);
+});
+
+test("initiator edit authority ends at proceedings and meeting roles remain meeting-specific", () => {
+  const policy = readFileSync(new URL("../src/firebase/meetingPolicy.js", import.meta.url), "utf8");
+  assert.match(policy, /const initiator=String\(meeting\.initiatorUid\|\|""\)===uid&&!\["in progress","completed","cancelled","canceled"\]/);
+  assert.match(policy, /meeting\.meetingChairpersonUid\|\|meeting\.chairpersonUid/);
+  assert.match(policy, /meeting\.meetingSecretaryUid\|\|meeting\.secretaryUid/);
+  assert.match(policy, /return initiator\|\|assigned\.map/);
+  assert.doesNotMatch(policy.match(/const assigned=transitionActive[\s\S]*?return initiator/)[0], /transitionAdministratorUid|meetingAdministratorUid/);
+  const worker = readFileSync(new URL("../drive-gateway/src/meetingServices.mjs", import.meta.url), "utf8");
+  assert.match(worker, /const initiatorCanManage=clean\(meeting\.initiatorUid\)===uid&&!\["in progress","completed","cancelled","canceled"\]/);
+});
+
+test("minutes editing and report distribution belong to the meeting-specific Chairperson and Secretary", () => {
+  const meetings = readFileSync(new URL("../src/pages/Meetings.jsx", import.meta.url), "utf8");
+  assert.match(meetings, /const meetingSecretariat=Boolean\(selected&&/);
+  assert.match(meetings, /readOnly=\{!meetingSecretariat\}/);
+  assert.match(meetings, /meetingSecretariat&&<button type="button" onClick=\{compileAndDistributeReport/);
+  assert.match(meetings, /async function generateAISummary\(\)/);
+  assert.match(meetings, /async function generateAIMinutes\(\)/);
+  assert.match(meetings, /recordType:"AI_MINUTES_DRAFT"/);
+  assert.match(meetings, /recordType:"AI_SUMMARY_DRAFT"/);
+});
+
+test("IRPA users receive every Meeting Portal module without organisational-role selection", () => {
+  const app = readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
+  assert.match(app, /const UNIVERSAL_MEETING_MODULES=\["Meetings","Meeting Room","Participants","Resolutions","Voting","Actions","Decisions"\]/);
+  assert.match(app, /if\(!selected\)return\["Dashboard",\.\.\.UNIVERSAL_MEETING_MODULES\]/);
+  assert.match(app, /const hasIRPAIdentity=Boolean\(profile\?\.uid\|\|profile\?\.id\|\|employee\?\.uid\|\|employee\?\.id\)/);
+  assert.match(app, /!hasIRPAIdentity&&authorityCategories\.length>0&&!selectedAuthority/);
+  assert.match(app, /const meetingPortalModules=hasIRPAIdentity\?\["Dashboard",\.\.\.UNIVERSAL_MEETING_MODULES\]/);
+});
+
+test("any authenticated IRPA identity may initiate a meeting without an active-status gate", () => {
   assert.equal(canRegisterMeeting({ active: true, role: "Departmental Director" }), true);
   assert.equal(canRegisterMeeting({ active: false, role: "Departmental Director" }), false);
+  assert.equal(canRegisterMeeting({ uid: "inactive-member", active: false }), true);
   assert.equal(canRegisterMeeting({ active: true, role: "Staff" }), true);
   assert.equal(canRegisterMeeting({ active: true, role: "Member" }), true);
   assert.equal(canRegisterMeeting({ isAdmin: true }), true);
@@ -58,7 +116,7 @@ test("released meeting general details remain protected while the initiator may 
   assert.equal(canEditMeeting({ ...governance, registerStatus: "Registered", initiatorUid: "secretary-1", status: "In Progress" }, {
     uid: "secretary-1", active: true, role: "Board Secretary"
   }), false);
-  assert.equal(canEditMeeting({ ...governance, registerStatus: "Registered" }, { isAdmin: true }), true);
+  assert.equal(canEditMeeting({ ...governance, registerStatus: "Registered" }, { uid: "global-admin", isAdmin: true }), false);
 });
 
 test("a designated initiator may edit only an unreleased meeting they initiated", () => {
@@ -124,7 +182,7 @@ test("active Meeting Portal attendance screens never call undeployed Firebase at
 
 
 const meetingCentreSource = readFileSync(new URL("../src/pages/Meetings.jsx", import.meta.url), "utf8");
-test("Meeting Centre exposes initiation to every active member and employee", () => {
+test("Meeting Centre exposes initiation to every authenticated IRPA identity", () => {
   assert.ok(meetingCentreSource.includes("const canRegisterMeeting = identity => canRegisterMeetingByRole(identity) || identity.activeMember===true || identity.activeEmployee===true"));
   assert.equal(meetingCentreSource.split("canRegisterMeeting({...actorIdentity,isAdmin:admin})").length - 1, 4);
 });
@@ -204,19 +262,19 @@ test("active members can initiate meetings without a management title", async ()
   assert.equal(result.meetingWrites, 1);
 });
 
-test("inactive institutional identities cannot initiate meetings through the Worker", async () => {
+test("IRPA identities can initiate meetings without an active-status prerequisite through the Worker", async () => {
   const result = await createMeetingAsInstitutionalIdentity({
     uid: "inactive-user", email: "inactive@example.test",
     employee: { uid: "inactive-user", email: "inactive@example.test", status: "Suspended", role: "Staff" },
     category: "GENERAL"
   });
-  assert.equal(result.response.status, 403);
-  assert.equal(result.body.ok, false);
-  assert.equal(result.meetingWrites, 0);
+  assert.equal(result.response.status, 200);
+  assert.equal(result.body.ok, true);
+  assert.equal(result.meetingWrites, 1);
 });
 
 
-test("meeting registration keeps all three permanent appointments optional", async () => {
+test("meeting registration keeps all three meeting-specific appointments optional", async () => {
   const result = await createMeetingAsInstitutionalIdentity({
     uid: "member-no-leaders", email: "member@example.test",
     member: { uid: "member-no-leaders", email: "member@example.test", status: "Active", role: "Member" },
@@ -309,6 +367,17 @@ test("staff and general meetings enable ballots only during an active leadership
   assert.equal(meetingCapabilities({ ...meeting, transitionCommitteeActive: false }).voting, false);
 });
 
+test("all meeting proceedings and records have a minimum ten-year retention period", () => {
+  const source = readFileSync(new URL("../drive-gateway/src/meetingServices.mjs", import.meta.url), "utf8");
+  assert.match(source, /const retention = \{ GOVERNANCE:10, ADMINISTRATIVE:10, STAFF:10, GENERAL:10, OTHER:10 \}/);
+  assert.match(source, /IRPA-MEETING-RETENTION-2\.0-MINIMUM-10-YEARS/);
+  assert.match(source, /n<1\|\|n>30/);
+  assert.match(source, /requiredUntil=yearsFrom\(capturedAt,10\)/);
+  const legacy = readFileSync(new URL("../functions/meetingRecords.js", import.meta.url), "utf8");
+  assert.match(legacy, /RETENTION_YEARS=\{GOVERNANCE:10,ADMINISTRATIVE:10,STAFF:10,GENERAL:10,OTHER:10\}/);
+  assert.match(legacy, /years<1\|\|years>30/);
+});
+
 test("meeting governance source enforces the proceedings gate and immediate transition mandate expiry", () => {
   const source = readFileSync(new URL("../drive-gateway/src/meetingServices.mjs", import.meta.url), "utf8");
   assert.match(source, /Formal proceedings cannot begin until the meeting-specific Chairperson, Secretary and Meeting Administrator have all been declared/);
@@ -326,6 +395,45 @@ test("meeting governance Firestore rules restrict live voting control to the act
   assert.match(rules, /match \/meetings\/\{id\}\{allow read:if meetingCategoryReadAllowed\(resource\.data\)/);
 });
 
+
+test("universal Meeting Portal access includes attendance registers and working-document review", () => {
+  const worker = readFileSync(new URL("../drive-gateway/src/meetingServices.mjs", import.meta.url), "utf8");
+  assert.match(worker, /const records=participants\.map\(p=>\{/);
+  assert.match(worker, /Meeting Portal access is required to review working documents/);
+  assert.match(worker, /canReadRestrictedRecords/);
+  assert.match(worker, /Only the Meeting Administrator appointed to this meeting may update another participant's attendance/);
+});
+
+test("participant admission and removal are controlled only by the meeting-specific Administrator", () => {
+  const source = readFileSync(new URL("../drive-gateway/src/meetingServices.mjs", import.meta.url), "utf8");
+  assert.match(source, /const canManageParticipants=meetingAdministrator/);
+  assert.match(source, /Only the Meeting Administrator appointed to this meeting may register, update or remove participants/);
+  assert.match(source, /Only the Meeting Administrator appointed to this meeting may update another participant's attendance/);
+});
+
+test("legacy attendance callable preserves universal reads and Meeting Administrator-only control", () => {
+  const source = readFileSync(new URL("../functions/meetingAttendanceRegister.js", import.meta.url), "utf8");
+  assert.match(source, /return text\(m\.meetingAdministratorUid\)===uid\|\|\(transitionActive&&text\(m\.transitionAdministratorUid\)===uid\)/);
+  assert.match(source, /const identityInIrpa=isAdmin\(req\)\|\|memberSnap\.exists\|\|employeeSnap\.exists/);
+  assert.match(source, /filter\(p=>identityInIrpa\|\|manager\|\|matchesIdentity\(req,p\)\)/);
+});
+
+test("universal access is enforced in Firestore and Worker while live-room admission stays meeting-scoped", () => {
+  const rules = readFileSync(new URL("../firestore.rules", import.meta.url), "utf8");
+  const worker = readFileSync(new URL("../drive-gateway/src/meetingServices.mjs", import.meta.url), "utf8");
+  assert.match(rules, /function meetingUser\(\)\{return admin\(\)\|\|memberProfileExists\(\)\|\|employeeProfileExists\(\);\}/);
+  assert.match(rules, /function meetingRegistrar\(\)\{return meetingUser\(\);\}/);
+  assert.match(rules, /function meetingCategoryReadAllowed\(data\)\{return meetingUser\(\)\|\|meetingParticipant\(data\);\}/);
+  assert.match(worker, /canRead:true/);
+  const legacy = readFileSync(new URL("../functions/meetingRecords.js", import.meta.url), "utf8");
+  assert.match(legacy, /const identityInIrpa=admin\(req\)\|\|memberSnap\.exists\|\|employeeSnap\.exists/);
+  assert.match(legacy, /canRead:true/);
+  assert.doesNotMatch(legacy, /if\(!ctx\.canRead\|\|!ctx\.participant/);
+  assert.match(worker, /An IRPA member or employee identity is required to initiate a meeting/);
+  assert.match(worker, /if\(!c\.participant\)throw Object\.assign\(new Error\("Live meeting admission is restricted to invited participants/);
+  assert.match(worker, /Only the Chairperson appointed to this meeting may open formal proceedings/);
+  assert.match(worker, /Only the Meeting Administrator appointed to this meeting may view entry requests/);
+});
 
 const meetingServicesGovernanceSource = readFileSync(new URL("../drive-gateway/src/meetingServices.mjs", import.meta.url), "utf8");
 const meetingRoomGovernanceSource = readFileSync(new URL("../src/pages/MeetingRoom.jsx", import.meta.url), "utf8");
@@ -383,7 +491,7 @@ test("leadership election ballots are operable by the Transition Committee throu
 });
 
 test("leadership-election invitation management cannot be bypassed by the initiator or global administrator", () => {
-  assert.match(meetingServicesGovernanceSource, /const canManageParticipants=meeting\.leadershipElectionRequired===true\?\(chair\|\|secretary\|\|meetingAdministrator\)/);
+  assert.match(meetingServicesGovernanceSource, /const canManageParticipants=meetingAdministrator;/);
   assert.match(meetingServicesGovernanceSource, /if\(!c\.canManageParticipants\)return fail/);
   assert.match(meetingServicesGovernanceSource, /function meetingTransitionElectionAuthority\(meeting,uid\)/);
 });

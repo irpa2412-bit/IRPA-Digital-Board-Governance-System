@@ -7,7 +7,7 @@ const db=getFirestore();
 const text=v=>String(v??"").trim();
 const hash=v=>crypto.createHash("sha256").update(String(v),"utf8").digest("hex");
 const TERMINAL=new Set(["completed","closed","cancelled","canceled","archived"]);
-const RETENTION_YEARS={GOVERNANCE:7,ADMINISTRATIVE:5,STAFF:3,GENERAL:3,OTHER:3};
+const RETENTION_YEARS={GOVERNANCE:10,ADMINISTRATIVE:10,STAFF:10,GENERAL:10,OTHER:10};
 function categoryOf(m){const raw=text(m.meetingCategory||m.meetingPolicyId||m.category||m.meetingType).toUpperCase();if(["GOVERNANCE","BOARD","BOARD MEETING","BOARD COMMITTEE MEETING","ANNUAL GENERAL MEETING","SPECIAL MEETING"].includes(raw))return"GOVERNANCE";if(["ADMINISTRATIVE","MANAGEMENT","MANAGEMENT MEETING","ADMINISTRATION MEETING","OPERATIONS MEETING"].includes(raw))return"ADMINISTRATIVE";if(raw==="STAFF"||raw==="STAFF MEETING")return"STAFF";if(raw==="GENERAL"||raw==="GENERAL MEETING")return"GENERAL";return"OTHER";}
 function addYears(date,years){const d=new Date(date);d.setUTCFullYear(d.getUTCFullYear()+years);return d;}
 function admin(req){return req.auth?.token?.admin===true||text(req.auth?.token?.email).toLowerCase()==="irpa2412@gmail.com";}
@@ -22,7 +22,7 @@ async function context(req,meetingId){
  const secretary=text(meeting.secretaryEmail).toLowerCase()===email;
  const memberSnap=await db.collection("members").doc(uid).get();
  const employeeSnap=await db.collection("employees").doc(uid).get();
- const identityActive=admin(req)||(memberSnap.exists&&["Active","Activated"].includes(text(memberSnap.data()?.status||memberSnap.data()?.registrationStatus)))||(employeeSnap.exists&&["Active","Activated"].includes(text(employeeSnap.data()?.status||employeeSnap.data()?.employmentStatus||employeeSnap.data()?.registrationStatus)));
+ const identityInIrpa=admin(req)||memberSnap.exists||employeeSnap.exists;
  const listed=[...(meeting.participantUids||[]),...(meeting.attendeeUids||[]),...(meeting.memberUids||[]),...(meeting.invitedUids||[]),...(meeting.subscriberUids||[])].includes(uid);
  const subResults=await Promise.all([
   db.collection("meetingSubscriptions").where("meetingId","==",meetingId).where("uid","==",uid).limit(1).get().catch(()=>({empty:true})),
@@ -38,24 +38,30 @@ async function context(req,meetingId){
  });
  const subscribed=subResults.some(s=>!s.empty);
  const participant=listed||subscribed||participantRecord;
- if(!identityActive&&!participant)throw new HttpsError("permission-denied","An active IRPA identity or authorised meeting participant is required.");
- const canManage=admin(req)||chair||secretary||text(meeting.chairpersonUid)===uid||text(meeting.secretaryUid)===uid||text(meeting.createdByUid)===uid||text(meeting.initiatorUid)===uid;
- return {uid,email,meeting,category:cat,participant,subscribed,canManage,canRead:canManage||participant,confidentiality:text(meeting.confidentialityClass)||(cat==="GOVERNANCE"?"BOARD_RESTRICTED":"INTERNAL")};
+ if(!identityInIrpa&&!participant)throw new HttpsError("permission-denied","An IRPA member or employee identity or a verified invitation to this meeting is required.");
+ const canSecretariat=chair||secretary||text(meeting.meetingChairpersonUid)===uid||text(meeting.meetingSecretaryUid)===uid||text(meeting.chairpersonUid)===uid||text(meeting.secretaryUid)===uid;
+ const canManage=admin(req)||canSecretariat;
+ const member=memberSnap.data()||{},employee=employeeSnap.data()||{};
+ const roles=[member.role,member.title,member.position,member.departmentalRole,member.boardPosition,employee.role,employee.title,employee.position,employee.departmentalRole,employee.boardPosition,...(Array.isArray(member.roles)?member.roles:[]),...(Array.isArray(employee.roles)?employee.roles:[])].map(v=>text(v).toLowerCase());
+ const governanceReader=admin(req)||member.boardMember===true||employee.boardMember===true||Boolean(text(member.boardPosition)||text(employee.boardPosition))||roles.some(v=>["board member","board chairperson","board secretary","secretary to the board","executive director","director internal oversight"].includes(v));
+ const confidentiality=text(meeting.confidentialityClass)||(cat==="GOVERNANCE"?"BOARD_RESTRICTED":"INTERNAL");
+ return {uid,email,meeting,category:cat,participant,subscribed,canManage,canSecretariat,canRead:true,canReadRestrictedRecords:confidentiality!=="BOARD_RESTRICTED"||governanceReader,confidentiality};
 }
 function recordLabel(type){return ({TRANSCRIPT:"Meeting Transcript",MINUTES_DRAFT:"Draft Minutes",MINUTES_FINAL:"Approved / Final Minutes",AI_MINUTES_DRAFT:"AI-Assisted Draft Minutes",AI_SUMMARY_DRAFT:"AI-Assisted Meeting Summary Draft",SUBSCRIBER_TRANSCRIPT_DRAFT:"Subscriber Proceedings Draft",DECISION_REGISTER:"Decision Register",ATTENDANCE_REGISTER:"Attendance Register",OTHER:"Other Meeting Record"})[type]||"Meeting Record";}
 async function audit(action,ctx,recordId,details={}){await db.collection("audit").add({action,collection:"meetingRecords",recordId:recordId||null,details:{meetingId:ctx.meeting.id,meetingCategory:ctx.category,confidentialityClass:ctx.confidentiality,...details},actorUid:ctx.uid,actorEmail:ctx.email||null,createdAt:FieldValue.serverTimestamp()});}
 exports.captureMeetingRecord=onCall({region:"us-central1",timeoutSeconds:30},async req=>{
  const meetingId=text(req.data?.meetingId),type=text(req.data?.recordType).toUpperCase(),content=text(req.data?.content),title=text(req.data?.title);
  const ctx=await context(req,meetingId);
- if(!ctx.canManage)throw new HttpsError("permission-denied","Only the meeting administrator, chairperson or secretary may capture an authoritative meeting record.");
+ if(!ctx.canSecretariat)throw new HttpsError("permission-denied","Only the appointed Chairperson or Secretary may capture an authoritative meeting record.");
+ if(text(ctx.confidentiality).toUpperCase()==="BOARD_RESTRICTED"&&!ctx.canReadRestrictedRecords)throw new HttpsError("permission-denied","This Board-restricted meeting record is available only to authorised governance readers.");
  if(!["TRANSCRIPT","MINUTES_DRAFT","MINUTES_FINAL","DECISION_REGISTER","ATTENDANCE_REGISTER","OTHER"].includes(type))throw new HttpsError("invalid-argument","Unsupported meeting record type.");
  if(!content)throw new HttpsError("invalid-argument","Record content is empty.");
  if(content.length>900000)throw new HttpsError("invalid-argument","Text record exceeds the 900,000 character limit. Store large files through the controlled Documents Portal.");
  if(type==="MINUTES_FINAL"){const approvalId=text(req.data?.approvalReference);if(!approvalId)throw new HttpsError("failed-precondition","Final minutes require an approved authorization record ID. Capture them as a draft until approved.");const approvalSnap=await db.collection("authorizationRequests").doc(approvalId).get();if(!approvalSnap.exists)throw new HttpsError("failed-precondition","The referenced authorization record was not found.");const approval=approvalSnap.data()||{};if(!["approved","authorized","completed"].includes(text(approval.status).toLowerCase())||approval.meetingId!==meetingId)throw new HttpsError("failed-precondition","The authorization record must be approved and linked to this meeting before final minutes can be captured.");}
- const now=new Date(),retentionYears=RETENTION_YEARS[ctx.category]||3,retainUntil=addYears(now,retentionYears);
+ const now=new Date(),retentionYears=RETENTION_YEARS[ctx.category]||10,retainUntil=addYears(now,retentionYears);
  const ref=db.collection("meetingRecords").doc();
  const digest=hash(content);
- const data={meetingId,meetingReference:text(ctx.meeting.reference||ctx.meeting.title),meetingTitle:text(ctx.meeting.title),meetingCategory:ctx.category,meetingPolicyId:ctx.category,recordType:type,recordLabel:recordLabel(type),title:title||recordLabel(type),content,contentHash:digest,integrityAlgorithm:"SHA-256",integrityStatus:"VERIFIED_AT_CAPTURE",version:1,status:"Active",confidentialityClass:ctx.confidentiality,storageDestination:"FIRESTORE_MEETING_RECORDS",storagePath:null,documentPortalRequiredForBinary:true,approvalReference:text(req.data?.approvalReference)||null,legalHold:false,retentionYears,retainUntil,retentionPolicyVersion:"IRPA-MEETING-RETENTION-1.0",capturedByUid:ctx.uid,capturedByEmail:ctx.email||null,capturedAt:FieldValue.serverTimestamp(),createdAt:FieldValue.serverTimestamp(),updatedAt:FieldValue.serverTimestamp(),deletedAt:null,deletionStatus:"NOT_ELIGIBLE"};
+ const data={meetingId,meetingReference:text(ctx.meeting.reference||ctx.meeting.title),meetingTitle:text(ctx.meeting.title),meetingCategory:ctx.category,meetingPolicyId:ctx.category,recordType:type,recordLabel:recordLabel(type),title:title||recordLabel(type),content,contentHash:digest,integrityAlgorithm:"SHA-256",integrityStatus:"VERIFIED_AT_CAPTURE",version:1,status:"Active",confidentialityClass:ctx.confidentiality,storageDestination:"FIRESTORE_MEETING_RECORDS",storagePath:null,documentPortalRequiredForBinary:true,approvalReference:text(req.data?.approvalReference)||null,legalHold:false,retentionYears,retainUntil,retentionPolicyVersion:"IRPA-MEETING-RETENTION-2.0-MINIMUM-10-YEARS",capturedByUid:ctx.uid,capturedByEmail:ctx.email||null,capturedAt:FieldValue.serverTimestamp(),createdAt:FieldValue.serverTimestamp(),updatedAt:FieldValue.serverTimestamp(),deletedAt:null,deletionStatus:"NOT_ELIGIBLE"};
  await ref.set(data);
  await audit("MEETING_RECORD_CAPTURED",ctx,ref.id,{recordType:type,contentHash:digest,retentionYears,retainUntil:retainUntil.toISOString(),storageDestination:data.storageDestination});
  return {ok:true,recordId:ref.id,recordType:type,contentHash:digest,integrityStatus:data.integrityStatus,retentionYears,retainUntil:retainUntil.toISOString(),storageDestination:data.storageDestination};
@@ -64,7 +70,7 @@ exports.captureMeetingRecord=onCall({region:"us-central1",timeoutSeconds:30},asy
 exports.translateMeetingTranscript=onCall({region:"us-central1",timeoutSeconds:120,memory:"512MiB"},async req=>{
  const meetingId=text(req.data?.meetingId),content=text(req.data?.content),targetLanguage=text(req.data?.targetLanguage).toLowerCase();
  const ctx=await context(req,meetingId);
- if(!ctx.canRead)throw new HttpsError("permission-denied","Only an authorised meeting participant or subscriber may translate these proceedings.");
+ if(!ctx.canRead||(text(ctx.confidentiality).toUpperCase()==="BOARD_RESTRICTED"&&!ctx.canReadRestrictedRecords))throw new HttpsError("permission-denied","Meeting Portal access and the applicable Board confidentiality authority are required to translate these proceedings.");
  if(!content)throw new HttpsError("invalid-argument","Transcript text is required.");
  if(content.length>30000)throw new HttpsError("invalid-argument","Translate transcript sections of 30,000 characters or fewer.");
  const allowed=new Set(["sw","en","fr","es","pt","ar","hi","zh","de","it","ja"]);
@@ -87,15 +93,15 @@ exports.translateMeetingTranscript=onCall({region:"us-central1",timeoutSeconds:1
 exports.saveLiveMeetingProceedings=onCall({region:"us-central1",timeoutSeconds:30},async req=>{
  const meetingId=text(req.data?.meetingId),content=text(req.data?.content);
  const ctx=await context(req,meetingId);
- if(!ctx.canRead)throw new HttpsError("permission-denied","Only an authorised meeting participant or subscriber may save live proceedings.");
+ if(!ctx.canRead||(text(ctx.confidentiality).toUpperCase()==="BOARD_RESTRICTED"&&!ctx.canReadRestrictedRecords))throw new HttpsError("permission-denied","Meeting Portal access and the applicable Board confidentiality authority are required to save these proceedings.");
  if(text(ctx.meeting.status).toLowerCase()!=="in progress")throw new HttpsError("failed-precondition","Live proceedings auto-save is only available while the registered meeting status is In Progress.");
  if(TERMINAL.has(text(ctx.meeting.status).toLowerCase()))throw new HttpsError("failed-precondition","Proceedings cannot be appended to a closed or cancelled meeting.");
  if(!content)throw new HttpsError("invalid-argument","Live proceedings transcript is empty.");
  if(content.length>900000)throw new HttpsError("invalid-argument","Transcript exceeds the 900,000 character limit.");
  const recordId="live-transcript-"+hash(meetingId+":"+ctx.uid).slice(0,32);
  const ref=db.collection("meetingRecords").doc(recordId),prior=await ref.get(),now=new Date();
- const retentionYears=RETENTION_YEARS[ctx.category]||3,digest=hash(content);
- const data={meetingId,meetingReference:text(ctx.meeting.meetingReference||ctx.meeting.reference||ctx.meeting.title),meetingTitle:text(ctx.meeting.title),meetingCategory:ctx.category,meetingPolicyId:ctx.category,recordType:"SUBSCRIBER_TRANSCRIPT_DRAFT",recordLabel:"Live Proceedings Transcript Draft",title:"Live Proceedings — "+text(ctx.meeting.title||"IRPA Meeting"),content,contentHash:digest,integrityAlgorithm:"SHA-256",integrityStatus:"VERIFIED_AT_CAPTURE",version:Number(prior.data()?.version||0)+1,status:"Active",confidentialityClass:ctx.confidentiality,storageDestination:"FIRESTORE_MEETING_RECORDS",draftOnly:true,approved:false,approvalStatus:"NOT_SUBMITTED",requiresHumanReview:true,createdFrom:"IRPA_LIVE_PROCEEDINGS_AUTO_CAPTURE",liveCapture:true,legalHold:false,retentionYears,retainUntil:addYears(now,retentionYears),retentionPolicyVersion:"IRPA-MEETING-RETENTION-1.0",capturedByUid:ctx.uid,capturedByEmail:ctx.email||null,capturedAt:FieldValue.serverTimestamp(),createdAt:prior.exists?(prior.data()?.createdAt||FieldValue.serverTimestamp()):FieldValue.serverTimestamp(),updatedAt:FieldValue.serverTimestamp(),deletedAt:null,deletionStatus:"NOT_ELIGIBLE"};
+ const retentionYears=RETENTION_YEARS[ctx.category]||10,digest=hash(content);
+ const data={meetingId,meetingReference:text(ctx.meeting.meetingReference||ctx.meeting.reference||ctx.meeting.title),meetingTitle:text(ctx.meeting.title),meetingCategory:ctx.category,meetingPolicyId:ctx.category,recordType:"SUBSCRIBER_TRANSCRIPT_DRAFT",recordLabel:"Live Proceedings Transcript Draft",title:"Live Proceedings — "+text(ctx.meeting.title||"IRPA Meeting"),content,contentHash:digest,integrityAlgorithm:"SHA-256",integrityStatus:"VERIFIED_AT_CAPTURE",version:Number(prior.data()?.version||0)+1,status:"Active",confidentialityClass:ctx.confidentiality,storageDestination:"FIRESTORE_MEETING_RECORDS",draftOnly:true,approved:false,approvalStatus:"NOT_SUBMITTED",requiresHumanReview:true,createdFrom:"IRPA_LIVE_PROCEEDINGS_AUTO_CAPTURE",liveCapture:true,legalHold:false,retentionYears,retainUntil:addYears(now,retentionYears),retentionPolicyVersion:"IRPA-MEETING-RETENTION-2.0-MINIMUM-10-YEARS",capturedByUid:ctx.uid,capturedByEmail:ctx.email||null,capturedAt:FieldValue.serverTimestamp(),createdAt:prior.exists?(prior.data()?.createdAt||FieldValue.serverTimestamp()):FieldValue.serverTimestamp(),updatedAt:FieldValue.serverTimestamp(),deletedAt:null,deletionStatus:"NOT_ELIGIBLE"};
  await ref.set(data,{merge:true});
  await audit("LIVE_MEETING_PROCEEDINGS_AUTOSAVED",ctx,recordId,{contentHash:digest,version:data.version,characters:content.length,requiresHumanReview:true});
  return{ok:true,recordId,contentHash:digest,version:data.version,updated:true,draftOnly:true,requiresHumanReview:true};
@@ -103,11 +109,11 @@ exports.saveLiveMeetingProceedings=onCall({region:"us-central1",timeoutSeconds:3
 exports.saveMeetingAssistantDraft=onCall({region:"us-central1",timeoutSeconds:30},async req=>{
  const meetingId=text(req.data?.meetingId),type=text(req.data?.recordType).toUpperCase(),content=text(req.data?.content),title=text(req.data?.title);
  const ctx=await context(req,meetingId);
- if(!ctx.canRead)throw new HttpsError("permission-denied","Only an authorised participant or subscriber may save an AI Meeting Assistant draft.");
+ if(!ctx.canRead||(text(ctx.confidentiality).toUpperCase()==="BOARD_RESTRICTED"&&!ctx.canReadRestrictedRecords))throw new HttpsError("permission-denied","Meeting Portal access and the applicable Board confidentiality authority are required to save this assistant draft.");
  if(!["AI_MINUTES_DRAFT","AI_SUMMARY_DRAFT","SUBSCRIBER_TRANSCRIPT_DRAFT"].includes(type))throw new HttpsError("invalid-argument","Only assistant drafts and subscriber transcript drafts may be saved through this operation.");
  if(!content)throw new HttpsError("invalid-argument","Draft content is empty.");
  if(content.length>900000)throw new HttpsError("invalid-argument","Draft exceeds the 900,000 character limit.");
- const now=new Date(),retentionYears=RETENTION_YEARS[ctx.category]||3,retainUntil=addYears(now,retentionYears);
+ const now=new Date(),retentionYears=RETENTION_YEARS[ctx.category]||10,retainUntil=addYears(now,retentionYears);
  const ref=db.collection("meetingRecords").doc(),digest=hash(content);
  const data={
   meetingId,meetingReference:text(ctx.meeting.meetingReference||ctx.meeting.reference||ctx.meeting.title),
@@ -119,7 +125,7 @@ exports.saveMeetingAssistantDraft=onCall({region:"us-central1",timeoutSeconds:30
   storagePath:text(req.data?.driveArchive?.storagePath)||null,driveArchive:req.data?.driveArchive&&typeof req.data.driveArchive==="object"?{provider:"Google Drive",meetingCategory:ctx.category,folderId:text(req.data.driveArchive.folderId),folderUrl:text(req.data.driveArchive.folderUrl),fileId:text(req.data.driveArchive.fileId),webViewLink:text(req.data.driveArchive.webViewLink),fileName:text(req.data.driveArchive.fileName),storagePath:text(req.data.driveArchive.storagePath),contentType:text(req.data.driveArchive.contentType),fileSize:Number(req.data.driveArchive.fileSize||0)}:null,documentPortalRequiredForBinary:true,draftOnly:true,approved:false,
   approvalStatus:"NOT_SUBMITTED",requiresHumanReview:true,
   createdFrom:"IRPA_AI_MEETING_ASSISTANT",legalHold:false,retentionYears,retainUntil,
-  retentionPolicyVersion:"IRPA-MEETING-RETENTION-1.0",capturedByUid:ctx.uid,capturedByEmail:ctx.email||null,
+  retentionPolicyVersion:"IRPA-MEETING-RETENTION-2.0-MINIMUM-10-YEARS",capturedByUid:ctx.uid,capturedByEmail:ctx.email||null,
   capturedAt:FieldValue.serverTimestamp(),createdAt:FieldValue.serverTimestamp(),updatedAt:FieldValue.serverTimestamp(),
   deletedAt:null,deletionStatus:"NOT_ELIGIBLE"
  };
@@ -131,7 +137,9 @@ exports.listMeetingRecords=onCall({region:"us-central1",timeoutSeconds:30},async
  const meetingId=text(req.data?.meetingId),ctx=await context(req,meetingId);
  if(!ctx.canRead)throw new HttpsError("permission-denied","You are not authorised to list records for this meeting.");
  const snap=await db.collection("meetingRecords").where("meetingId","==",meetingId).get();
- const records=snap.docs.map(d=>({id:d.id,...d.data()})).filter(r=>r.status==="Active").sort((a,b)=>(b.capturedAt?.toMillis?.()||0)-(a.capturedAt?.toMillis?.()||0));
+ const sourceRecords=snap.docs.map(d=>({id:d.id,ref:d.ref,...d.data()})).filter(r=>r.status==="Active");
+ for(const row of sourceRecords){const capturedAt=row.capturedAt?.toDate?.()||row.createdAt?.toDate?.()||new Date(),requiredUntil=addYears(capturedAt,10),existingUntil=row.retainUntil?.toDate?.()||new Date(0);if(Number(row.retentionYears||0)<10||existingUntil<requiredUntil){await row.ref.update({retentionYears:10,retainUntil:requiredUntil,retentionPolicyVersion:"IRPA-MEETING-RETENTION-2.0-MINIMUM-10-YEARS",retentionReconciledAt:FieldValue.serverTimestamp(),updatedAt:FieldValue.serverTimestamp()});row.retentionYears=10;row.retainUntil=requiredUntil;row.retentionPolicyVersion="IRPA-MEETING-RETENTION-2.0-MINIMUM-10-YEARS";}}
+ const records=sourceRecords.filter(r=>text(r.confidentialityClass||ctx.confidentiality).toUpperCase()!=="BOARD_RESTRICTED"||ctx.canReadRestrictedRecords).sort((a,b)=>(b.capturedAt?.toMillis?.()||0)-(a.capturedAt?.toMillis?.()||0));
  await audit("MEETING_RECORD_REGISTER_VIEWED",ctx,null,{recordCount:records.length});
  return {ok:true,records:records.map(r=>({id:r.id,title:r.title,recordType:r.recordType,recordLabel:r.recordLabel,contentHash:r.contentHash,integrityStatus:r.integrityStatus,confidentialityClass:r.confidentialityClass,version:r.version,capturedAt:r.capturedAt?.toDate?.().toISOString?.()||null,retainUntil:r.retainUntil?.toDate?.().toISOString?.()||null,retentionYears:r.retentionYears,legalHold:r.legalHold===true,deletionStatus:r.deletionStatus||"NOT_ELIGIBLE",storageDestination:r.storageDestination}))};
 });
@@ -141,7 +149,7 @@ exports.retrieveMeetingRecord=onCall({region:"us-central1",timeoutSeconds:30},as
  const snap=await db.collection("meetingRecords").doc(recordId).get();
  if(!snap.exists)throw new HttpsError("not-found","Meeting record not found.");
  const record={id:snap.id,...snap.data()},ctx=await context(req,record.meetingId);
- if(!ctx.canRead||record.status!=="Active")throw new HttpsError("permission-denied","This record is not available to this identity or is no longer active.");
+ if(!ctx.canRead||record.status!=="Active"||(text(record.confidentialityClass||ctx.confidentiality).toUpperCase()==="BOARD_RESTRICTED"&&!ctx.canReadRestrictedRecords))throw new HttpsError("permission-denied","This record is not available to this identity or is no longer active.");
  const actual=hash(record.content||"");
  if(actual!==record.contentHash) {await audit("MEETING_RECORD_INTEGRITY_FAILURE",ctx,recordId,{expectedHash:record.contentHash||null,actualHash:actual});throw new HttpsError("data-loss","Record integrity verification failed. Access is blocked and an audit event was recorded.");}
  await audit("MEETING_RECORD_RETRIEVED",ctx,recordId,{recordType:record.recordType,contentHash:actual});
@@ -152,7 +160,7 @@ exports.updateMeetingRecordProtection=onCall({region:"us-central1",timeoutSecond
  const ref=db.collection("meetingRecords").doc(recordId),snap=await ref.get();
  if(!snap.exists)throw new HttpsError("not-found","Meeting record not found.");
  const record=snap.data(),ctx=await context(req,record.meetingId);
- if(!ctx.canManage)throw new HttpsError("permission-denied","Only the meeting administrator, chairperson or secretary may change record protection.");
+ if(!ctx.canManage||(text(record.confidentialityClass||ctx.confidentiality).toUpperCase()==="BOARD_RESTRICTED"&&!ctx.canReadRestrictedRecords))throw new HttpsError("permission-denied","Only an authorised governance reader with record-protection authority may change meeting-record protection.");
  if(record.status!=="Active")throw new HttpsError("failed-precondition","Only active records can change protection.");
  if(operation==="LEGAL_HOLD"){
   const held=req.data?.enabled===true;
@@ -164,7 +172,7 @@ exports.updateMeetingRecordProtection=onCall({region:"us-central1",timeoutSecond
   const years=Number(req.data?.retentionYears);
   if(!Number.isInteger(years)||years<1||years>30)throw new HttpsError("invalid-argument","Retention extension must be an integer from 1 to 30 years.");
   const until=addYears(new Date(),years);
-  await ref.update({retentionYears:years,retainUntil:until,retentionPolicyVersion:"IRPA-MEETING-RETENTION-1.0-EXTENDED",retentionExtendedByUid:ctx.uid,retentionExtendedAt:FieldValue.serverTimestamp(),updatedAt:FieldValue.serverTimestamp()});
+  await ref.update({retentionYears:years,retainUntil:until,retentionPolicyVersion:"IRPA-MEETING-RETENTION-2.0-MINIMUM-10-YEARS-EXTENDED",retentionExtendedByUid:ctx.uid,retentionExtendedAt:FieldValue.serverTimestamp(),updatedAt:FieldValue.serverTimestamp()});
   await audit("MEETING_RECORD_RETENTION_EXTENDED",ctx,recordId,{retentionYears:years,retainUntil:until.toISOString()});
   return {ok:true,retentionYears:years,retainUntil:until.toISOString()};
  }
@@ -175,7 +183,7 @@ exports.disposeMeetingRecord=onCall({region:"us-central1",timeoutSeconds:30},asy
  const ref=db.collection("meetingRecords").doc(recordId),snap=await ref.get();
  if(!snap.exists)throw new HttpsError("not-found","Meeting record not found.");
  const record=snap.data(),ctx=await context(req,record.meetingId);
- if(!ctx.canManage)throw new HttpsError("permission-denied","Only the meeting administrator, chairperson or secretary may request record disposition.");
+ if(!ctx.canManage||(text(record.confidentialityClass||ctx.confidentiality).toUpperCase()==="BOARD_RESTRICTED"&&!ctx.canReadRestrictedRecords))throw new HttpsError("permission-denied","Only an authorised governance reader with record-disposition authority may request record disposition.");
  if(operation==="REQUEST_DELETE"){
   await ref.update({deletionStatus:"PENDING_REVIEW",deletionRequestedByUid:ctx.uid,deletionRequestedAt:FieldValue.serverTimestamp(),deletionReason:text(req.data?.reason)||"Retention/disposition review",updatedAt:FieldValue.serverTimestamp()});
   await audit("MEETING_RECORD_DELETE_REQUESTED",ctx,recordId,{reason:text(req.data?.reason)||null});
@@ -216,17 +224,11 @@ exports.compileAndEmailMeetingReport=onCall({
  const meetingId=text(request.data?.meetingId),minutesText=text(request.data?.minutesText);
  if(!meetingId)throw new HttpsError("invalid-argument","Meeting ID is required.");
  if(minutesText.length>150000)throw new HttpsError("invalid-argument","Compiled minutes exceed the 150,000 character limit.");
- const meetingSnap=await db.collection("meetings").doc(meetingId).get();
- if(!meetingSnap.exists)throw new HttpsError("not-found","The registered meeting could not be found.");
- const meeting={id:meetingSnap.id,...meetingSnap.data()};
- const isAdmin=admin(request);
- const isInitiator=text(meeting.initiatorUid)===uid;
- const isChair=text(meeting.chairpersonUid)===uid||text(meeting.chairpersonEmail).toLowerCase()===email;
- const isSecretary=text(meeting.secretaryUid)===uid||text(meeting.secretaryEmail).toLowerCase()===email;
- let activeAdmin=isAdmin;
- if(!activeAdmin){const adminSnap=await db.collection("adminProfiles").doc(uid).get();activeAdmin=adminSnap.exists&&adminSnap.data()?.active===true;}
- if(!activeAdmin&&!isInitiator&&!isChair&&!isSecretary)throw new HttpsError("permission-denied","Only the authorised meeting initiator, chairperson, secretary or administrator may compile and distribute the meeting report.");
- if(!text(meeting.registerStatus))throw new HttpsError("failed-precondition","The meeting is not registered and cannot be reported.");
+ const ctx=await context(request,meetingId);
+ const meeting=ctx.meeting;
+ if(!ctx.canSecretariat)throw new HttpsError("permission-denied","Only the appointed Chairperson or Secretary may compile and distribute the meeting report.");
+ if(text(ctx.confidentiality).toUpperCase()==="BOARD_RESTRICTED"&&!ctx.canReadRestrictedRecords)throw new HttpsError("permission-denied","This Board-restricted meeting report is available only to authorised governance readers.");
+  if(!text(meeting.registerStatus))throw new HttpsError("failed-precondition","The meeting is not registered and cannot be reported.");
  const [resolutionSnap,decisionSnap,voteSnap,subscriptionSnap,participantSnap,recordSnap]=await Promise.all([
   db.collection("resolutions").where("meetingId","==",meetingId).get().catch(()=>({docs:[]})),
   db.collection("decisions").where("meetingId","==",meetingId).get().catch(()=>({docs:[]})),
@@ -336,7 +338,7 @@ exports.compileAndEmailMeetingReport=onCall({
  const sentCount=results.filter(r=>r.status==="Sent").length,failedCount=results.filter(r=>r.status!=="Sent").length;
  await dispatchRef.set({status:failedCount?"Partially Failed":"Sent",sentCount,failedCount,recipientCount:recipients.length,recipients:results,completedAt:FieldValue.serverTimestamp(),updatedAt:FieldValue.serverTimestamp()},{merge:true});
  const recordRef=db.collection("meetingRecords").doc();
- await recordRef.set({meetingId,meetingReference,meetingTitle:text(meeting.title),meetingCategory:categoryOf(meeting),meetingPolicyId:categoryOf(meeting),recordType:"MEETING_REPORT",recordLabel:"Compiled Meeting Report",title:"Standard Meeting Report — "+(text(meeting.title)||meetingReference),content:report,contentHash:hash(report),integrityAlgorithm:"SHA-256",integrityStatus:"VERIFIED_AT_CAPTURE",version:1,status:"Active",confidentialityClass:text(meeting.confidentialityClass)||(categoryOf(meeting)==="GOVERNANCE"?"BOARD_RESTRICTED":"INTERNAL"),storageDestination:"FIRESTORE_MEETING_RECORDS",approvalStatus:reportStatus,draftOnly:!reportStatus.startsWith("Compiled report — approval status recorded"),requiresHumanReview:true,retentionYears:RETENTION_YEARS[categoryOf(meeting)]||3,retainUntil:addYears(new Date(),RETENTION_YEARS[categoryOf(meeting)]||3),retentionPolicyVersion:"IRPA-MEETING-RETENTION-1.0",capturedByUid:uid,capturedByEmail:email||null,capturedAt:FieldValue.serverTimestamp(),createdAt:FieldValue.serverTimestamp(),updatedAt:FieldValue.serverTimestamp(),deletedAt:null,deletionStatus:"NOT_ELIGIBLE"});
+ await recordRef.set({meetingId,meetingReference,meetingTitle:text(meeting.title),meetingCategory:categoryOf(meeting),meetingPolicyId:categoryOf(meeting),recordType:"MEETING_REPORT",recordLabel:"Compiled Meeting Report",title:"Standard Meeting Report — "+(text(meeting.title)||meetingReference),content:report,contentHash:hash(report),integrityAlgorithm:"SHA-256",integrityStatus:"VERIFIED_AT_CAPTURE",version:1,status:"Active",confidentialityClass:text(meeting.confidentialityClass)||(categoryOf(meeting)==="GOVERNANCE"?"BOARD_RESTRICTED":"INTERNAL"),storageDestination:"FIRESTORE_MEETING_RECORDS",approvalStatus:reportStatus,draftOnly:!reportStatus.startsWith("Compiled report — approval status recorded"),requiresHumanReview:true,retentionYears:RETENTION_YEARS[categoryOf(meeting)]||10,retainUntil:addYears(new Date(),RETENTION_YEARS[categoryOf(meeting)]||10),retentionPolicyVersion:"IRPA-MEETING-RETENTION-2.0-MINIMUM-10-YEARS",capturedByUid:uid,capturedByEmail:email||null,capturedAt:FieldValue.serverTimestamp(),createdAt:FieldValue.serverTimestamp(),updatedAt:FieldValue.serverTimestamp(),deletedAt:null,deletionStatus:"NOT_ELIGIBLE"});
  await audit("MEETING_REPORT_COMPILED_AND_DISTRIBUTED",{uid,email,meeting,category:categoryOf(meeting),confidentiality:text(meeting.confidentialityClass)||"INTERNAL"},recordRef.id,{reportHash,dispatchId,recipientCount:recipients.length,sentCount,failedCount,aggregatedVoteCounts:voteCounts});
  return{ok:failedCount===0,reportRecordId:recordRef.id,dispatchId,reportHash,recipientCount:recipients.length,sentCount,failedCount,status:failedCount?"Partially Failed":"Sent"};
 });
@@ -346,7 +348,8 @@ function workingDocumentId(meetingId,documentId){return hash(String(meetingId)+"
 exports.registerMeetingWorkingDocument=onCall({region:"us-central1",timeoutSeconds:30},async req=>{
  const meetingId=text(req.data?.meetingId),documentId=text(req.data?.documentId);
  const ctx=await context(req,meetingId);
- if(!ctx.canManage)throw new HttpsError("permission-denied","Only the meeting host, chairperson or secretary may add working documents.");
+ if(!ctx.canSecretariat)throw new HttpsError("permission-denied","Only the appointed Chairperson or Secretary may register meeting working documents.");
+ if(text(ctx.confidentiality).toUpperCase()==="BOARD_RESTRICTED"&&!ctx.canReadRestrictedRecords)throw new HttpsError("permission-denied","This Board-restricted meeting is available only to authorised governance readers.");
  if(!documentId)throw new HttpsError("invalid-argument","Document ID is required.");
  const snap=await db.collection("documents").doc(documentId).get();
  if(!snap.exists)throw new HttpsError("not-found","The controlled document was not found.");
@@ -364,6 +367,7 @@ exports.listMeetingWorkingDocuments=onCall({region:"us-central1",timeoutSeconds:
  const docs=[];
  for(const row of snap.docs){
   const d=row.data()||{};
+  if(text(d.classification||ctx.confidentiality).toLowerCase()==="board_restricted"&&!ctx.canReadRestrictedRecords)continue;
   const reviews=await db.collection("meetingDocumentReviews").where("workingDocumentId","==",row.id).get();
   docs.push({id:row.id,documentId:text(d.documentId),title:text(d.title),reference:text(d.reference),fileName:text(d.fileName),webViewLink:text(d.webViewLink),classification:text(d.classification||"INTERNAL"),reviews:reviews.docs.map(r=>{const v=r.data()||{};return{id:r.id,reviewType:text(v.reviewType),comment:text(v.comment),status:text(v.status),reviewerName:text(v.reviewerName),createdAt:v.createdAt?.toDate?.()?.toISOString?.()||null};})});
  }
@@ -372,11 +376,12 @@ exports.listMeetingWorkingDocuments=onCall({region:"us-central1",timeoutSeconds:
 exports.submitMeetingDocumentReview=onCall({region:"us-central1",timeoutSeconds:30},async req=>{
  const meetingId=text(req.data?.meetingId),id=text(req.data?.workingDocumentId),type=text(req.data?.reviewType).toUpperCase(),comment=text(req.data?.comment);
  const ctx=await context(req,meetingId);
- if(!ctx.canRead||!ctx.participant&&!ctx.canManage)throw new HttpsError("permission-denied","Only an authorised meeting participant may review working documents.");
+ if(!ctx.canRead)throw new HttpsError("permission-denied","Meeting Portal access is required to review working documents.");
  if(!id||!["ASSESSMENT","COMMENT","SIGNATURE_REQUEST"].includes(type))throw new HttpsError("invalid-argument","A working document and supported review type are required.");
  if(!comment||comment.length>5000)throw new HttpsError("invalid-argument","Enter a comment or assessment of up to 5,000 characters.");
  const docRef=db.collection("meetingWorkingDocuments").doc(id),docSnap=await docRef.get();
  if(!docSnap.exists||text(docSnap.data()?.meetingId)!==meetingId||text(docSnap.data()?.status)!=="ACTIVE")throw new HttpsError("not-found","Active working document not found for this meeting.");
+ if(text(docSnap.data()?.classification||ctx.confidentiality).toLowerCase()==="board_restricted"&&!ctx.canReadRestrictedRecords)throw new HttpsError("permission-denied","This Board-restricted working document is available only to authorised governance readers.");
  const reviewRef=db.collection("meetingDocumentReviews").doc();
  const memberSnap=await db.collection("members").doc(ctx.uid).get(),employeeSnap=await db.collection("employees").doc(ctx.uid).get();
  const participantSnap=await db.collection("participants").where("meetingId","==",meetingId).get();

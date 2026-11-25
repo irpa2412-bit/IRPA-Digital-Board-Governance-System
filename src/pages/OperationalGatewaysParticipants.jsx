@@ -22,7 +22,7 @@ export default function OperationalGatewaysParticipants(){
   setErr("");
   try{
   const includeParticipantRecords=participantEnvironmentConfirmed();
-  // Resolve category/role-authorized meetings first, then scope dependent registers to those meetings.
+  // Resolve the full Meeting Portal register for every IRPA identity, then scope dependent participant records to those meetings.
   const meetingsResult=await getAccessibleMeetingRecords();
   const accessibleMeetings=Array.isArray(meetingsResult)?meetingsResult:[];
   const accessibleMeetingIds=accessibleMeetings.map(meeting=>meeting.id).filter(Boolean);

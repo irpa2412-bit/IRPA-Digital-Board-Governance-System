@@ -11,9 +11,9 @@ const registeredEmail=p=>text(p.email||p.participantEmail||p.invitedEmail||p.sub
 const registeredUid=p=>[p.uid,p.userId,p.participantUid,p.memberUid,p.invitedUid].map(text).filter(Boolean);
 const signatureId=(meetingId,participantId)=>crypto.createHash("sha256").update(meetingId+"\0"+participantId).digest("hex");
 function canManage(req,m){
- const uid=req.auth.uid,email=text(req.auth.token.email).toLowerCase();
- return isAdmin(req)||[m.initiatorUid,m.chairpersonUid,m.secretaryUid,m.createdByUid].map(text).includes(uid)||
-   !!email&&[m.initiatorEmail,m.chairpersonEmail,m.secretaryEmail].map(v=>text(v).toLowerCase()).includes(email);
+ const uid=req.auth.uid;
+ const transitionActive=m.transitionCommitteeActive===true&&text(m.status).toLowerCase()!=="in progress"&&text(m.proceedingsStatus).toLowerCase()!=="in progress";
+ return text(m.meetingAdministratorUid)===uid||(transitionActive&&text(m.transitionAdministratorUid)===uid);
 }
 async function getMeeting(req,meetingId){
  if(!req.auth?.uid)throw new HttpsError("unauthenticated","Sign in before accessing the attendance register.");
@@ -84,10 +84,12 @@ exports.getMeetingAttendanceRegister=onCall({region:"us-central1",timeoutSeconds
   db.collection("meetingAttendanceSignatures").where("meetingId","==",meetingId).get()
  ]);
  const own=participantSnap.docs.find(d=>matchesIdentity(req,{id:d.id,...d.data()}));
- if(!manager&&!own)throw new HttpsError("permission-denied","You are not registered as a participant in this meeting.");
+ const [memberSnap,employeeSnap]=await Promise.all([db.collection("members").doc(req.auth.uid).get(),db.collection("employees").doc(req.auth.uid).get()]);
+ const identityInIrpa=isAdmin(req)||memberSnap.exists||employeeSnap.exists;
+ if(!identityInIrpa&&!own)throw new HttpsError("permission-denied","An IRPA identity or a verified invitation to this meeting is required.");
  const signatures=new Map(signatureSnap.docs.map(d=>[text(d.data()?.participantId),{id:d.id,...d.data(),signedAt:d.data()?.signedAt?.toDate?.()?.toISOString()||null}]));
  const records=participantSnap.docs.map(d=>({id:d.id,...d.data()}))
-  .filter(p=>manager||matchesIdentity(req,p))
+  .filter(p=>identityInIrpa||manager||matchesIdentity(req,p))
   .map(p=>{
    const sig=signatures.get(p.id);
    return {participantId:p.id,name:registeredName(p),role:text(p.role||p.participantRole||p.participantType),email:registeredEmail(p),attendanceStatus:text(p.attendanceStatus||p.status)||"Unmarked",signed:!!sig,signatureMethod:sig?.signatureMethod||null,typedName:sig?.typedName||null,signedAt:sig?.signedAt||null,signatureId:sig?.id||null};

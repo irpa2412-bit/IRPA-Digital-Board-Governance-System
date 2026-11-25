@@ -16,7 +16,7 @@ test("working document upload UI is host-controller gated and meeting-scoped", (
 
 test("server validates host authority and meeting/document linkage before registering uploads", () => {
   assert.match(backend, /exports\.registerMeetingWorkingDocument=onCall/);
-  assert.match(backend, /if\(!ctx\.canManage\)throw new HttpsError\("permission-denied","Only the meeting host, chairperson or secretary may add working documents\."/);
+  assert.match(backend, /if\(!ctx\.canSecretariat\)throw new HttpsError\("permission-denied","Only the appointed Chairperson or Secretary may register meeting working documents\."/);
   assert.match(backend, /text\(d\.meetingId\)!==meetingId/);
   assert.match(backend, /MEETING_WORKING_DOCUMENT_REGISTERED/);
   assert.match(exportsFile, /exports\.registerMeetingWorkingDocument = meetingWorkingDocuments\.registerMeetingWorkingDocument/);
@@ -24,7 +24,8 @@ test("server validates host authority and meeting/document linkage before regist
 
 test("only authorised meeting participants can submit bounded assessments/comments", () => {
   assert.match(backend, /exports\.submitMeetingDocumentReview=onCall/);
-  assert.match(backend, /if\(!ctx\.canRead\|\|!ctx\.participant&&!ctx\.canManage\)/);
+  assert.match(backend, /if\(!ctx\.canRead\)/);
+  assert.match(backend, /board_restricted.*!ctx\.canReadRestrictedRecords/);
   assert.match(backend, /\["ASSESSMENT","COMMENT","SIGNATURE_REQUEST"\]/);
   assert.match(backend, /comment\.length>5000/);
   assert.match(backend, /MEETING_WORKING_DOCUMENT_REVIEW_SUBMITTED/);

@@ -13,7 +13,7 @@ function safeJson(value){
   try{return JSON.parse(decoder.decode(value))}catch{return null}
 }
 
-export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",controller=false}){
+export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",controller=false,canJoin=false}){
  const roomRef=useRef(null),remoteRef=useRef(null),localRef=useRef(null);
  const[status,setStatus]=useState("READY"),[error,setError]=useState(""),[muted,setMuted]=useState(true),[camera,setCamera]=useState(false),[screen,setScreen]=useState(false),[hand,setHand]=useState(false),[moderator,setModerator]=useState(false),[recordingAllowed,setRecordingAllowed]=useState(false);
  const[participants,setParticipants]=useState([]),[messages,setMessages]=useState([]),[chat,setChat]=useState(""),[deviceReady,setDeviceReady]=useState(false),[deviceCheck,setDeviceCheck]=useState("NOT CHECKED"),[sessionId,setSessionId]=useState(""),[recordingStatus,setRecordingStatus]=useState("NOT_STARTED"),[recordingInfo,setRecordingInfo]=useState(null),[recordingBusy,setRecordingBusy]=useState(false);
@@ -45,7 +45,7 @@ export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",c
  async function connect(){
    if(!meeting?.id)return setError("Select an IRPA meeting first.");
    if(!auth.currentUser)return setError("Sign in to IRPA before joining the Meeting Room.");
-   if(!controller)return setError("Meeting control authority is required to join the live room.");
+   if(!canJoin)return setError("An appointment to this meeting or a verified invitation is required to join the live room.");
    if(roomRef.current)return;
    setError("");setStatus("AUTHORIZING");
    try{
@@ -137,7 +137,7 @@ export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",c
   finally{setRecordingBusy(false)}
  }
  const participantCount=participants.length;
- const readiness=useMemo(()=>status==="CONNECTED"?(deviceReady?"READY":"CHECK DEVICE"):(controller?"READY TO JOIN":"READ ONLY"),[status,deviceReady,controller]);
+ const readiness=useMemo(()=>status==="CONNECTED"?(deviceReady?"READY":"CHECK DEVICE"):(canJoin?"READY TO JOIN":"READ ONLY"),[status,deviceReady,canJoin]);
 
  return <section className="panel" style={{marginTop:18}}>
   <div className="panel-header">
@@ -164,7 +164,7 @@ export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",c
   </div>
   {error&&<div className="error-message action-feedback" style={{marginTop:12}}>{error}</div>}
   <div className="form-actions" style={{marginTop:14}}>
-   {status!=="CONNECTED"&&<button onClick={connect} disabled={!controller||status==="AUTHORIZING"}>{status==="AUTHORIZING"?"Authorizing…":"Join IRPA-DGBS Meeting Room"}</button>}
+   {status!=="CONNECTED"&&<button onClick={connect} disabled={!canJoin||status==="AUTHORIZING"}>{status==="AUTHORIZING"?"Authorizing…":"Join IRPA-DGBS Meeting Room"}</button>}
    {status==="CONNECTED"&&<>
     {controller&&recordingAllowed&&<button className={recordingStatus==="RECORDING"?"danger-button":"secondary-button"} onClick={recordingStatus==="RECORDING"?stopRecording:startRecording} disabled={recordingBusy||["STARTING","STOPPING"].includes(recordingStatus)}>{recordingBusy?(recordingStatus==="RECORDING"?"Stopping Recording…":"Working…"):recordingStatus==="RECORDING"?"Stop Recording":"Start Recording"}</button>}
     <button className="secondary-button" onClick={toggleMic}>{muted?"Unmute microphone":"Mute microphone"}</button>

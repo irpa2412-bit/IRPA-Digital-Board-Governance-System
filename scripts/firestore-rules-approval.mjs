@@ -8,6 +8,11 @@ function latestByTime(items) {
   }).at(-1);
 }
 
+export function findRulesCommitIds(prCommits, pathCommits) {
+  const prShas = new Set((Array.isArray(prCommits) ? prCommits : []).map(commit => commit?.sha).filter(Boolean));
+  return (Array.isArray(pathCommits) ? pathCommits : []).filter(commit => prShas.has(commit?.sha)).map(commit => commit.sha);
+}
+
 export function evaluateApproval({ changedFiles, labels, labelEvents, timeline, rulesCommitIds, allowedActors, apiError }) {
   if (apiError) return { pass: false, reason: `GitHub API verification failed; failing closed: ${apiError}` };
   if (!Array.isArray(changedFiles) || !Array.isArray(labels) || !Array.isArray(labelEvents) ||
@@ -96,9 +101,10 @@ async function main() {
   const [owner, name] = repo.split("/");
   const base = `${API}/repos/${owner}/${name}`;
   try {
-    const [changed, pr, events, commits, timeline] = await Promise.all([
+    const [changed, issue, pull, events, commits, timeline] = await Promise.all([
       apiPages(`${base}/pulls/${prNumber}/files?per_page=100`, token),
       apiJson(`${base}/issues/${prNumber}`, token),
+      apiJson(`${base}/pulls/${prNumber}`, token),
       apiPages(`${base}/issues/${prNumber}/events?per_page=100`, token),
       apiPages(`${base}/pulls/${prNumber}/commits?per_page=100`, token),
       apiPages(`${base}/issues/${prNumber}/timeline?per_page=100`, token)
@@ -108,18 +114,12 @@ async function main() {
       console.log("PASS: firestore.rules unchanged.");
       return;
     }
+    if (!pull.head?.sha) throw new Error("Pull request head SHA is missing; cannot verify rules history.");
     const allowedActors = await loadApprovers(base, token);
-    const rulesCommitIds = [];
-    for (const commit of commits) {
-      const detail = await apiJson(`${base}/commits/${commit.sha}`, token);
-      if (!Array.isArray(detail.files)) throw new Error(`Commit ${commit.sha} did not return a files array.`);
-      if (detail.files.length >= 300 && !detail.files.some(file => file.filename === "firestore.rules")) {
-        throw new Error(`Commit ${commit.sha} may have a truncated file list; cannot verify rules history.`);
-      }
-      if (detail.files.some(file => file.filename === "firestore.rules")) rulesCommitIds.push(commit.sha);
-    }
+    const pathCommits = await apiPages(`${base}/commits?path=firestore.rules&sha=${pull.head.sha}&per_page=100`, token);
+    const rulesCommitIds = findRulesCommitIds(commits, pathCommits);
     const result = evaluateApproval({
-      changedFiles, labels: (pr.labels || []).map(label => label.name),
+      changedFiles, labels: (issue.labels || []).map(label => label.name),
       labelEvents: events, timeline, rulesCommitIds, allowedActors
     });
     if (result.pass) { console.log(`PASS: ${result.reason}`); return; }

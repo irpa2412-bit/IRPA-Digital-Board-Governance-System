@@ -2489,8 +2489,21 @@ async function authorizeMeetingArchiveUser(env, claims, meetingId, meetingCatego
   const uid=String(claims.user_id||"");
   const email=String(claims.email||"").trim().toLowerCase();
   const adminEmail=String(env.AUTHORIZED_DRIVE_EMAIL||"").trim().toLowerCase();
-  if(claims.admin===true||(adminEmail&&email===adminEmail))return {meeting,category,uid,email,privilegedToken};
-  const directKeys=["initiatorUid","createdByUid","chairpersonUid","secretaryUid"];
+  const [memberDoc,employeeDoc,adminDoc]=await Promise.all([
+    uid?getFirestoreDocument(env,"members/"+uid,privilegedToken):null,
+    uid?getFirestoreDocument(env,"employees/"+uid,privilegedToken):null,
+    uid?getFirestoreDocument(env,"adminProfiles/"+uid,privilegedToken):null
+  ]);
+  const unpack=record=>record?Object.fromEntries(Object.entries(record.fields||{}).map(([k,v])=>[k,firestoreFieldValue(v)])):{};
+  const member=unpack(memberDoc),employee=unpack(employeeDoc),adminProfile=unpack(adminDoc);
+  const isAdmin=claims.admin===true||(adminEmail&&email===adminEmail)||adminProfile.active===true;
+  if(isAdmin)return {meeting,category,uid,email,privilegedToken};
+  const roles=[member.role,member.title,member.position,member.departmentalRole,member.boardPosition,...(Array.isArray(member.roles)?member.roles:[]),...(Array.isArray(member.assignedRoles)?member.assignedRoles:[]),...(Array.isArray(employee.roles)?employee.roles:[]),employee.role,employee.title,employee.position,employee.departmentalRole,employee.boardPosition].map(value=>String(value||"").trim().toLowerCase());
+  const governanceReader=member.boardMember===true||employee.boardMember===true||Boolean(member.boardPosition||employee.boardPosition)||String(member.department||"")==="Board of Directors"||String(employee.department||"")==="Board of Directors"||roles.some(role=>["board member","board chairperson","board secretary","secretary to the board","executive director","director internal oversight"].includes(role));
+  const confidentiality=String(meeting.confidentialityClass||(category==="GOVERNANCE"?"BOARD_RESTRICTED":"INTERNAL")).trim().toUpperCase();
+  if(confidentiality==="BOARD_RESTRICTED"&&!governanceReader)throw new Error("This Board-restricted meeting archive is available only to authorised governance readers.");
+  if(memberDoc||employeeDoc)return {meeting,category,uid,email,privilegedToken};
+  const directKeys=["initiatorUid","createdByUid","meetingChairpersonUid","meetingSecretaryUid","meetingAdministratorUid","transitionChairpersonUid","transitionSecretaryUid","transitionAdministratorUid","chairpersonUid","secretaryUid"];
   if(directKeys.some(key=>String(meeting[key]||"")===uid))return {meeting,category,uid,email,privilegedToken};
   const listedKeys=["participantUids","attendeeUids","memberUids","invitedUids","subscriberUids"];
   if(listedKeys.some(key=>Array.isArray(meeting[key])&&meeting[key].map(String).includes(uid)))return {meeting,category,uid,email,privilegedToken};
@@ -2500,7 +2513,7 @@ async function authorizeMeetingArchiveUser(env, claims, meetingId, meetingCatego
   if(subscriptions.some(row=>([row.uid,row.subscriberUid,row.userId,row.memberUid,row.participantUid].map(v=>String(v||"")).includes(uid)||(email&&[row.email,row.subscriberEmail,row.participantEmail].some(v=>String(v||"").trim().toLowerCase()===email)))&&!["revoked","cancelled","canceled","inactive","removed"].includes(String(row.status||"").toLowerCase())))return {meeting,category,uid,email,privilegedToken};
   const participants=await queryMeetingArchiveRecords(env,"participants",meetingId,privilegedToken);
   if(participants.some(row=>(String(row.participantUid||row.uid||row.userId||"")===uid||(email&&String(row.participantEmail||row.email||"").trim().toLowerCase()===email))&&!["revoked","cancelled","canceled","inactive","removed"].includes(String(row.status||"").toLowerCase())))return {meeting,category,uid,email,privilegedToken};
-  throw new Error("This account is not a registered participant or subscriber for the selected meeting.");
+  throw new Error("This account is not an IRPA identity or a verified invitee for the selected meeting.");
 }
 
 async function provisionMeetingCategoryArchive(request, env) {

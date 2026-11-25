@@ -34,6 +34,12 @@ beforeEach(async () => {
       status: "Active",
       role: "Staff"
     });
+    await db.doc("employees/inactive-staff").set({
+      uid: "inactive-staff",
+      email: "inactive@example.test",
+      status: "Suspended",
+      role: "Staff"
+    });
     await db.doc("adminProfiles/admin-user").set({ active: true, email: "admin@example.test" });
     await db.doc("systemSettings/actualDataAccess").set({enabled:true,status:"OPEN",finalTestsAttested:true});
   });
@@ -81,7 +87,90 @@ test("departmental registrar cannot edit a released meeting", async () => {
   }).firestore();
   await assertFails(db.doc("meetings/departmental-meeting").update({ title: "Unauthorised edit" }));
 });
-test("only administrator can delete a meeting", async () => {
+test("formal proceedings cannot begin until all three meeting-specific appointments are validated", async () => {
+  await testEnv.withSecurityRulesDisabled(async context => {
+    await context.firestore().doc("meetings/missing-leaders").set(meeting({
+      meetingCategory: "GENERAL",
+      meetingPolicyId: "GENERAL",
+      meetingType: "General Meeting",
+      registerStatus: "Registered",
+      status: "Scheduled",
+      proceedingsStatus: "Not Started",
+      meetingChairpersonUid: "chair-user",
+      meetingSecretaryUid: "",
+      meetingAdministratorUid: "",
+      transitionCommitteeActive: false
+    }));
+    await context.firestore().doc("meetings/complete-leaders").set(meeting({
+      meetingCategory: "GENERAL",
+      meetingPolicyId: "GENERAL",
+      meetingType: "General Meeting",
+      registerStatus: "Registered",
+      status: "Scheduled",
+      proceedingsStatus: "Not Started",
+      meetingChairpersonUid: "chair-user",
+      meetingSecretaryUid: "secretary-user",
+      meetingAdministratorUid: "administrator-user",
+      transitionCommitteeActive: false
+    }));
+  });
+  const chairDb = testEnv.authenticatedContext("chair-user", { email: "chair@example.test" }).firestore();
+  await assertFails(chairDb.doc("meetings/missing-leaders").update({
+    status: "In Progress",
+    proceedingsStatus: "In Progress"
+  }));
+  await assertSucceeds(chairDb.doc("meetings/complete-leaders").update({
+    status: "In Progress",
+    proceedingsStatus: "In Progress"
+  }));
+});
+
+test("meeting initiators can create invitations and participant records before proceedings; unassigned users cannot", async () => {
+  await testEnv.withSecurityRulesDisabled(async context => {
+    await context.firestore().doc("meetings/admin-controlled-meeting").set(meeting({
+      meetingCategory: "GENERAL",
+      meetingPolicyId: "GENERAL",
+      meetingType: "General Meeting",
+      initiatorUid: "staff-user",
+      meetingAdministratorUid: "meeting-admin"
+    }));
+  });
+  const initiatorDb = testEnv.authenticatedContext("staff-user", { email: "staff@example.test" }).firestore();
+  const administratorDb = testEnv.authenticatedContext("meeting-admin", { email: "admin@example.test" }).firestore();
+  const unassignedDb = testEnv.authenticatedContext("unassigned-user", { email: "unassigned@example.test" }).firestore();
+  await assertSucceeds(initiatorDb.doc("participants/initiator-added").set({
+    meetingId: "admin-controlled-meeting",
+    participantUid: "external-1",
+    participantName: "External Participant"
+  }));
+  await assertSucceeds(administratorDb.doc("participants/admin-added").set({
+    meetingId: "admin-controlled-meeting",
+    participantUid: "external-1",
+    participantName: "External Participant"
+  }));
+  await assertSucceeds(initiatorDb.doc("invitations/initiator-invite").set({
+    meetingId: "admin-controlled-meeting",
+    email: "external@example.test",
+    status: "Pending"
+  }));
+  await assertSucceeds(administratorDb.doc("invitations/admin-invite").set({
+    meetingId: "admin-controlled-meeting",
+    email: "external@example.test",
+    status: "Pending"
+  }));
+  await assertFails(unassignedDb.doc("participants/unassigned-added").set({
+    meetingId: "admin-controlled-meeting",
+    participantUid: "external-2",
+    participantName: "Unassigned User"
+  }));
+  await assertFails(unassignedDb.doc("invitations/unassigned-invite").set({
+    meetingId: "admin-controlled-meeting",
+    email: "unassigned-external@example.test",
+    status: "Pending"
+  }));
+});
+
+test("real meetings cannot be deleted even by an administrator", async () => {
   await testEnv.withSecurityRulesDisabled(async context => {
     await context.firestore().doc("meetings/departmental-meeting").set(meeting({
       registerStatus: "Registered",
@@ -96,7 +185,7 @@ test("only administrator can delete a meeting", async () => {
     email: "admin@example.test",
     admin: true
   }).firestore();
-  await assertSucceeds(adminDb.doc("meetings/departmental-meeting").delete());
+  await assertFails(adminDb.doc("meetings/departmental-meeting").delete());
 });
 test("meeting creation rejects missing or invalid category metadata", async () => {
   const db = testEnv.authenticatedContext("departmental-director", {
@@ -109,7 +198,7 @@ test("meeting creation rejects missing or invalid category metadata", async () =
 });
 
 
-test("meeting register is readable while meeting writes remain role-controlled", async () => {
+test("everyone in IRPA can read all meeting categories while meeting writes remain governed", async () => {
   await testEnv.withSecurityRulesDisabled(async context => {
     const db = context.firestore();
     await db.doc("meetings/governance-record").set(meeting({
@@ -129,12 +218,62 @@ test("meeting register is readable while meeting writes remain role-controlled",
   const boardDb = testEnv.authenticatedContext("board-member", {
     email: "board@example.test"
   }).firestore();
-  await assertFails(staffDb.doc("meetings/governance-record").get());
+  await assertSucceeds(staffDb.doc("meetings/governance-record").get());
   await assertSucceeds(boardDb.doc("meetings/governance-record").get());
   await assertSucceeds(staffDb.doc("meetings/staff-record").get());
 });
 
-test("authenticated users can query the read-only meeting register across categories", async () => {
+test("real meetings and their participant records cannot be deleted directly", async () => {
+  await testEnv.withSecurityRulesDisabled(async context => {
+    await context.firestore().doc("meetings/real-protected-meeting").set(meeting({
+      meetingCategory: "GENERAL",
+      meetingPolicyId: "GENERAL",
+      meetingType: "General Meeting",
+      recordOrigin: "REAL",
+      environment: "REAL"
+    }));
+    await context.firestore().doc("participants/real-protected-participant").set({
+      meetingId: "real-protected-meeting",
+      participantName: "Protected Participant",
+      recordOrigin: "REAL"
+    });
+  });
+  const db = testEnv.authenticatedContext("admin-user", { admin: true }).firestore();
+  await assertFails(db.doc("meetings/real-protected-meeting").delete());
+  await assertFails(db.doc("participants/real-protected-participant").delete());
+});
+
+test("explicitly trial meetings may be deleted by the system administrator", async () => {
+  await testEnv.withSecurityRulesDisabled(async context => {
+    await context.firestore().doc("meetings/trial-meeting").set(meeting({
+      meetingCategory: "OTHER",
+      meetingPolicyId: "OTHER",
+      meetingType: "Trial Meeting",
+      recordOrigin: "TRIAL",
+      environment: "TRIAL"
+    }));
+  });
+  const db = testEnv.authenticatedContext("admin-user", { admin: true }).firestore();
+  await assertSucceeds(db.doc("meetings/trial-meeting").delete());
+});
+
+test("IRPA employees are not denied Meeting Portal access by inactive employment status", async () => {
+  await testEnv.withSecurityRulesDisabled(async context => {
+    await context.firestore().doc("meetings/inactive-staff-meeting").set(meeting({
+      meetingCategory: "GOVERNANCE",
+      meetingPolicyId: "GOVERNANCE",
+      meetingType: "Board Meeting",
+      initiatorUid: "inactive-staff"
+    }));
+  });
+  const db = testEnv.authenticatedContext("inactive-staff", {
+    email: "inactive@example.test"
+  }).firestore();
+  await assertSucceeds(db.doc("meetings/inactive-staff-meeting").get());
+  await assertSucceeds(db.collection("meetings").where("meetingCategory", "==", "GOVERNANCE").get());
+});
+
+test("every authenticated IRPA identity can query the meeting register across categories", async () => {
   await testEnv.withSecurityRulesDisabled(async context => {
     await context.firestore().doc("meetings/governance-record").set(meeting({
       meetingCategory: "GOVERNANCE",
@@ -148,12 +287,12 @@ test("authenticated users can query the read-only meeting register across catego
   const boardDb = testEnv.authenticatedContext("board-member", {
     email: "board@example.test"
   }).firestore();
-  await assertFails(staffDb.collection("meetings").where("meetingCategory", "==", "GOVERNANCE").get());
+  await assertSucceeds(staffDb.collection("meetings").where("meetingCategory", "==", "GOVERNANCE").get());
   await assertSucceeds(boardDb.collection("meetings").where("meetingCategory", "==", "GOVERNANCE").get());
   await assertSucceeds(staffDb.collection("meetings").where("meetingCategory", "==", "STAFF").get());
 });
 
-test("explicit category metadata overrides a conflicting legacy meeting type", async () => {
+test("universal portal access is not narrowed by conflicting legacy meeting-type metadata", async () => {
   await testEnv.withSecurityRulesDisabled(async context => {
     await context.firestore().doc("meetings/category-mismatch").set(meeting({
       meetingCategory: "STAFF",
@@ -167,7 +306,7 @@ test("explicit category metadata overrides a conflicting legacy meeting type", a
   const staffDb = testEnv.authenticatedContext("staff-user", {
     email: "staff@example.test"
   }).firestore();
-  await assertFails(boardDb.doc("meetings/category-mismatch").get());
+  await assertSucceeds(boardDb.doc("meetings/category-mismatch").get());
   await assertSucceeds(staffDb.doc("meetings/category-mismatch").get());
 });
 
@@ -214,10 +353,12 @@ test("invitee can check in only their own participant record", async () => {
 
 
 test("meeting initiator can register an invitee and create the linked invitation", async () => {
-  await testEnv.withSecurityRulesDisabled(async context => {const db=context.firestore();await db.doc("meetings/organizer-meeting").set(meeting({initiatorUid:"departmental-director",initiatorEmail:"director@example.test",registerStatus:"Registered"}));});
+  await testEnv.withSecurityRulesDisabled(async context => {const db=context.firestore();await db.doc("meetings/organizer-meeting").set(meeting({initiatorUid:"departmental-director",initiatorEmail:"director@example.test",registerStatus:"Registered"}));await db.doc("meetings/proceedings-meeting").set(meeting({initiatorUid:"departmental-director",initiatorEmail:"director@example.test",status:"In Progress",proceedingsStatus:"In Progress",registerStatus:"Registered"}));});
   const db=testEnv.authenticatedContext("departmental-director",{email:"director@example.test"}).firestore();
   await assertSucceeds(db.doc("participants/new-invitee").set({meetingId:"organizer-meeting",participantEmail:"guest@example.test",participantName:"Guest",participantRole:"Invited Guest",attendanceStatus:"Invited"}));
   await assertSucceeds(db.doc("invitations/guest-invitation").set({meetingId:"organizer-meeting",participantId:"new-invitee",email:"guest@example.test",name:"Guest",status:"Pending"}));
+  await assertFails(db.doc("participants/proceedings-invitee").set({meetingId:"proceedings-meeting",participantEmail:"late-guest@example.test",participantName:"Late Guest",participantRole:"Invited Guest",attendanceStatus:"Invited"}));
+  await assertFails(db.doc("invitations/proceedings-invitation").set({meetingId:"proceedings-meeting",participantId:"proceedings-invitee",email:"late-guest@example.test",name:"Late Guest",status:"Pending"}));
 });
 
 
@@ -251,8 +392,8 @@ test("participant and invitation registers follow the linked meeting category po
   }).firestore();
   await assertSucceeds(boardDb.doc("participants/governance-participant").get());
   await assertSucceeds(boardDb.doc("invitations/governance-invitation").get());
-  await assertFails(staffDb.doc("participants/governance-participant").get());
-  await assertFails(staffDb.doc("invitations/governance-invitation").get());
+  await assertSucceeds(staffDb.doc("participants/governance-participant").get());
+  await assertSucceeds(staffDb.doc("invitations/governance-invitation").get());
 });
 
 test("active institutional users can read the organisation-wide member and employee directories", async () => {
