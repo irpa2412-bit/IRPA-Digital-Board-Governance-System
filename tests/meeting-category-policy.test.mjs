@@ -49,7 +49,7 @@ test("explicitly invited participants can access their meeting regardless of ins
   }, { isInvited: true }), true);
 });
 
-test("any active registered member or employee may initiate a meeting", () => {
+test("any authenticated IRPA identity may initiate a meeting without an active-status gate", () => {
   assert.equal(canRegisterMeeting({ active: true, role: "Departmental Director" }), true);
   assert.equal(canRegisterMeeting({ active: false, role: "Departmental Director" }), false);
   assert.equal(canRegisterMeeting({ uid: "inactive-member", active: false }), true);
@@ -333,6 +333,19 @@ test("meeting governance Firestore rules restrict live voting control to the act
   assert.match(rules, /match \/meetings\/\{id\}\{allow read:if meetingCategoryReadAllowed\(resource\.data\)/);
 });
 
+
+test("universal access is enforced in Firestore and Worker while live-room admission stays meeting-scoped", () => {
+  const rules = readFileSync(new URL("../firestore.rules", import.meta.url), "utf8");
+  const worker = readFileSync(new URL("../drive-gateway/src/meetingServices.mjs", import.meta.url), "utf8");
+  assert.match(rules, /function meetingUser\(\)\{return admin\(\)\|\|memberProfileExists\(\)\|\|employeeProfileExists\(\);\}/);
+  assert.match(rules, /function meetingRegistrar\(\)\{return meetingUser\(\);\}/);
+  assert.match(rules, /function meetingCategoryReadAllowed\(data\)\{return meetingUser\(\);\}/);
+  assert.match(worker, /canRead:true/);
+  assert.match(worker, /An IRPA member or employee identity is required to initiate a meeting/);
+  assert.match(worker, /if\(!c\.participant\)throw Object\.assign\(new Error\("Live meeting admission is restricted to invited participants/);
+  assert.match(worker, /Only the Chairperson appointed to this meeting may open formal proceedings/);
+  assert.match(worker, /Only the Meeting Administrator appointed to this meeting may view entry requests/);
+});
 
 const meetingServicesGovernanceSource = readFileSync(new URL("../drive-gateway/src/meetingServices.mjs", import.meta.url), "utf8");
 const meetingRoomGovernanceSource = readFileSync(new URL("../src/pages/MeetingRoom.jsx", import.meta.url), "utf8");
