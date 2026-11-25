@@ -37,13 +37,13 @@ test("production Firebase data mutations and Functions deployments require expli
 
 
 
-test("production Firebase Hosting deployment workflow requires exact DEPLOY RULES confirmation", () => {
+test("production Firebase Hosting workflow requires explicit yes confirmation for Firestore deployment", () => {
   const source = readWorkflow(".github/workflows/firebase-deploy.yml");
-  assert.match(source, /confirm_production_firestore_rules_deployment:[\s\S]*?default: "no"/);
+  assert.match(source, /confirm_production_firestore_rules_deployment:[\s\S]*?type: choice[\s\S]*?options:[\s\S]*?- "no"[\s\S]*?- "yes"[\s\S]*?default: "no"/);
   const start = source.indexOf("- name: Deploy Firestore Rules and Indexes");
   assert.ok(start >= 0);
   const next = source.indexOf("\n      - name:", start + 1);
-  assert.match(source.slice(start, next < 0 ? source.length : next), /github\.event_name == 'workflow_dispatch' && inputs\.confirm_production_firestore_rules_deployment == 'DEPLOY RULES'/);
+  assert.match(source.slice(start, next < 0 ? source.length : next), /github\.event_name == 'workflow_dispatch' && inputs\.confirm_production_firestore_rules_deployment == 'yes'/);
 });
 
 test("isolated staging Firestore rules publisher requires manual DEPLOY RULES confirmation", () => {
@@ -88,9 +88,9 @@ test("production deployment workflows are not triggered by pull requests", () =>
   }
 });
 
-test("production Firebase CLI rules and Worker deployments require explicit owner dispatch approval", () => {
+test("production Firebase CLI rules require explicit yes and Worker deployment retains its separate owner approval", () => {
   const source = readWorkflow(".github/workflows/firebase-cli-deploy.yml");
-  assert.match(source, /confirm_production_firestore_rules_deployment:[\s\S]*?default: "no"/);
+  assert.match(source, /confirm_production_firestore_rules_deployment:[\s\S]*?type: choice[\s\S]*?options:[\s\S]*?- "no"[\s\S]*?- "yes"[\s\S]*?default: "no"/);
   assert.match(source, /authorize_production_worker_deployment:[\s\S]*?default: "no"/);
   const workerStart = source.indexOf("- name: Deploy grant crawler to Cloudflare Workers");
   const rulesStart = source.indexOf("- name: Deploy Firestore Rules and Indexes");
@@ -100,8 +100,8 @@ test("production Firebase CLI rules and Worker deployments require explicit owne
   const rulesEnd = source.indexOf("\n      - name:", rulesStart + 1);
   const fallbackRulesEnd = source.indexOf("\n      - name:", fallbackRulesStart + 1);
   assert.match(source.slice(workerStart, workerEnd), /inputs\.authorize_production_worker_deployment == 'yes'/);
-  assert.match(source.slice(rulesStart, rulesEnd), /if: steps\.cloudflare_gate\.outcome == 'success' && github\.event_name == 'workflow_dispatch' && inputs\.confirm_production_firestore_rules_deployment == 'DEPLOY RULES'/);
-  assert.match(source.slice(fallbackRulesStart, fallbackRulesEnd), /if: steps\.cloudflare_gate\.outcome != 'success' && github\.event_name == 'workflow_dispatch' && inputs\.confirm_production_firestore_rules_deployment == 'DEPLOY RULES'/);
+  assert.match(source.slice(rulesStart, rulesEnd), /if: steps\.cloudflare_gate\.outcome == 'success' && github\.event_name == 'workflow_dispatch' && inputs\.confirm_production_firestore_rules_deployment == 'yes'/);
+  assert.match(source.slice(fallbackRulesStart, fallbackRulesEnd), /if: steps\.cloudflare_gate\.outcome != 'success' && github\.event_name == 'workflow_dispatch' && inputs\.confirm_production_firestore_rules_deployment == 'yes'/);
   assert.match(source, /wrangler deploy --config cloudflare\/grant-crawler\/wrangler\.toml/);
   assert.match(source, /wrangler --config cloudflare\/grant-crawler\/wrangler\.toml secret put FIREBASE_SERVICE_ACCOUNT_JSON/);
   assert.doesNotMatch(source, /working-directory: cloudflare\/grant-crawler/);
