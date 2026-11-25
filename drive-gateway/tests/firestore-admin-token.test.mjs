@@ -13,17 +13,17 @@ function routeSource(name, nextName) {
 const cloudflareDeploy = await readFile(new URL("../../.github/workflows/cloudflare-gateway-deploy.yml", import.meta.url), "utf8");
 
 test("Firebase ID tokens are verified with jose and Firestore admin credentials come from Cloudflare Secrets Store", () => {
-  assert.match(source, /createLocalJWKSet/);
-  assert.match(source, /jwtVerify\\(match\\[1\\], keySet/);
-  assert.match(source, /issuer: `https:\\/\\/securetoken\\.googleapis\\.com/);
-  assert.match(source, /audience: getFirebaseProjectId\\(env\\)/);
-  assert.match(source, /requiredClaims: \\[\"exp\", \"sub\", \"aud\", \"iss\"\\]/);
-  assert.match(source, /env\\.FIREBASE_SERVICE_ACCOUNT[\\s\\S]*?\\.get\\(\\)/);
-  assert.match(cloudflareDeploy, /secrets_store_secrets/);
-  assert.match(cloudflareDeploy, /binding: \"FIREBASE_SERVICE_ACCOUNT\"/);
-  assert.match(cloudflareDeploy, /store_id: \"27d6d55c4704412bba09a56d1a999435\"/);
-  assert.match(cloudflareDeploy, /secret_name: \"FIREBASE_SERVICE_ACCOUNT\"/);
-  assert.doesNotMatch(cloudflareDeploy, /CLOUDFLARE_FIREBASE_SERVICE_ACCOUNT_JSON/);
+  assert.ok(source.includes("createLocalJWKSet"));
+  assert.ok(source.includes("jwtVerify(match[1], keySet"));
+  assert.ok(source.includes('issuer: `https://securetoken.google.com/${getFirebaseProjectId(env)}`'));
+  assert.ok(source.includes("audience: getFirebaseProjectId(env)"));
+  assert.ok(source.includes('requiredClaims: ["exp", "sub", "aud", "iss"]'));
+  assert.ok(source.includes("env.FIREBASE_SERVICE_ACCOUNT.get()"));
+  assert.ok(cloudflareDeploy.includes("secrets_store_secrets"));
+  assert.ok(cloudflareDeploy.includes('binding: "FIREBASE_SERVICE_ACCOUNT"'));
+  assert.ok(cloudflareDeploy.includes('store_id: "27d6d55c4704412bba09a56d1a999435"'));
+  assert.ok(cloudflareDeploy.includes('secret_name: "FIREBASE_SERVICE_ACCOUNT"'));
+  assert.ok(!cloudflareDeploy.includes("CLOUDFLARE_FIREBASE_SERVICE_ACCOUNT_JSON"));
 });
 
 test("signature asset and completed archive use the Worker admin token", () => {
