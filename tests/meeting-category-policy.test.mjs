@@ -375,8 +375,8 @@ test("universal Meeting Portal access includes attendance registers and working-
 test("participant admission and removal are controlled only by the meeting-specific Administrator", () => {
   const source = readFileSync(new URL("../drive-gateway/src/meetingServices.mjs", import.meta.url), "utf8");
   assert.match(source, /const canManageParticipants=meetingAdministrator/);
-  assert.match(source, /Only the appointed meeting Chairperson, Secretary or Meeting Administrator may register participants/);
-  assert.match(source, /Only the Meeting Administrator appointed to this meeting may update the daily attendance sheet/);
+  assert.match(source, /Only the Meeting Administrator appointed to this meeting may register, update or remove participants/);
+  assert.match(source, /Only the Meeting Administrator appointed to this meeting may update another participant's attendance/);
 });
 
 test("legacy attendance callable preserves universal reads and Meeting Administrator-only control", () => {
