@@ -9,7 +9,6 @@
     "reason": "Owner-authorised 24 November 2026 meeting governance change for meeting-specific Chairperson, Secretary and Meeting Administrator appointments; temporary Transition Committee election workflow; server-enforced role separation; meeting-scoped invitations, ballots and media moderation; and immediate Transition Committee mandate expiry when formal proceedings begin. This change explicitly includes the necessary meeting-scoped Firestore authorization rules; no unrelated collection, portal or signature rules are changed.",
     "files": [
       "drive-gateway/src/meetingServices.mjs",
-      "functions/meetingRecords.js",
       "drive-gateway/src/meetingDeletion.mjs",
       "src/pages/Meetings.jsx",
       "drive-gateway/src/meetingEnvironment.mjs",
@@ -34,7 +33,7 @@
       "tests/fixtures/mocks.js",
       "tests/meeting-portal-browser.test.mjs"
     ],
-    "expectedEffect": "Allow every IRPA member and employee identity to access the complete Meeting Portal across all meeting categories and initiate/register meetings without an active-status, role, department, invitation or participant-list gate; permit initial registration with no permanent leadership appointments; require a complete temporary Transition Committee before leadership-election invitations and ballots; allow eligible participants to vote only in that election; require all three permanent meeting appointments and closed election ballots before proceedings; expire temporary authority atomically at proceedings start; keep Meeting Administrator authority operational only; preserve Board-only quorum, voting, resolutions, signature and record protections. The legacy Firebase LiveKit callable is also hardened so only the meeting-specific Meeting Administrator can receive room moderation or control recording; global administrators, initiators, Chairpersons and Secretaries cannot obtain technical moderation by legacy callable paths. The Voting Process page now opens and closes ballots through the meeting Worker using the current meeting's Chairperson/Secretary or active Transition Committee Chairperson/Secretary; global administrator status alone does not confer voting control. Ordinary governance votes remain Board-member-only, while pre-proceedings leadership-election ballots admit listed active members and employees.",
+    "expectedEffect": "Allow active registered IRPA members and employees to initiate meetings; permit initial registration with no permanent leadership appointments; require a complete temporary Transition Committee before leadership-election invitations and ballots; allow eligible participants to vote only in that election; require all three permanent meeting appointments and closed election ballots before proceedings; expire temporary authority atomically at proceedings start; keep Meeting Administrator authority operational only; preserve Board-only quorum, voting, resolutions, signature and record protections. The legacy Firebase LiveKit callable is also hardened so only the meeting-specific Meeting Administrator can receive room moderation or control recording; global administrators, initiators, Chairpersons and Secretaries cannot obtain technical moderation by legacy callable paths. The Voting Process page now opens and closes ballots through the meeting Worker using the current meeting's Chairperson/Secretary or active Transition Committee Chairperson/Secretary; global administrator status alone does not confer voting control. Ordinary governance votes remain Board-member-only, while pre-proceedings leadership-election ballots admit listed active members and employees.",
     "prohibitedChanges": [
       "Do not create portal-wide meeting leadership roles.",
       "Do not allow Meeting Administrator to chair, vote, establish quorum, approve resolutions or approve minutes by virtue of that role.",
@@ -53,7 +52,33 @@
     "commit": "331201cb3c626cc96cd006fe8263bf69bafea9b1",
     "rollbackCommit": "331201cb3c626cc96cd006fe8263bf69bafea9b1"
   },
-  "validation": "Universal access implemented in App navigation (including access without organisational-role selection), shared client policy, Meeting Centre queries, Worker and legacy callable read paths, production and staging Firestore meeting rules, attendance register reads and working-document review. Verified external invitees retain access only to their invited meeting and live-room entry remains invitation/appointment controlled. The Meeting Administrator alone controls participant admission/removal, attendance marking and technical media moderation; Chairperson/Secretary retain proceedings and secretariat authority. All three meeting-specific appointments are required before proceedings; Transition Committee authority ends at proceedings start. Board-restricted records remain protected. Worker and legacy record paths enforce minimum ten-year retention and reconcile existing records when the register is retrieved. Real meetings and linked governance records cannot be directly deleted; only TRIAL meetings/children may be deleted. CI and production verification pending.",
+  "validation": {
+    "baselineSmoke": "PASS",
+    "portalSmoke": {
+      "Meeting Portal": "PASS"
+    },
+    "fullRegression": "PASS",
+    "behaviourDifferences": [
+      "Environment is immutable after creation.",
+      "Only the exact TRIAL marker at creation qualifies; REAL, missing, invalid, lowercase or whitespace-padded values are non-deletable."
+    ],
+    "evidence": [
+      "Owner's exact conditional approval is recorded in PR #845 issue comment 7068716176.",
+      "Baseline smoke executed from exact pre-change base SHA 5fa8d46deeeb96c3172a1798411c18f57991855d: PR #849 run 44948792716, job 136982110084. npm run test:protected-portals reported PASS for all seven registered portals, including Meeting Portal.",
+      "Meeting Portal baseline smoke evidence: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/44948792716/job/136982110084",
+      "Full regression executed from exact pre-change base SHA 5fa8d46deeeb96c3172a1798411c18f57991855d: PR #849 run 44948792716, job 136982110196. npm run test:all FAILED: tests/workflow-production-deploy-policy.test.mjs — production Firebase CLI rules and Worker deployments require explicit owner dispatch approval (8 passed, 1 failed).",
+      "Full regression failure evidence: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/44948792716/job/136982110196",
+      "Baseline smoke and full regression were rerun after PR #846 was merged, both on the exact PR #845 base SHA 7f285df5437f96a58e4fcf9e7d2a85b8a9ee112c. Run 44952176019: baseline-protection-smoke job 136992981056 reported all seven registered portals PASS; baseline-full-regression job 136992981099 checked out the same SHA, ran npm run test:all inside the Firestore emulator, and exited successfully (code 0).",
+      "Baseline smoke PASS for Meeting Portal on exact baseline 7f285df5437f96a58e4fcf9e7d2a85b8a9ee112c: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/44952176019/job/136992981056",
+      "Full regression PASS on exact baseline 7f285df5437f96a58e4fcf9e7d2a85b8a9ee112c: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/44952176019/job/136992981099; npm run test:all completed in the Firestore emulator with exit code 0.",
+      "Meeting Portal portal smoke PASS on exact baseline 7f285df5437f96a58e4fcf9e7d2a85b8a9ee112c: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/44952176019/job/136992981056",
+      "Baseline smoke PASS on exact pre-change PR #955 base SHA 331201cb3c626cc96cd006fe8263bf69bafea9b1: run 45385986460, job 138416884257 checked out that SHA and ran npm run test:protected-portals for all seven registered portals.",
+      "Baseline smoke evidence on exact PR #955 base 331201cb3c626cc96cd006fe8263bf69bafea9b1: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/45385986460/job/138416884257",
+      "Full regression PASS on exact PR #955 base 331201cb3c626cc96cd006fe8263bf69bafea9b1: run 45385986460, job 138416884498 checked out that SHA and completed npm run test:all in the Firestore emulator successfully.",
+      "Full regression evidence on exact PR #955 base 331201cb3c626cc96cd006fe8263bf69bafea9b1: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/45385986460/job/138416884498",
+      "Meeting Portal portal smoke PASS on exact PR #955 base 331201cb3c626cc96cd006fe8263bf69bafea9b1: run 45385986460 job 138416884257 checked out the exact baseline and executed npm run test:protected-portals, which reported PASS for all seven registered portals including Meeting Portal. https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/45385986460/job/138416884257"
+    ]
+  },
   "renewals": [
     {
       "at": "2026-11-23T19:55:00Z",
@@ -83,72 +108,6 @@
         "tests/meeting-room-authorization-boundary.test.mjs",
         "tests/meeting-invitation-resend-quorum.test.mjs",
         "tests/meeting-quorum-reconciliation.test.mjs"
-      ]
-    },
-    {
-      "at": "2026-11-25T05:50:00Z",
-      "action": "owner-directed universal full Meeting Portal access and ten-year proceedings retention correction",
-      "pullRequest": 959,
-      "files": [
-        "src/firebase/meetingPolicy.js",
-        "src/firebase/data.js",
-        "drive-gateway/src/meetingServices.mjs",
-        "firestore.rules",
-        "functions/meetingRecords.js",
-        "src/pages/Meetings.jsx",
-        "src/pages/MeetingRoom.jsx",
-        "tests/meeting-category-policy.test.mjs"
-      ]
-    },
-    {
-      "at": "2026-11-25T06:40:00Z",
-      "action": "completed cross-layer universal Meeting Portal access and role-boundary implementation",
-      "pullRequest": 959,
-      "files": [
-        "drive-gateway/src/meetingServices.mjs",
-        "firestore.rules",
-        "firestore.staging.rules",
-        "functions/meetingAttendanceRegister.js",
-        "functions/meetingRecords.js",
-        "scripts/check-meeting-media-governance.mjs",
-        "src/App.jsx",
-        "src/firebase/data.js",
-        "src/firebase/meetingPolicy.js",
-        "src/meeting/IRPADGBSMeetingRoomMedia.jsx",
-        "src/meeting/MeetingAccessControl.jsx",
-        "src/pages/MeetingRoom.jsx",
-        "src/pages/Meetings.jsx",
-        "src/pages/OperationalGatewaysParticipants.jsx",
-        "tests/meeting-category-firestore-rules.test.cjs",
-        "tests/meeting-category-policy.test.mjs",
-        "tests/meeting-room-authorization-boundary.test.mjs"
-      ]
-    },
-    {
-      "at": "2026-11-25T06:55:00Z",
-      "action": "closed remaining direct Firestore and legacy authorization bypasses",
-      "pullRequest": 959,
-      "files": [
-        "firestore.rules",
-        "firestore.staging.rules",
-        "functions/meetingAttendanceRegister.js",
-        "functions/meetingRecords.js",
-        "drive-gateway/src/meetingServices.mjs",
-        "src/meeting/IRPADGBSMeetingRoomMedia.jsx",
-        "src/pages/MeetingRoom.jsx",
-        "tests/meeting-category-firestore-rules.test.cjs",
-        "tests/meeting-category-policy.test.mjs",
-        "tests/meeting-room-authorization-boundary.test.mjs",
-        "tests/meeting-working-documents-security.test.mjs"
-      ]
-    },
-    {
-      "at": "2026-11-25T07:10:00Z",
-      "action": "extend universal access to category archives",
-      "pullRequest": 959,
-      "files": [
-        "drive-gateway/src/index.js",
-        "tests/meeting-category-policy.test.mjs"
       ]
     }
   ],
@@ -265,56 +224,14 @@
   "accessInitiationChange": {
     "changeId": "MP-2026-11-23-ORG-WIDE-INITIATION",
     "relatedPullRequest": 941,
-    "status": "IMPLEMENTED_IN_PR_959_PENDING_VALIDATION",
+    "status": "SUBMITTED_FOR_VALIDATION",
     "scope": [
-      "docs/portal-protection/records/meeting-portal.json",
-      "docs/portal-protection/windows/meeting-portal.json",
-      "drive-gateway/src/meetingServices.mjs",
-      "firestore.rules",
-      "firestore.staging.rules",
-      "functions/meetingAttendanceRegister.js",
-      "functions/meetingRecords.js",
-      "scripts/check-meeting-media-governance.mjs",
-      "src/App.jsx",
-      "src/firebase/data.js",
-      "src/firebase/meetingPolicy.js",
-      "src/meeting/IRPADGBSMeetingRoomMedia.jsx",
-      "src/meeting/MeetingAccessControl.jsx",
-      "src/pages/MeetingRoom.jsx",
-      "src/pages/Meetings.jsx",
-      "src/pages/OperationalGatewaysParticipants.jsx",
-      "tests/meeting-category-firestore-rules.test.cjs",
       "tests/meeting-category-policy.test.mjs",
-      "tests/meeting-room-authorization-boundary.test.mjs",
-      "tests/meeting-working-documents-security.test.mjs",
-      "drive-gateway/src/index.js"
+      "drive-gateway/src/meetingServices.mjs",
+      "src/pages/Meetings.jsx"
     ],
-    "ownerInstruction": "24-25 November 2026: everyone in IRPA must have full access to the entire Meeting Portal; anyone in IRPA may initiate/register a meeting; access is not restricted by role, department, membership/employment status, invitation or participant listing. Meeting-specific leadership and live-room admission remain separate controls.",
-    "governanceBoundary": "Universal Meeting Portal access and meeting initiation do not bypass meeting-specific live-room admission, Chairperson/Secretary/Administrator responsibilities, Board voting eligibility, quorum, resolutions, formal approvals, or protected governance-record safeguards.",
-    "validation": "Universal portal access now applies across all meeting categories and meeting-record access paths for IRPA identities; active-status and participant-list gates are not used for portal entry, meeting initiation, meeting record listing or working-document review. Ongoing live-room admission and protected Board records remain separately governed. CI and production verification pending.",
-    "policyCorrectionPullRequest": 959
-  },
-  "scope": [
-    "docs/portal-protection/records/meeting-portal.json",
-    "docs/portal-protection/windows/meeting-portal.json",
-    "drive-gateway/src/meetingServices.mjs",
-    "firestore.rules",
-    "firestore.staging.rules",
-    "functions/meetingAttendanceRegister.js",
-    "functions/meetingRecords.js",
-    "scripts/check-meeting-media-governance.mjs",
-    "src/App.jsx",
-    "src/firebase/data.js",
-    "src/firebase/meetingPolicy.js",
-    "src/meeting/IRPADGBSMeetingRoomMedia.jsx",
-    "src/meeting/MeetingAccessControl.jsx",
-    "src/pages/MeetingRoom.jsx",
-    "src/pages/Meetings.jsx",
-    "src/pages/OperationalGatewaysParticipants.jsx",
-    "tests/meeting-category-firestore-rules.test.cjs",
-    "tests/meeting-category-policy.test.mjs",
-    "tests/meeting-room-authorization-boundary.test.mjs",
-    "tests/meeting-working-documents-security.test.mjs",
-    "drive-gateway/src/index.js"
-  ]
+    "ownerInstruction": "23 November 2026: every active registered member may initiate meetings; staff and members must have access to the shared Meeting Portal; meetings operate at multiple organisational levels.",
+    "governanceBoundary": "Meeting initiation and participation do not grant Board voting, quorum, resolutions, formal approval, or unrestricted access to restricted Board records.",
+    "validation": "Worker functional tests and Meeting Centre initiation tests added to the existing Meeting Portal policy test file; direct Firestore rules and shared policy file unchanged; CI pending."
+  }
 }
