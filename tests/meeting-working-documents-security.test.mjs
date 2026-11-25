@@ -25,6 +25,7 @@ test("server validates host authority and meeting/document linkage before regist
 test("only authorised meeting participants can submit bounded assessments/comments", () => {
   assert.match(backend, /exports\.submitMeetingDocumentReview=onCall/);
   assert.match(backend, /if\(!ctx\.canRead\)/);
+  assert.match(backend, /board_restricted.*!ctx\.canReadRestrictedRecords/);
   assert.match(backend, /\["ASSESSMENT","COMMENT","SIGNATURE_REQUEST"\]/);
   assert.match(backend, /comment\.length>5000/);
   assert.match(backend, /MEETING_WORKING_DOCUMENT_REVIEW_SUBMITTED/);
