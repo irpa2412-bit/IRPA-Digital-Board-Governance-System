@@ -160,7 +160,7 @@ exports.updateMeetingRecordProtection=onCall({region:"us-central1",timeoutSecond
  const ref=db.collection("meetingRecords").doc(recordId),snap=await ref.get();
  if(!snap.exists)throw new HttpsError("not-found","Meeting record not found.");
  const record=snap.data(),ctx=await context(req,record.meetingId);
- if(!ctx.canManage)throw new HttpsError("permission-denied","Only the meeting administrator, chairperson or secretary may change record protection.");
+ if(!ctx.canManage||(text(record.confidentialityClass||ctx.confidentiality).toUpperCase()==="BOARD_RESTRICTED"&&!ctx.canReadRestrictedRecords))throw new HttpsError("permission-denied","Only an authorised governance reader with record-protection authority may change meeting-record protection.");
  if(record.status!=="Active")throw new HttpsError("failed-precondition","Only active records can change protection.");
  if(operation==="LEGAL_HOLD"){
   const held=req.data?.enabled===true;
@@ -183,7 +183,7 @@ exports.disposeMeetingRecord=onCall({region:"us-central1",timeoutSeconds:30},asy
  const ref=db.collection("meetingRecords").doc(recordId),snap=await ref.get();
  if(!snap.exists)throw new HttpsError("not-found","Meeting record not found.");
  const record=snap.data(),ctx=await context(req,record.meetingId);
- if(!ctx.canManage)throw new HttpsError("permission-denied","Only the meeting administrator, chairperson or secretary may request record disposition.");
+ if(!ctx.canManage||(text(record.confidentialityClass||ctx.confidentiality).toUpperCase()==="BOARD_RESTRICTED"&&!ctx.canReadRestrictedRecords))throw new HttpsError("permission-denied","Only an authorised governance reader with record-disposition authority may request record disposition.");
  if(operation==="REQUEST_DELETE"){
   await ref.update({deletionStatus:"PENDING_REVIEW",deletionRequestedByUid:ctx.uid,deletionRequestedAt:FieldValue.serverTimestamp(),deletionReason:text(req.data?.reason)||"Retention/disposition review",updatedAt:FieldValue.serverTimestamp()});
   await audit("MEETING_RECORD_DELETE_REQUESTED",ctx,recordId,{reason:text(req.data?.reason)||null});
@@ -224,16 +224,11 @@ exports.compileAndEmailMeetingReport=onCall({
  const meetingId=text(request.data?.meetingId),minutesText=text(request.data?.minutesText);
  if(!meetingId)throw new HttpsError("invalid-argument","Meeting ID is required.");
  if(minutesText.length>150000)throw new HttpsError("invalid-argument","Compiled minutes exceed the 150,000 character limit.");
- const meetingSnap=await db.collection("meetings").doc(meetingId).get();
- if(!meetingSnap.exists)throw new HttpsError("not-found","The registered meeting could not be found.");
- const meeting={id:meetingSnap.id,...meetingSnap.data()};
- const isAdmin=admin(request);
- const isInitiator=text(meeting.initiatorUid)===uid;
- const isChair=text(meeting.chairpersonUid)===uid||text(meeting.chairpersonEmail).toLowerCase()===email;
- const isSecretary=text(meeting.secretaryUid)===uid||text(meeting.secretaryEmail).toLowerCase()===email;
- let activeAdmin=isAdmin;
- if(!activeAdmin){const adminSnap=await db.collection("adminProfiles").doc(uid).get();activeAdmin=adminSnap.exists&&adminSnap.data()?.active===true;}
- if(!activeAdmin&&!isInitiator&&!isChair&&!isSecretary)throw new HttpsError("permission-denied","Only the authorised meeting initiator, chairperson, secretary or administrator may compile and distribute the meeting report.");
+ const ctx=await context(request,meetingId);
+ const meeting=ctx.meeting;
+ if(!ctx.canSecretariat)throw new HttpsError("permission-denied","Only the appointed Chairperson or Secretary may compile and distribute the meeting report.");
+ if(text(ctx.confidentiality).toUpperCase()==="BOARD_RESTRICTED"&&!ctx.canReadRestrictedRecords)throw new HttpsError("permission-denied","This Board-restricted meeting report is available only to authorised governance readers.");
+ const uid=ctx.uid,email=ctx.email||"";
  if(!text(meeting.registerStatus))throw new HttpsError("failed-precondition","The meeting is not registered and cannot be reported.");
  const [resolutionSnap,decisionSnap,voteSnap,subscriptionSnap,participantSnap,recordSnap]=await Promise.all([
   db.collection("resolutions").where("meetingId","==",meetingId).get().catch(()=>({docs:[]})),
@@ -355,6 +350,7 @@ exports.registerMeetingWorkingDocument=onCall({region:"us-central1",timeoutSecon
  const meetingId=text(req.data?.meetingId),documentId=text(req.data?.documentId);
  const ctx=await context(req,meetingId);
  if(!ctx.canSecretariat)throw new HttpsError("permission-denied","Only the appointed Chairperson or Secretary may register meeting working documents.");
+ if(text(ctx.confidentiality).toUpperCase()==="BOARD_RESTRICTED"&&!ctx.canReadRestrictedRecords)throw new HttpsError("permission-denied","This Board-restricted meeting is available only to authorised governance readers.");
  if(!documentId)throw new HttpsError("invalid-argument","Document ID is required.");
  const snap=await db.collection("documents").doc(documentId).get();
  if(!snap.exists)throw new HttpsError("not-found","The controlled document was not found.");
