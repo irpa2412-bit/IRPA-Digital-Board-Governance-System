@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { evaluateApproval } from "../scripts/firestore-rules-approval.mjs";
+import { evaluateApproval, findRulesCommitIds } from "../scripts/firestore-rules-approval.mjs";
 
 const base = {
   changedFiles: ["src/example.js", "firestore.rules"],
@@ -42,4 +42,10 @@ test("API error fails closed", () => {
   const result = evaluateApproval({ apiError: "HTTP 503" });
   assert.equal(result.pass, false);
   assert.match(result.reason, /failing closed/);
+});
+
+
+test("rules commit discovery intersects the PR commits with the path-specific history", () => {
+  const ids = findRulesCommitIds([{ sha: "a" }, { sha: "b" }, { sha: "c" }], [{ sha: "base" }, { sha: "b" }, { sha: "c" }]);
+  assert.deepEqual(ids, ["b", "c"]);
 });
