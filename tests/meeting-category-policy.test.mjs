@@ -18,10 +18,16 @@ const governance = {
   initiatorUid: "secretary-1"
 };
 
-test("governance category denies an unrelated active staff identity", () => {
+test("every IRPA identity has full Meeting Portal access across governance categories", () => {
   assert.equal(canAccessMeetingCategory(governance, {
     uid: "staff-1", active: true, activeEmployee: true, role: "Staff"
-  }), false);
+  }), true);
+  assert.equal(canAccessMeetingCategory(governance, {
+    uid: "member-2", active: false, activeMember: false, role: "Member"
+  }), true);
+  assert.equal(canAccessMeetingCategory({ meetingCategory: "ADMINISTRATIVE" }, {
+    uid: "employee-2", active: true, activeEmployee: true, role: "Field Officer"
+  }), true);
 });
 
 test("governance category allows authorised board roles and administrators", () => {
@@ -46,6 +52,7 @@ test("explicitly invited participants can access their meeting regardless of ins
 test("any active registered member or employee may initiate a meeting", () => {
   assert.equal(canRegisterMeeting({ active: true, role: "Departmental Director" }), true);
   assert.equal(canRegisterMeeting({ active: false, role: "Departmental Director" }), false);
+  assert.equal(canRegisterMeeting({ uid: "inactive-member", active: false }), true);
   assert.equal(canRegisterMeeting({ active: true, role: "Staff" }), true);
   assert.equal(canRegisterMeeting({ active: true, role: "Member" }), true);
   assert.equal(canRegisterMeeting({ isAdmin: true }), true);
@@ -124,7 +131,7 @@ test("active Meeting Portal attendance screens never call undeployed Firebase at
 
 
 const meetingCentreSource = readFileSync(new URL("../src/pages/Meetings.jsx", import.meta.url), "utf8");
-test("Meeting Centre exposes initiation to every active member and employee", () => {
+test("Meeting Centre exposes initiation to every authenticated IRPA identity", () => {
   assert.ok(meetingCentreSource.includes("const canRegisterMeeting = identity => canRegisterMeetingByRole(identity) || identity.activeMember===true || identity.activeEmployee===true"));
   assert.equal(meetingCentreSource.split("canRegisterMeeting({...actorIdentity,isAdmin:admin})").length - 1, 4);
 });
