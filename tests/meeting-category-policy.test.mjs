@@ -72,7 +72,8 @@ test("meeting archive access is universal for IRPA identities except Board-restr
 test("initiator edit authority ends at proceedings and meeting roles remain meeting-specific", () => {
   const policy = readFileSync(new URL("../src/firebase/meetingPolicy.js", import.meta.url), "utf8");
   assert.match(policy, /const initiator=String\(meeting\.initiatorUid\|\|""\)===uid&&!\["in progress","completed","cancelled","canceled"\]/);
-  assert.match(policy, /meeting\.meetingChairpersonUid\|\|meeting\.chairpersonUid/);\n  assert.match(policy, /meeting\.meetingSecretaryUid\|\|meeting\.secretaryUid/);
+  assert.match(policy, /meeting\.meetingChairpersonUid\|\|meeting\.chairpersonUid/);
+  assert.match(policy, /meeting\.meetingSecretaryUid\|\|meeting\.secretaryUid/);
   assert.match(policy, /return initiator\|\|assigned\.map/);
   assert.doesNotMatch(policy.match(/const assigned=transitionActive[\s\S]*?return initiator/)[0], /transitionAdministratorUid|meetingAdministratorUid/);
   const worker = readFileSync(new URL("../drive-gateway/src/meetingServices.mjs", import.meta.url), "utf8");
