@@ -334,6 +334,14 @@ test("meeting governance Firestore rules restrict live voting control to the act
 });
 
 
+test("universal Meeting Portal access includes attendance registers and working-document review", () => {
+  const worker = readFileSync(new URL("../drive-gateway/src/meetingServices.mjs", import.meta.url), "utf8");
+  assert.match(worker, /const records=participants\.map\(p=>\{/);
+  assert.match(worker, /Meeting Portal access is required to review working documents/);
+  assert.match(worker, /canReadRestrictedRecords/);
+  assert.match(worker, /Only the Meeting Administrator appointed to this meeting may update another participant's attendance/);
+});
+
 test("universal access is enforced in Firestore and Worker while live-room admission stays meeting-scoped", () => {
   const rules = readFileSync(new URL("../firestore.rules", import.meta.url), "utf8");
   const worker = readFileSync(new URL("../drive-gateway/src/meetingServices.mjs", import.meta.url), "utf8");
