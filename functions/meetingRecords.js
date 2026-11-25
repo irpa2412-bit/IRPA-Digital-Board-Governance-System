@@ -385,6 +385,7 @@ exports.submitMeetingDocumentReview=onCall({region:"us-central1",timeoutSeconds:
  if(!comment||comment.length>5000)throw new HttpsError("invalid-argument","Enter a comment or assessment of up to 5,000 characters.");
  const docRef=db.collection("meetingWorkingDocuments").doc(id),docSnap=await docRef.get();
  if(!docSnap.exists||text(docSnap.data()?.meetingId)!==meetingId||text(docSnap.data()?.status)!=="ACTIVE")throw new HttpsError("not-found","Active working document not found for this meeting.");
+ if(text(docSnap.data()?.classification||ctx.confidentiality).toLowerCase()==="board_restricted"&&!ctx.canReadRestrictedRecords)throw new HttpsError("permission-denied","This Board-restricted working document is available only to authorised governance readers.");
  const reviewRef=db.collection("meetingDocumentReviews").doc();
  const memberSnap=await db.collection("members").doc(ctx.uid).get(),employeeSnap=await db.collection("employees").doc(ctx.uid).get();
  const participantSnap=await db.collection("participants").where("meetingId","==",meetingId).get();
