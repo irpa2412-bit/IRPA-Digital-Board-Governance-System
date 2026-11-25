@@ -3,6 +3,7 @@ import{collection,doc,getDocs,query,where,setDoc,updateDoc,serverTimestamp}from"
 import{auth,db}from"../firebase/config";
 import authority from"../../config/org-structure-authority.json";
 import "./JobDescriptionWorkflowPortal.css";
+import PortalsControlUnit from "./PortalsControlUnit";
 
 const RESERVED_ROLE_IDS=new Set(["administrator","board-chairperson","board-vice-chairperson","board-secretary","board-treasurer","board-member","executive-director"]);
 const activeRecord=d=>["active","activated"].includes(String(d.status||d.employmentStatus||d.registrationStatus||"").toLowerCase());
@@ -124,5 +125,6 @@ export default function JobDescriptionWorkflowPortal({selectedAuthority,isAdmin=
    {!canManage&&<section className="jdwf-panel"><h2>My assigned job descriptions</h2>{workflows.length===0?<p>No job description has been released to your authenticated account.</p>:workflows.map(w=><article className="jdwf-item" key={w.roleId}><h3>{w.roleTitle}</h3><p>Workflow status: <strong>{w.status}</strong></p><p>Effective: {w.effectiveFrom||"Not recorded"} · Review: {w.reviewBy||"Not recorded"}</p><p>Appointment/engagement reference: {w.appointmentReference||"Pending"}</p><p>Written delegation reference: {w.delegationReference||"Pending"}</p><p>{w.roleSnapshot?.purpose}</p><h4>Key duties</h4><ul>{(w.roleSnapshot?.keyDuties||[]).map((x,i)=><li key={i}>{x}</li>)}</ul><h4>Limits and prohibited actions</h4><p>{w.roleSnapshot?.limits?.documentValue||"As specified in the approved job description"}</p><ul>{(w.roleSnapshot?.prohibitedActions||[]).map((x,i)=><li key={i}>{x}</li>)}</ul>{w.status==="RELEASED_TO_DELEGATE"&&<><label>Acknowledgement note (optional)<textarea value={acknowledgements[w.roleId]||""} onChange={e=>setAcknowledgements(v=>({...v,[w.roleId]:e.target.value}))}/></label><button disabled={busy} onClick={()=>acknowledge(w)}>Acknowledge receipt</button></>}</article>)}</section>}
    {canManage&&<section className="jdwf-panel"><h2>Workflow register</h2>{workflows.length===0?<p>No released descriptions have entered the workflow.</p>:workflows.map(w=><article className="jdwf-register-row" key={w.roleId}><strong>{w.roleTitle}</strong><span>v{w.version}</span><Status>{w.status}</Status><span>{w.designatedRecipientName||"Awaiting Executive Director designation"}</span></article>)}</section>}
   </>}
+  {isAdmin&&<PortalsControlUnit user={user} isAdmin={isAdmin}/>}
  </main>;
 }
