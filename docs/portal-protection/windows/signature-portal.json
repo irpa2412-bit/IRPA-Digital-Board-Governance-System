@@ -7,10 +7,10 @@
   "warningHours": 12,
   "openedAt": "2026-11-22T18:06:00.000Z",
   "expiresAt": "2026-11-25T18:06:00.000Z",
-  "lastActivityAt": "2026-11-24T08:11:25Z",
+  "lastActivityAt": "2026-11-25T07:30:00.000Z",
   "emergency": false,
   "emergencyLimitHours": 24,
-  "reason": "Owner-authorised 24 November 2026 repair of automatic completion distribution for the signature email-link workflow. Correct recipient identity to owner plus each signer position (not email address), include every invited signer, add bounded transient SMTP retries and persist per-attempt SMTP stages. Preserve Completed semantics, authoritative PDF/hash/certificate/archive, identity and token protections, manual owner recovery and backup controls. No SMTP settings, secrets, Worker bindings, Firestore rules or production records are changed.",
+  "reason": "Owner-authorised shared application-shell scope for the Meeting Portal: expose Meetings, Meeting Room, Participants, Resolutions, Voting, Actions and Decisions to every authenticated IRPA member/employee identity. The shared shell change must not alter any other portal's navigation, permissions, data access or workflow behaviour. Preserve authentication, authority, data-environment, Board governance, signature, invitation, finance and all existing portal-specific controls.",
   "scope": [
     "src/pages/SignaturePlatform.jsx",
     "src/pages/SignaturePlatformWithUpload.jsx",
@@ -39,7 +39,8 @@
     "drive-gateway/tests/completed-document-route.test.mjs",
     "drive-gateway/src/index.js",
     "drive-gateway/tests/signature-distribution.test.mjs",
-    "docs/signature-recovery/signature-email-link-distribution-change-record-2026-11-24.md"
+    "docs/signature-recovery/signature-email-link-distribution-change-record-2026-11-24.md",
+    "src/App.jsx"
   ],
   "activityLog": [
     {
@@ -119,6 +120,14 @@
         "drive-gateway/tests/signature-distribution.test.mjs",
         "docs/signature-recovery/signature-email-link-distribution-change-record-2026-11-24.md"
       ]
+    },
+    {
+      "at": "2026-11-25T07:30:00.000Z",
+      "action": "owner-authorised-shared-app-shell-scope",
+      "description": "Owner-authorised shared application-shell scope for the Meeting Portal: expose Meetings, Meeting Room, Participants, Resolutions, Voting, Actions and Decisions to every authenticated IRPA member/employee identity. The shared shell change must not alter any other portal's navigation, permissions, data access or workflow behaviour. Preserve authentication, authority, data-environment, Board governance, signature, invitation, finance and all existing portal-specific controls.",
+      "baselineCommit": "1dfd4a0c10052230ef85855eee202494c451d9",
+      "baselineSmokeRun": "45567104332",
+      "fullRegressionRun": "45567104332"
     }
   ],
   "emergencyExpiresAt": null,

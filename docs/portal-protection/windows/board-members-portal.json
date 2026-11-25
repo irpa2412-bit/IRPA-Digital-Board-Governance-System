@@ -1,18 +1,28 @@
 {
   "schemaVersion": 1,
   "portal": "Board Members Portal",
-  "status": "closed",
+  "status": "open",
   "durationHours": 72,
   "inactivityCloseHours": 72,
   "warningHours": 12,
-  "openedAt": null,
-  "expiresAt": null,
-  "lastActivityAt": null,
+  "openedAt": "2026-11-25T07:29:00.000Z",
+  "expiresAt": "2026-11-28T07:29:00.000Z",
+  "lastActivityAt": "2026-11-25T07:30:00.000Z",
   "emergency": false,
   "emergencyLimitHours": 24,
-  "reason": "No active repair authorization. An owner-approved APPROVE or RENEW comment opens one 72-hour window for this portal only.",
+  "reason": "Owner-authorised shared application-shell scope for the Meeting Portal: expose Meetings, Meeting Room, Participants, Resolutions, Voting, Actions and Decisions to every authenticated IRPA member/employee identity. The shared shell change must not alter any other portal's navigation, permissions, data access or workflow behaviour. Preserve authentication, authority, data-environment, Board governance, signature, invitation, finance and all existing portal-specific controls.",
   "scope": [
-    "src/pages/BoardMembers.jsx"
+    "src/pages/BoardMembers.jsx",
+    "src/App.jsx"
   ],
-  "activityLog": []
+  "activityLog": [
+    {
+      "at": "2026-11-25T07:30:00.000Z",
+      "action": "owner-authorised-shared-app-shell-scope",
+      "description": "Owner-authorised shared application-shell scope for the Meeting Portal: expose Meetings, Meeting Room, Participants, Resolutions, Voting, Actions and Decisions to every authenticated IRPA member/employee identity. The shared shell change must not alter any other portal's navigation, permissions, data access or workflow behaviour. Preserve authentication, authority, data-environment, Board governance, signature, invitation, finance and all existing portal-specific controls.",
+      "baselineCommit": "1dfd4a0c10052230ef85855eee202494c451d9",
+      "baselineSmokeRun": "45567104332",
+      "fullRegressionRun": "45567104332"
+    }
+  ]
 }
