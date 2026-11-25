@@ -23,20 +23,20 @@ function identityRoles(identity={}){
   return new Set(values.map(NORMALIZE_ROLE).filter(Boolean));
 }
 export function canRegisterMeeting(identity={}){
-  return identity.isAdmin===true||identity.admin===true||identity.active===true;
+  // Every authenticated IRPA identity may initiate a meeting; the meeting-specific
+  // leadership appointments govern proceedings, not access to initiation.
+  return identity.isAdmin===true||identity.admin===true||Boolean(identity.uid||identity.authenticated===true);
 }
 export function canAccessMeetingCategory(meeting={},identity={},options={}){
   if(identity.isAdmin===true||identity.admin===true)return true;
   if(options.isInvited===true||options.isRegisteredParticipant===true||options.isInitiator===true)return true;
-  if(identity.active!==true)return false;
-  const policy=resolveCategory(meeting.meetingCategory||meeting.meetingPolicyId||meeting.category||meeting.meetingType);
-  if(policy.id==="GENERAL"&&(identity.activeMember===true||identity.activeEmployee===true))return true;
-  const roles=identityRoles(identity);
-  return policy.accessRoles.some(role=>roles.has(NORMALIZE_ROLE(role)));
+  // Universal IRPA access: category and organisational role never gate the portal.
+  // Live-room admission and protected governance actions have separate controls.
+  return Boolean(identity.uid||identity.authenticated===true||identity.active===true);
 }
 export function canEditMeeting(meeting={},identity={}){
   if(identity.isAdmin===true||identity.admin===true)return true;
-  if(identity.active!==true||!identity.uid||String(meeting.initiatorUid||"")!==String(identity.uid))return false;
+  if(!identity.uid||String(meeting.initiatorUid||"")!==String(identity.uid))return false;
   return !["in progress","completed","cancelled","canceled"].includes(String(meeting.status||"").trim().toLowerCase())&&
     String(meeting.proceedingsStatus||"").trim().toLowerCase()!=="in progress";
 }
