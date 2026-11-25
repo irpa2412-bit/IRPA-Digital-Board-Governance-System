@@ -3768,7 +3768,10 @@ async function getFirestoreAdminAccessToken(env) {
   let diagnosticStep = "token creation";
   let serviceAccount;
   try {
-    serviceAccount = JSON.parse(env.FIREBASE_SERVICE_ACCOUNT_JSON || "");
+    const storedCredential = env.FIREBASE_SERVICE_ACCOUNT && typeof env.FIREBASE_SERVICE_ACCOUNT.get === "function"
+      ? await env.FIREBASE_SERVICE_ACCOUNT.get()
+      : env.FIREBASE_SERVICE_ACCOUNT_JSON;
+    serviceAccount = JSON.parse(typeof storedCredential === "string" ? storedCredential : "");
   } catch {
     throw new Error("Privileged Firestore identity is not configured correctly.");
   }
