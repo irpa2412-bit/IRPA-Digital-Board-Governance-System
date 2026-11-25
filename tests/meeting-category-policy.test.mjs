@@ -316,6 +316,14 @@ test("staff and general meetings enable ballots only during an active leadership
   assert.equal(meetingCapabilities({ ...meeting, transitionCommitteeActive: false }).voting, false);
 });
 
+test("all meeting proceedings and records have a minimum ten-year retention period", () => {
+  const source = readFileSync(new URL("../drive-gateway/src/meetingServices.mjs", import.meta.url), "utf8");
+  assert.match(source, /const retention = \{ GOVERNANCE:10, ADMINISTRATIVE:10, STAFF:10, GENERAL:10, OTHER:10 \}/);
+  assert.match(source, /IRPA-MEETING-RETENTION-2\.0-MINIMUM-10-YEARS/);
+  assert.match(source, /n<10\|\|n>30/);
+  assert.match(source, /requiredUntil=yearsFrom\(capturedAt,10\)/);
+});
+
 test("meeting governance source enforces the proceedings gate and immediate transition mandate expiry", () => {
   const source = readFileSync(new URL("../drive-gateway/src/meetingServices.mjs", import.meta.url), "utf8");
   assert.match(source, /Formal proceedings cannot begin until the meeting-specific Chairperson, Secretary and Meeting Administrator have all been declared/);
