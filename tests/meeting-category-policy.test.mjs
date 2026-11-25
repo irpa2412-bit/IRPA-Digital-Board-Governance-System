@@ -211,19 +211,19 @@ test("active members can initiate meetings without a management title", async ()
   assert.equal(result.meetingWrites, 1);
 });
 
-test("inactive institutional identities cannot initiate meetings through the Worker", async () => {
+test("IRPA identities can initiate meetings without an active-status prerequisite through the Worker", async () => {
   const result = await createMeetingAsInstitutionalIdentity({
     uid: "inactive-user", email: "inactive@example.test",
     employee: { uid: "inactive-user", email: "inactive@example.test", status: "Suspended", role: "Staff" },
     category: "GENERAL"
   });
-  assert.equal(result.response.status, 403);
-  assert.equal(result.body.ok, false);
-  assert.equal(result.meetingWrites, 0);
+  assert.equal(result.response.status, 200);
+  assert.equal(result.body.ok, true);
+  assert.equal(result.meetingWrites, 1);
 });
 
 
-test("meeting registration keeps all three permanent appointments optional", async () => {
+test("meeting registration keeps all three meeting-specific appointments optional", async () => {
   const result = await createMeetingAsInstitutionalIdentity({
     uid: "member-no-leaders", email: "member@example.test",
     member: { uid: "member-no-leaders", email: "member@example.test", status: "Active", role: "Member" },
