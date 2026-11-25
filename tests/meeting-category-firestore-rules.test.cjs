@@ -87,7 +87,7 @@ test("departmental registrar cannot edit a released meeting", async () => {
   }).firestore();
   await assertFails(db.doc("meetings/departmental-meeting").update({ title: "Unauthorised edit" }));
 });
-test("only administrator can delete a meeting", async () => {
+test("real meetings cannot be deleted even by an administrator", async () => {
   await testEnv.withSecurityRulesDisabled(async context => {
     await context.firestore().doc("meetings/departmental-meeting").set(meeting({
       registerStatus: "Registered",
@@ -102,7 +102,7 @@ test("only administrator can delete a meeting", async () => {
     email: "admin@example.test",
     admin: true
   }).firestore();
-  await assertSucceeds(adminDb.doc("meetings/departmental-meeting").delete());
+  await assertFails(adminDb.doc("meetings/departmental-meeting").delete());
 });
 test("meeting creation rejects missing or invalid category metadata", async () => {
   const db = testEnv.authenticatedContext("departmental-director", {
