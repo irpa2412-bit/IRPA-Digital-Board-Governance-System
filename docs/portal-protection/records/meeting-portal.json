@@ -9,6 +9,7 @@
     "reason": "Owner-authorised 24 November 2026 meeting governance change for meeting-specific Chairperson, Secretary and Meeting Administrator appointments; temporary Transition Committee election workflow; server-enforced role separation; meeting-scoped invitations, ballots and media moderation; and immediate Transition Committee mandate expiry when formal proceedings begin. This change explicitly includes the necessary meeting-scoped Firestore authorization rules; no unrelated collection, portal or signature rules are changed.",
     "files": [
       "drive-gateway/src/meetingServices.mjs",
+      "functions/meetingRecords.js",
       "drive-gateway/src/meetingDeletion.mjs",
       "src/pages/Meetings.jsx",
       "drive-gateway/src/meetingEnvironment.mjs",
@@ -232,6 +233,6 @@
     ],
     "ownerInstruction": "24-25 November 2026: everyone in IRPA must have full access to the entire Meeting Portal; anyone in IRPA may initiate/register a meeting; access is not restricted by role, department, membership/employment status, invitation or participant listing. Meeting-specific leadership and live-room admission remain separate controls.",
     "governanceBoundary": "Universal Meeting Portal access and meeting initiation do not bypass meeting-specific live-room admission, Chairperson/Secretary/Administrator responsibilities, Board voting eligibility, quorum, resolutions, formal approvals, or protected governance-record safeguards.",
-    "validation": "Universal access implemented in the shared client policy, Meeting Centre query selection, Worker read authorization, Worker meeting initiation, meeting-specific Firestore rules, attendance register reads and working-document review; Board-restricted records remain protected. Meeting records are reconciled to a minimum ten-year retention period. Regression tests added. Production promotion and live verification must be recorded separately."
+    "validation": "Universal access implemented in the shared client policy, Meeting Centre query selection, Worker read authorization, Worker meeting initiation, meeting-specific Firestore rules, attendance register reads and working-document review; Board-restricted records remain protected. Worker and legacy meeting-record callable retention policies are aligned to a minimum ten-year period, and existing Worker records are reconciled on record-register retrieval. Regression tests added. Production promotion and live verification must be recorded separately."
   }
 }
