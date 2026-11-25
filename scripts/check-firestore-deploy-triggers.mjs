@@ -13,7 +13,7 @@ for (const name of files) {
     if (customStagingPublisher &&
         (!condition.includes("github.event_name == 'workflow_dispatch'") ||
          !condition.includes("inputs.confirm_staging_firestore_rules_deployment == 'DEPLOY RULES'"))) {
-      failures.push(name + ': custom staging Firestore rules publisher lacks manual workflow_dispatch and exact DEPLOY RULES confirmation.');
+      failures.push(name + ': custom staging Firestore rules publisher lacks manual workflow_dispatch and explicit yes confirmation.');
     }
 
     if (!/--only\s+[^\n]*firestore/i.test(block) || !deployCommand.test(block)) continue;
@@ -32,10 +32,10 @@ for (const name of files) {
       continue;
     }
     if (!condition.includes("github.event_name == 'workflow_dispatch'") ||
-        !condition.includes("inputs.confirm_production_firestore_rules_deployment == 'DEPLOY RULES'")) {
+        !condition.includes("inputs.confirm_production_firestore_rules_deployment == 'yes'")) {
       failures.push(name + ': production Firestore deployment lacks manual workflow_dispatch and exact DEPLOY RULES confirmation.');
     }
   }
 }
 if (failures.length) { console.error('FIRESTORE_DEPLOY_TRIGGER_GUARD_FAILED'); console.error(failures.join('\n')); process.exit(1); }
-console.log('PASS: every production and staging Firestore publisher is manually dispatched and requires exact DEPLOY RULES confirmation; emulator-only commands are excluded.');
+console.log('PASS: every production and staging Firestore publisher is manually dispatched and requires explicit yes confirmation; emulator-only commands are excluded.');
