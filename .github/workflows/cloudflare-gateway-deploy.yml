@@ -208,6 +208,15 @@ jobs:
           npm install
           npm run build
 
+      - name: Provision privileged Firestore REST identity as a Worker secret
+        env:
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.CLOUDFLARE_FIREBASE_SERVICE_ACCOUNT_JSON }}
+        run: |
+          set -euo pipefail
+          test -n "$FIREBASE_SERVICE_ACCOUNT_JSON" || { echo "::error::CLOUDFLARE_FIREBASE_SERVICE_ACCOUNT_JSON is required; no credential value will be printed."; exit 1; }
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT_JSON" | npx wrangler secret put FIREBASE_SERVICE_ACCOUNT_JSON --name irpa-google-drive-gateway
+          echo "FIRESTORE_REST_SERVICE_ACCOUNT_SECRET=provisioned"
+
       - name: Deploy production Worker — authorized cutover
         uses: cloudflare/wrangler-action@v3
         with:
