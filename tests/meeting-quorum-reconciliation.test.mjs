@@ -6,6 +6,7 @@ import { isBoardMeeting, meetingCapabilities } from "../src/firebase/meetingPoli
 const service=readFileSync("drive-gateway/src/meetingServices.mjs","utf8");
 const room=readFileSync("src/pages/MeetingRoom.jsx","utf8");
 const api=readFileSync("src/firebase/meetingGatewayApi.js","utf8");
+const data=readFileSync("src/firebase/data.js","utf8");
 const meetings=readFileSync("src/pages/Meetings.jsx","utf8");
 
 test("only explicit Board and Board Meeting types require the one-third quorum",()=>{
@@ -100,4 +101,16 @@ test("Meeting Participants portal loads its register directory from Cloudflare a
   assert.match(service,/source:"ACTIVE_REGISTERS_BOARD_UID_ONLY"/);
   assert.match(participants,/listMeetingInviteeDirectory/);
   assert.doesNotMatch(participants,/listMeetingInviteeDirectory.*from"\.\.\/firebase\/data"/);
+});
+
+
+test("legacy invitee-directory export delegates to the authenticated Cloudflare Worker",()=>{
+  assert.match(data,/listMeetingInviteeDirectory as listMeetingInviteeDirectoryViaGateway/);
+  const match=data.match(/export async function listMeetingInviteeDirectory\(\)\s*\{([\s\S]*?)\n\}/);
+  assert.ok(match,"legacy export remains available to existing callers");
+  assert.match(match[1],/listMeetingInviteeDirectoryViaGateway\(\)/);
+  assert.doesNotMatch(match[1],/httpsCallable|getFunctions/);
+  assert.doesNotMatch(data,/httpsCallable\(getFunctions\(undefined,"us-central1"\),"listMeetingInviteeDirectory"\)/);
+  assert.match(api,/\/api\/meeting-invitee-directory\/list/);
+  assert.match(service,/\/api\/meeting-invitee-directory\/list/);
 });

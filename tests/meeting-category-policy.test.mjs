@@ -93,6 +93,7 @@ test("category capabilities keep voting and resolutions disabled outside governa
 });
 
 const meetingDataSource = readFileSync(new URL("../src/firebase/data.js", import.meta.url), "utf8");
+const meetingGatewayApiSource = readFileSync(new URL("../src/firebase/meetingGatewayApi.js", import.meta.url), "utf8");
 test("meeting register retrieval avoids an unscoped collection read", () => {
   const start = meetingDataSource.indexOf("export async function getAccessibleMeetingRecords");
   const end = meetingDataSource.indexOf("function meetingCreatedAt", start);
@@ -387,3 +388,20 @@ test("leadership-election invitation management cannot be bypassed by the initia
   assert.match(meetingServicesGovernanceSource, /if\(!c\.canManageParticipants\)return fail/);
   assert.match(meetingServicesGovernanceSource, /function meetingTransitionElectionAuthority\(meeting,uid\)/);
 });
+
+
+test("legacy invitee directory export delegates to the authenticated Cloudflare Worker",()=>{
+  const start=meetingDataSource.indexOf("export async function listMeetingInviteeDirectory()");
+  const end=meetingDataSource.indexOf("\n}",start);
+  assert.ok(start>=0&&end>start,"legacy compatibility export remains available");
+  const source=meetingDataSource.slice(start,end);
+  assert.match(source,/listMeetingInviteeDirectoryViaGateway\(\)/);
+  assert.doesNotMatch(source,/httpsCallable|getFunctions/);
+  assert.match(source,/boardMembers:Array\.isArray\(directory\?\.boardMembers\)/);
+  assert.match(source,/members:Array\.isArray\(directory\?\.members\)/);
+  assert.match(source,/employees:Array\.isArray\(directory\?\.employees\)/);
+  assert.match(meetingGatewayApiSource,/\/api\/meeting-invitee-directory\/list/);
+});
+
+
+
