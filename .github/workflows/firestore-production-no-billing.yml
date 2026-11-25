@@ -66,6 +66,12 @@ jobs:
             "https://firebaserules.googleapis.com/v1/projects/irpa-digital-board-governance/rulesets/$ruleset_id")"
           create_time="$(jq -r '.createTime // empty' <<< "$ruleset")"
           test -n "$create_time"
+          release_date="$(date -u -d "$create_time" +%Y-%m-%d)"
+          today="$(date -u +%Y-%m-%d)"
+          if [[ "$release_date" != "$today" ]]; then
+            echo "::error::Live Firestore ruleset timestamp is not today's date ($today); got $create_time."
+            exit 1
+          fi
           echo "ruleset=$ruleset_name" >> "$GITHUB_OUTPUT"
           echo "created_at=$create_time" >> "$GITHUB_OUTPUT"
           echo "LIVE_FIRESTORE_RULESET=$ruleset_name"
