@@ -26,3 +26,26 @@ export function createDutyAssignment(i){
 }
 export function acknowledgeDuty(a,actorUid,note=""){if(!a||a.status!=="ASSIGNED")throw new PcuValidationError("Duty cannot be acknowledged","INVALID_TRANSITION");if(a.assigneeType!=="IDENTITY"||clean(actorUid)!==a.assigneeId)throw new PcuValidationError("Only assigned identity may acknowledge","ACKNOWLEDGEMENT_FORBIDDEN");return Object.freeze({...a,status:"ACKNOWLEDGED",acknowledgement:Object.freeze({actorUid,note:clean(note),at:new Date().toISOString()}),permissionsActivated:false,grantedClaims:[]});}
 export function assertWorkflowActors(a={}){const out={};for(const k of ["initiator","reviewer","recommender","approver","implementer","auditor"])out[k]=clean(a[k])||null;if(out.approver&&out.approver===out.initiator)throw new PcuValidationError("Initiator and approver must differ","SEPARATION_OF_DUTIES");if(out.auditor&&[out.initiator,out.approver,out.implementer].includes(out.auditor))throw new PcuValidationError("Auditor must be independent","SEPARATION_OF_DUTIES");return Object.freeze(out);}
+
+export function createDutyDefinition(input){
+ const tenantId=validId(input?.tenantId,"tenantId"),title=clean(input.title),description=clean(input.description);
+ if(!title||title.length>180)throw new PcuValidationError("Duty title is required and must be at most 180 characters","INVALID_DUTY_TITLE");
+ if(description.length>4000)throw new PcuValidationError("Duty description is too long","INVALID_DUTY_DESCRIPTION");
+ const cadence=input.cadence||"AD_HOC";
+ if(!["AD_HOC","DAILY","WEEKLY","MONTHLY","QUARTERLY","ANNUALLY"].includes(cadence))throw new PcuValidationError("Unsupported duty cadence","INVALID_CADENCE");
+ return Object.freeze({id:validId(input.id,"duty id"),tenantId,title,description,parentMandateId:input.parentMandateId||null,cadence,serviceStandard:clean(input.serviceStandard),performanceIndicators:Array.isArray(input.performanceIndicators)?[...input.performanceIndicators]:[],version:1,status:"ACTIVE",createdBy:validId(input.createdBy,"createdBy")});
+}
+export function reviseDutyAssignment(previous,input){
+ if(!previous||previous.status==="REVOKED")throw new PcuValidationError("Cannot supersede a missing or revoked assignment","INVALID_SUPERSESSION");
+ const next=createDutyAssignment({...input,version:previous.version+1,supersedesId:previous.id});
+ if(next.tenantId!==previous.tenantId||next.dutyId!==previous.dutyId)throw new PcuValidationError("A revision must remain in the same tenant and duty","INVALID_SUPERSESSION");
+ return next;
+}
+export function revokeDutyAssignment(assignment,actorUid,reason){
+ if(!assignment||assignment.status==="REVOKED")throw new PcuValidationError("Assignment is already revoked or missing","INVALID_REVOCATION");
+ if(!clean(reason))throw new PcuValidationError("Revocation reason is required","REVOCATION_REASON_REQUIRED");
+ return Object.freeze({...assignment,status:"REVOKED",revokedAt:new Date().toISOString(),revokedBy:validId(actorUid,"actorUid"),revocationReason:clean(reason),permissionsActivated:false,grantedClaims:[]});
+}
+export function createAuditEvent(input){
+ return Object.freeze({id:validId(input.id,"audit event id"),tenantId:validId(input.tenantId,"tenantId"),actorUid:validId(input.actorUid,"actorUid"),action:validId(input.action,"audit action"),entityType:validId(input.entityType,"entityType"),entityId:validId(input.entityId,"entityId"),occurredAt:input.occurredAt||new Date().toISOString(),details:Object.freeze({...input.details}),immutable:true});
+}
