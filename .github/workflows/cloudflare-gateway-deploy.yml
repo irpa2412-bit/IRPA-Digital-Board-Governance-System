@@ -79,7 +79,8 @@ jobs:
           const bindings = Array.isArray(response.result?.bindings) ? response.result.bindings : [];
           const managed = new Map([
             ["DRIVE_KV", "kv_namespace"],
-            ["ESIGN_DO", "durable_object_namespace"]
+            ["ESIGN_DO", "durable_object_namespace"],
+            ["FIREBASE_SERVICE_ACCOUNT", "secrets_store_secret"]
           ]);
           const resourceTypes = new Set([
             "kv_namespace", "durable_object_namespace", "r2_bucket", "d1", "service",
@@ -130,6 +131,16 @@ jobs:
             const remoteId = String(driveKvBindings[0].namespace_id || "").toLowerCase();
             if (!/^[a-f0-9]{32}$/.test(remoteId)) throw new Error("Safety stop: existing production DRIVE_KV binding has an invalid namespace ID.");
             if (remoteId !== configuredDriveKvId) throw new Error("Safety stop: production DRIVE_KV differs from the controlled repository DRIVE_KV ID.");
+          }
+
+          const firebaseAccountBindings = bindings.filter(b => b.name === "FIREBASE_SERVICE_ACCOUNT");
+          if (firebaseAccountBindings.length > 1) throw new Error("Safety stop: production Worker contains duplicate FIREBASE_SERVICE_ACCOUNT bindings.");
+          if (firebaseAccountBindings.length === 1) {
+            const binding = firebaseAccountBindings[0];
+            if (String(binding.store_id || "") !== "27d6d55c4704412bba09a56d1a999435" ||
+                String(binding.secret_name || "") !== "FIREBASE_SERVICE_ACCOUNT") {
+              throw new Error("Safety stop: existing production Firestore Secrets Store binding points to a different store or secret.");
+            }
           }
 
           const esignBindings = bindings.filter(b => b.name === "ESIGN_DO");
