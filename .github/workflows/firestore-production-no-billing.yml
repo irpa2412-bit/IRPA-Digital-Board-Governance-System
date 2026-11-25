@@ -46,6 +46,7 @@ jobs:
           project_id: irpa-digital-board-governance
 
       - name: Deploy Firestore Rules and Indexes only
+        if: github.event_name == 'workflow_dispatch' && inputs.confirm_production_firestore_rules_deployment == 'DEPLOY RULES'
         run: |
           set -euo pipefail
           npx --yes firebase-tools deploy --project irpa-digital-board-governance --only firestore:rules,firestore:indexes --non-interactive
