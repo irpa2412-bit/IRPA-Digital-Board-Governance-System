@@ -232,32 +232,85 @@ jobs:
               throw new Error("Live Cloudflare build stamp mismatch: expected " + expectedCommit + ", received " + liveStamp);
             }
 
-            const assetResults = await page.evaluate(async names => {
+            const assetResults = await page.evaluate(async ({ names, documentChunk, expectedHash }) => {
               const results = [];
+              let exactMatch = null;
+              let attempts = 0;
+              let lastObservation = { status: "not-requested", hash: null, contentType: null, byteLength: 0, error: null };
+              const deadline = Date.now() + 5 * 60 * 1000;
+
               for (const name of names) {
-                const response = await fetch("/assets/" + encodeURIComponent(name) + "?__irpa_signing_check=" + Date.now());
+                if (name === documentChunk) continue;
+                const response = await fetch("/assets/" + encodeURIComponent(name) + "?__irpa_signing_check=" + Date.now(), { cache: "no-store" });
                 const bytes = await response.arrayBuffer();
                 const digest = await crypto.subtle.digest("SHA-256", bytes);
                 const hash = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
                 results.push({ name, status: response.status, hash });
               }
-              return results;
-            }, jsAssets);
 
-            const failedAssets = assetResults.filter(asset => asset.status !== 200);
+              while (Date.now() < deadline) {
+                attempts += 1;
+                const url = "/assets/" + encodeURIComponent(documentChunk) +
+                  "?__irpa_signing_check=" + Date.now() + "-" + attempts;
+                const controller = new AbortController();
+                const timeoutId = window.setTimeout(() => controller.abort(), 10000);
+                try {
+                  const response = await fetch(url, { cache: "no-store", signal: controller.signal });
+                  const bytes = await response.arrayBuffer();
+                  const digest = await crypto.subtle.digest("SHA-256", bytes);
+                  const hash = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
+                  lastObservation = {
+                    status: response.status,
+                    hash,
+                    contentType: response.headers.get("content-type"),
+                    byteLength: bytes.byteLength,
+                    error: null
+                  };
+                  if (response.status === 200 && hash === expectedHash) {
+                    exactMatch = { name: documentChunk, ...lastObservation };
+                    break;
+                  }
+                } catch (error) {
+                  lastObservation = {
+                    status: "request-error",
+                    hash: null,
+                    contentType: null,
+                    byteLength: 0,
+                    error: String(error?.message || error)
+                  };
+                } finally {
+                  window.clearTimeout(timeoutId);
+                }
+
+                const remaining = deadline - Date.now();
+                if (remaining > 0) await new Promise(resolve => window.setTimeout(resolve, Math.min(15000, remaining)));
+              }
+              return {
+                results,
+                exactMatch,
+                attempts,
+                lastObservation,
+                boundedWindowMs: 5 * 60 * 1000
+              };
+            }, { names: jsAssets, documentChunk, expectedHash: localHash });
+
+            const failedAssets = assetResults.results.filter(asset => asset.status !== 200);
             if (failedAssets.length) throw new Error("JavaScript assets did not all return HTTP 200: " + JSON.stringify(failedAssets));
-            const liveChunk = assetResults.find(asset => asset.name === documentChunk);
-            if (!liveChunk || liveChunk.status !== 200 || liveChunk.hash !== localHash) {
-              throw new Error("DocumentLifecycleModule SHA-256 mismatch: local=" + localHash + " live=" + (liveChunk?.hash || "missing"));
+            if (!assetResults.exactMatch || assetResults.exactMatch.hash !== localHash) {
+              throw new Error("DocumentLifecycleModule exact SHA-256 verification failed after " +
+                assetResults.attempts + " attempt(s): expected=" + localHash +
+                " lastObserved=" + JSON.stringify(assetResults.lastObservation));
             }
             console.log(JSON.stringify({
               check: "all-built-JavaScript-assets",
-              count: assetResults.length,
+              count: assetResults.results.length + 1,
               allHttp200: true,
               documentLifecycleModule: documentChunk,
               localSha256: localHash,
-              liveSha256: liveChunk.hash,
-              hashMatch: true,
+              liveSha256: assetResults.exactMatch.hash,
+              hashMatch: assetResults.exactMatch.hash === localHash,
+              attempts: assetResults.attempts,
+              boundedWindowMs: assetResults.boundedWindowMs,
               liveBuildStamp: liveStamp
             }));
 
