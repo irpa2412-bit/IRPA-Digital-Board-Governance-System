@@ -160,6 +160,10 @@ jobs:
             main: "src/index.js",
             compatibility_date: "2026-09-24",
             vars: {
+              FIREBASE_PROJECT_ID: "irpa-digital-board-governance",
+              AUTHORIZED_DRIVE_EMAIL: "irpa2412@gmail.com",
+              IRPA_APP_URL: "https://irpa-digital-board-governance.web.app",
+              IRPA_ENVIRONMENT: "production",
               ESIGN_MODULE_ENABLED: "true",
               CLOUDFLARE_AUTH_FUNCTIONS_ENABLED: "true",
               IRPA_PRODUCTION_CUTOVER: "true",
@@ -193,6 +197,8 @@ jobs:
           const fs = require("fs");
           const c = JSON.parse(fs.readFileSync("wrangler.json", "utf8"));
           if (c.name !== "irpa-google-drive-gateway") throw new Error("Worker identity mismatch.");
+          if (c.vars?.FIREBASE_PROJECT_ID !== "irpa-digital-board-governance") throw new Error("Production Firebase project binding is incorrect. Deployment blocked.");
+          if (c.vars?.IRPA_ENVIRONMENT !== "production") throw new Error("Worker environment must be production. Deployment blocked.");
           if (c.vars?.ESIGN_MODULE_ENABLED !== "true") throw new Error("Production e-signature flag is not exactly true. Deployment blocked.");
           if (c.vars?.CLOUDFLARE_AUTH_FUNCTIONS_ENABLED !== "true") throw new Error("Production Cloudflare authentication cutover flag is not exactly true. Deployment blocked.");
           if (c.vars?.IRPA_PRODUCTION_CUTOVER !== "true") throw new Error("Explicit production cutover marker is missing. Deployment blocked.");
