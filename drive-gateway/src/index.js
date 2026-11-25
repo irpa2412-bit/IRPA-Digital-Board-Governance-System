@@ -1,3 +1,4 @@
+import { createLocalJWKSet, jwtVerify } from "jose";
 const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
 const MAX_BYTES = 10 * 1024 * 1024;
 const ALLOWED_CONTENT_TYPES = new Set([
@@ -10,6 +11,16 @@ const ALLOWED_CONTENT_TYPES = new Set([
   "image/gif","image/bmp","image/tiff","image/avif","application/zip","video/mp4","video/webm","video/quicktime","video/x-msvideo","video/x-matroska","audio/mpeg","audio/wav","audio/x-wav","audio/webm","audio/mp4","audio/x-m4a","audio/aac","audio/ogg","audio/flac"
 ]);
 const OAUTH_STATE_TTL = 600;
+async function getFirebaseJwks() {
+  if (jwksCache && Date.now() - jwksFetchedAt < 60 * 60 * 1000) return jwksCache;
+  const response = await fetch("https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com");
+  if (!response.ok) throw new Error("Unable to retrieve Firebase signing keys.");
+  const data = await response.json();
+  if (!Array.isArray(data.keys) || data.keys.length === 0) throw new Error("Firebase signing keys were not returned.");
+  jwksCache = Object.fromEntries(data.keys.map(key => [key.kid, key]));
+  jwksFetchedAt = Date.now();
+  return jwksCache;
+}
 import { buildMailMimeMessage, escapeHtml as escapeMailHtml, normalizeRecipientEmail, recipientDomain, safeMailError, sendWithRetry, validateMailHeader } from "./mailDelivery.js";
 
 import { classifySmtpReplyCategory } from "./invitationEmail.mjs";
@@ -912,7 +923,7 @@ async function upload(request, env) {
     if (ownerUid !== claims.user_id) {
       return json({ ok: false, error: "A signature profile may only be uploaded by its owner." }, 403, corsHeaders(request));
     }
-    const { memberRecord, employeeRecord } = await getInstitutionalProfileForUser(env, claims);
+    const { memberRecord, employeeRecord } = await getInstitutionalProfileForUser(env, claims, adminToken);
     const adminRecord = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, await getFirestoreAdminAccessToken(env));
     if (!memberRecord && !employeeRecord && !adminRecord?.fields?.active?.booleanValue) {
       return json({ ok: false, error: "A registered IRPA member or employee profile is required before a Signature Profile asset can be uploaded." }, 403, corsHeaders(request));
@@ -1024,7 +1035,10 @@ async function getFirebaseAuthAdminAccessToken(env) {
   const now = Math.floor(Date.now() / 1000);
   if (firebaseAuthAdminTokenCache.token && firebaseAuthAdminTokenCache.expiresAt > now + 60) return firebaseAuthAdminTokenCache.token;
   let serviceAccount;
-  try { serviceAccount = JSON.parse(env.FIREBASE_SERVICE_ACCOUNT_JSON || ""); }
+  try { const storedCredential = env.FIREBASE_SERVICE_ACCOUNT && typeof env.FIREBASE_SERVICE_ACCOUNT.get === "function"
+      ? await env.FIREBASE_SERVICE_ACCOUNT.get()
+      : env.FIREBASE_SERVICE_ACCOUNT_JSON;
+    serviceAccount = JSON.parse(typeof storedCredential === "string" ? storedCredential : ""); }
   catch { throw new Error("Firebase Authentication service identity is not configured correctly."); }
   if (serviceAccount.project_id !== getFirebaseProjectId(env) || typeof serviceAccount.client_email !== "string" || !serviceAccount.client_email.endsWith(".iam.gserviceaccount.com") || typeof serviceAccount.private_key !== "string") {
     throw new Error("Firebase Authentication service identity is invalid for this Firebase project.");
@@ -1684,7 +1698,7 @@ async function controlledDocumentUploadPolicyCheck(request, env) {
   try {
     const claims = await authenticateFirebaseRequest(request, env);
     step = "Resolve active institutional profile";
-    const { memberRecord, employeeRecord } = await getInstitutionalProfileForUser(env, claims);
+    const { memberRecord, employeeRecord } = await getInstitutionalProfileForUser(env, claims, adminToken);
     const adminRecord = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, await getFirestoreAdminAccessToken(env));
     if (!memberRecord && !employeeRecord && !adminRecord?.fields?.active?.booleanValue) {
       return json({ ok: false, step, error: "An active IRPA member, employee or administrator profile is required for controlled document upload policy checks." }, 403, corsHeaders(request));
@@ -1777,7 +1791,7 @@ async function registerControlledDocumentRecord(request, env) {
 
 async function uploadControlledDocument(request, env) {
   const claims = await authenticateFirebaseRequest(request, env);
-  const { memberRecord, employeeRecord } = await getInstitutionalProfileForUser(env, claims);
+  const { memberRecord, employeeRecord } = await getInstitutionalProfileForUser(env, claims, adminToken);
   const adminRecord = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, await getFirestoreAdminAccessToken(env));
   if (!memberRecord && !employeeRecord && !adminRecord?.fields?.active?.booleanValue) {
     return json({ok:false,error:"An active IRPA member, employee or administrator profile is required for controlled document upload."},403,corsHeaders(request));
@@ -2869,8 +2883,8 @@ async function sendRegistrationNumber(request, env) {
   const data = await request.json();
   const uid = cleanId(data.uid || claims.user_id);
   if (uid !== claims.user_id) return json({ok:false,error:"Registration-number email may only be requested for the authenticated account."},403,corsHeaders(request));
-  const member = await getFirestoreDocument(env, `members/${uid}`, claims.token);
-  const employee = await getFirestoreDocument(env, `employees/${uid}`, claims.token);
+  const member = await getFirestoreDocument(env, `members/${uid}`, adminToken);
+  const employee = await getFirestoreDocument(env, `employees/${uid}`, adminToken);
   const memberFields = member?.fields || {};
   const employeeFields = employee?.fields || {};
   const number = employeeFields.employeeNumber?.stringValue || memberFields.memberNumber?.stringValue || "";
@@ -3519,43 +3533,42 @@ async function driveFetch(env, accessToken, path, options = {}) {
 
 async function authenticateFirebaseRequest(request, env, options = {}) {
   const header = request.headers.get("Authorization") || "";
-  const match = header.match(/^Bearer\s+(.+)$/i);
-  if (!match) throw new Error("Firebase authentication is required.");
+  const match = header.match(/^Bearer\s+([^\s]+)$/i);
+  if (!match) {
+    const error = new Error("Firebase authentication is required.");
+    error.status = 401;
+    throw error;
+  }
 
-  const token = match[1];
-  const parts = token.split(".");
-  if (parts.length !== 3) throw new Error("Invalid Firebase ID token.");
+  let payload;
+  try {
+    const jwks = await getFirebaseJwks();
+    const keySet = createLocalJWKSet({ keys: Object.values(jwks) });
+    const verified = await jwtVerify(match[1], keySet, {
+      issuer: `https://securetoken.google.com/${getFirebaseProjectId(env)}`,
+      audience: getFirebaseProjectId(env),
+      algorithms: ["RS256"],
+      requiredClaims: ["exp", "sub", "aud", "iss"],
+      clockTolerance: 5
+    });
+    payload = verified.payload;
+  } catch (cause) {
+    const error = new Error("Firebase ID token is invalid, expired, or not issued for this production project.");
+    error.status = 401;
+    error.cause = cause;
+    throw error;
+  }
 
-  const headerPart = JSON.parse(base64UrlDecode(parts[0]));
-  const payload = JSON.parse(base64UrlDecode(parts[1]));
-  const now = Math.floor(Date.now() / 1000);
-  if (payload.iss !== `https://securetoken.google.com/${getFirebaseProjectId(env)}`) throw new Error("Invalid Firebase token issuer.");
-  if (payload.aud !== getFirebaseProjectId(env)) throw new Error("Invalid Firebase token audience.");
-  if (!payload.sub || Number(payload.exp || 0) <= now) throw new Error("Firebase token is expired.");
-
-  const jwks = await getFirebaseJwks();
-  const jwk = jwks[headerPart.kid];
-  if (!jwk) throw new Error("Firebase token signing key not found.");
-
-  const key = await crypto.subtle.importKey(
-    "jwk",
-    jwk,
-    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
-    false,
-    ["verify"]
-  );
-  const valid = await crypto.subtle.verify(
-    "RSASSA-PKCS1-v1_5",
-    key,
-    base64UrlBytes(parts[2]),
-    new TextEncoder().encode(`${parts[0]}.${parts[1]}`)
-  );
-  if (!valid) throw new Error("Invalid Firebase ID token signature.");
-
+  const uid = String(payload.user_id || payload.sub || "").trim();
+  if (!uid || uid !== String(payload.sub || "").trim()) {
+    const error = new Error("Firebase ID token subject is invalid.");
+    error.status = 401;
+    throw error;
+  }
   const claims = {
-    token,
-    user_id: payload.user_id || payload.sub,
-    email: payload.email || null,
+    token: match[1],
+    user_id: uid,
+    email: typeof payload.email === "string" ? payload.email : null,
     firebaseClaims: {
       admin: payload.admin === true,
       irpaRoles: Array.isArray(payload.irpaRoles) ? payload.irpaRoles : [],
@@ -3569,7 +3582,8 @@ async function authenticateFirebaseRequest(request, env, options = {}) {
 }
 
 async function assertActivatedPortalUser(claims, env) {
-  const admin = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, claims.token);
+  const adminToken = await getFirestoreAdminAccessToken(env);
+  const admin = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, adminToken);
   if (admin?.fields?.active?.booleanValue === true) return;
 
   // Invitation activation preserves the canonical institutional record ID
@@ -3596,35 +3610,6 @@ async function assertActivatedPortalUser(claims, env) {
     throw error;
   }
 }
-
-async function getFirebaseJwks() {
-  if (jwksCache && Date.now() - jwksFetchedAt < 60 * 60 * 1000) {
-    return jwksCache;
-  }
-
-  const response = await fetch(
-    "https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com"
-  );
-
-  if (!response.ok) {
-    throw new Error("Unable to retrieve Firebase signing keys.");
-  }
-
-  const data = await response.json();
-
-  if (!Array.isArray(data.keys) || data.keys.length === 0) {
-    throw new Error("Firebase signing keys were not returned.");
-  }
-
-  jwksCache = Object.fromEntries(
-    data.keys.map((key) => [key.kid, key])
-  );
-
-  jwksFetchedAt = Date.now();
-
-  return jwksCache;
-}
-
 
 async function queryFirestoreByEmail(env, collectionName, fieldName, email, firebaseToken) {
   const value = String(email || "").trim().toLowerCase();
@@ -3720,15 +3705,15 @@ async function getFirestoreDocumentsByEmail(env, collectionName, email, firebase
   return rows.filter(row => row.document).map(row => row.document);
 }
 
-async function getInstitutionalProfileForUser(env, claims) {
+async function getInstitutionalProfileForUser(env, claims, adminToken) {
   const uid = claims.user_id;
   const email = String(claims.email || "").trim().toLowerCase();
-  const directMember = await getFirestoreDocument(env, `members/${uid}`, claims.token);
-  const directEmployee = await getFirestoreDocument(env, `employees/${uid}`, claims.token);
+  const directMember = await getFirestoreDocument(env, `members/${uid}`, adminToken);
+  const directEmployee = await getFirestoreDocument(env, `employees/${uid}`, adminToken);
   if (directMember || directEmployee) return { memberRecord: directMember, employeeRecord: directEmployee };
   const [memberMatches, employeeMatches] = await Promise.all([
-    getFirestoreDocumentsByEmail(env, "members", email, claims.token),
-    getFirestoreDocumentsByEmail(env, "employees", email, claims.token)
+    getFirestoreDocumentsByEmail(env, "members", email, adminToken),
+    getFirestoreDocumentsByEmail(env, "employees", email, adminToken)
   ]);
   return {
     memberRecord: memberMatches[0] || null,
@@ -3783,7 +3768,10 @@ async function getFirestoreAdminAccessToken(env) {
   let diagnosticStep = "token creation";
   let serviceAccount;
   try {
-    serviceAccount = JSON.parse(env.FIREBASE_SERVICE_ACCOUNT_JSON || "");
+    const storedCredential = env.FIREBASE_SERVICE_ACCOUNT && typeof env.FIREBASE_SERVICE_ACCOUNT.get === "function"
+      ? await env.FIREBASE_SERVICE_ACCOUNT.get()
+      : env.FIREBASE_SERVICE_ACCOUNT_JSON;
+    serviceAccount = JSON.parse(typeof storedCredential === "string" ? storedCredential : "");
   } catch {
     throw new Error("Privileged Firestore identity is not configured correctly.");
   }
@@ -4058,9 +4046,10 @@ function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
+// Staging origins https://irpa-dbg-staging-a73ec.web.app and https://irpa-dbg-staging-a73ec.firebaseapp.com are intentionally excluded from this production CORS allowlist.
 function corsHeaders(request) {
   const origin = request.headers.get("Origin") || "";
-  const allowed = origin === "https://irpa-digital-board-governance-frontend.irpa-governance.workers.dev" || origin === "https://irpa.or.tz" || origin === "https://www.irpa.or.tz" || origin === "https://irpa-digital-board-governance.web.app" || origin === "https://irpa-digital-board-governance.firebaseapp.com" || origin === "http://localhost:5173" || origin === "https://staging.irpa.or.tz" || origin === "https://irpa-dgb-meeting-room-staging.irpa-governance.workers.dev" || origin === "https://irpa-dbg-staging-a73ec.web.app" || origin === "https://irpa-dbg-staging-a73ec.firebaseapp.com";
+  const allowed = origin === "https://irpa-digital-board-governance-frontend.irpa-governance.workers.dev" || origin === "https://irpa.or.tz" || origin === "https://www.irpa.or.tz" || origin === "https://irpa-digital-board-governance.web.app" || origin === "https://irpa-digital-board-governance.firebaseapp.com";
   return {
     "Access-Control-Allow-Origin": allowed ? origin : "https://irpa.or.tz",
     "Access-Control-Allow-Headers": "Authorization, Content-Type, X-IRPA-Invitation-Version, x-signing-token",

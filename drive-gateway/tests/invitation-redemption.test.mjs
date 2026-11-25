@@ -7,6 +7,7 @@ const {privateKey, publicKey}=generateKeyPairSync("rsa",{modulusLength:2048});
 const privateKeyPem=privateKey.export({type:"pkcs8",format:"pem"});
 const publicKeyPem=publicKey.export({type:"spki",format:"pem"});
 const serviceAccount={
+  project_id:"irpa-digital-board-governance",
   client_email:"irpa-test@irpa-digital-board-governance.iam.gserviceaccount.com",
   private_key:privateKeyPem
 };
@@ -476,8 +477,9 @@ test("portal activation gate rejects a valid Firebase ID token whose member reco
   const originalFetch=global.fetch;
   const jwk=publicKey.export({format:"jwk"});
   const idToken=makeFirebaseIdToken("pending-portal-uid");
-  global.fetch=async(url)=>{
+  global.fetch=async(url,options={})=>{
     const target=String(url);
+    if(target==="https://oauth2.googleapis.com/token") return new Response(JSON.stringify({access_token:"test-google-access-token",expires_in:3600}),{status:200});
     if(target.includes("securetoken@system.gserviceaccount.com")) return new Response(JSON.stringify({keys:[{...jwk,kid:"invitation-test-key",alg:"RS256",use:"sig"}]}),{status:200});
     if(target.includes("/documents/adminProfiles/pending-portal-uid")) return new Response("",{status:404});
     if(target.includes("/documents/members/pending-portal-uid")) return new Response(JSON.stringify({fields:{status:{stringValue:"Pending"},accountActivated:{booleanValue:false}}}),{status:200});
@@ -485,7 +487,7 @@ test("portal activation gate rejects a valid Firebase ID token whose member reco
     throw new Error("Unexpected external request: "+target);
   };
   try{
-    const response=await handler.fetch(new Request("https://gw.test/api/esign/cleanup",{method:"POST",headers:{Authorization:"Bearer "+idToken,"Content-Type":"application/json"},body:"{}"}),{FIREBASE_PROJECT_ID:"irpa-digital-board-governance",ESIGN_MODULE_ENABLED:"true"});
+    const response=await handler.fetch(new Request("https://gw.test/api/esign/cleanup",{method:"POST",headers:{Authorization:"Bearer "+idToken,"Content-Type":"application/json"},body:"{}"}),{FIREBASE_PROJECT_ID:"irpa-digital-board-governance",FIREBASE_SERVICE_ACCOUNT_JSON:JSON.stringify(serviceAccount),ESIGN_MODULE_ENABLED:"true"});
     assert.equal(response.status,403);
     assert.deepEqual(await response.json(),{ok:false,error:"IRPA_INVITATION_FAILURE:PORTAL_ACTIVATION_REQUIRED"});
   } finally { global.fetch=originalFetch; }
@@ -740,6 +742,7 @@ test("activated canonical Board Member record authorizes portal access when its 
   global.fetch=async(url,options={})=>{
     const target=String(url);
 
+    if(target==="https://oauth2.googleapis.com/token") return new Response(JSON.stringify({access_token:"test-google-access-token",expires_in:3600}),{status:200});
     if(target.includes("securetoken@system.gserviceaccount.com")){
       return new Response(JSON.stringify({keys:[{...jwk,kid:"invitation-test-key",alg:"RS256",use:"sig"}]}),{status:200});
     }

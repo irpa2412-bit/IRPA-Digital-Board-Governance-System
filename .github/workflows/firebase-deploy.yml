@@ -51,14 +51,6 @@ on:
         required: true
         type: string
         default: "no"
-      authorize_production_functions_deployment:
-        description: "Owner approval to deploy production Firebase Functions"
-        required: true
-        type: choice
-        options:
-          - "no"
-          - "yes"
-        default: "no"
 
 jobs:
   build-and-deploy:
@@ -445,69 +437,9 @@ jobs:
           echo "Firebase Hosting bundle still does not match build $EXPECTED_BUILD_COMMIT after 18 attempts." >&2
           exit 1
 
-      # Keep Firebase function deployments independent from Firestore. The frontend is deployed by cloudflare-pages-deploy.yml.
-      # Google Cloud billing is currently closed for this project, so new Cloud Functions
-      # deployments cannot activate Cloud Build/Artifact Registry. Existing deployed
-      # functions remain untouched; deployment can be re-enabled when billing is restored.
-      - name: Deploy login authorization resolver
-        if: github.event_name == 'workflow_dispatch' && inputs.authorize_production_functions_deployment == 'yes'
-        continue-on-error: true
-        uses: w9jds/firebase-action@v14.17.0
-        with:
-          args: deploy --project irpa-digital-board-governance --only functions:resolveAuthenticatedLoginContext
-        env:
-          GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
-
-      - name: Deploy retained Firebase password-reset function
-        if: github.event_name == 'workflow_dispatch' && inputs.authorize_production_functions_deployment == 'yes'
-        continue-on-error: true
-        uses: w9jds/firebase-action@v14.17.0
-        with:
-          args: deploy --project irpa-digital-board-governance --only functions:preparePasswordResetPhone
-        env:
-          GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
-      
-      - name: Deploy actual-data access control callables
-        if: github.event_name == 'workflow_dispatch' && inputs.authorize_production_functions_deployment == 'yes'
-        id: actual_data_gate
-        continue-on-error: true
-        uses: w9jds/firebase-action@v14.17.0
-        with:
-          args: deploy --project irpa-digital-board-governance --only functions:getActualDataAccessStatus,functions:setActualDataAccess
-        env:
-          GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
-
-      - name: Report actual-data gate callable deployment status
-        if: always()
-        env:
-          ACTUAL_DATA_GATE_OUTCOME: ${{ steps.actual_data_gate.outcome }}
-        run: |
-          if [ "$ACTUAL_DATA_GATE_OUTCOME" = "success" ]; then
-            echo "ACTUAL_DATA_GATE_CALLABLES_DEPLOYED=true"
-          else
-            echo "::warning::Firestore rules keep actual operational writes closed, but administrator-controlled reopening remains unavailable until both actual-data gate callables deploy successfully. Check Cloud Functions billing, API enablement and service-account permissions."
-          fi
-
-      - name: Deploy signed meeting attendance register callables
-        if: github.event_name == 'workflow_dispatch' && inputs.authorize_production_functions_deployment == 'yes'
-        id: attendance_register
-        continue-on-error: true
-        uses: w9jds/firebase-action@v14.17.0
-        with:
-          args: deploy --project irpa-digital-board-governance --only functions:signMeetingAttendance,functions:getMeetingAttendanceRegister
-        env:
-          GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
-
-      - name: Report meeting attendance callable deployment status
-        if: always()
-        env:
-          ATTENDANCE_REGISTER_OUTCOME: ${{ steps.attendance_register.outcome }}
-        run: |
-          if [ "$ATTENDANCE_REGISTER_OUTCOME" = "success" ]; then
-            echo "MEETING_ATTENDANCE_REGISTER_CALLABLES_DEPLOYED=true"
-          else
-            echo "::warning::Meeting attendance UI is published, but its server-side signing/retrieval callables were not deployed. Check Firebase Cloud Functions billing, API enablement and service-account permissions before treating the register as live."
-          fi
+      # Actual-data access is served by the authenticated Cloudflare Gateway route. Meeting attendance
+      # server endpoints are being migrated to the same Worker; no Firebase Cloud Functions deploys
+      # are part of this production workflow (Spark-plan compatible).
       # Invitation removal is served by /api/invitations/remove on the Cloudflare gateway.
       # Firebase Cloud Functions deployment is intentionally not used for this migrated endpoint.
 

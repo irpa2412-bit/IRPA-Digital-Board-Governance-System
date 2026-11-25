@@ -1,0 +1,115 @@
+name: Deploy production Firestore rules and indexes (no Cloud Functions)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_production_firestore_rules_deployment:
+        description: "Type DEPLOY RULES to publish production Firestore rules and indexes"
+        required: true
+        type: string
+        default: "no"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: irpa-firestore-production-release
+  cancel-in-progress: false
+
+jobs:
+  deploy-firestore:
+    name: Publish and verify Firestore configuration
+    environment: production
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require explicit owner confirmation
+        if: ${{ inputs.confirm_production_firestore_rules_deployment != 'DEPLOY RULES' }}
+        run: |
+          echo "::error::Production Firestore deployment requires the exact 'DEPLOY RULES' confirmation."
+          exit 1
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Authenticate to the production Firebase project
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
+          project_id: irpa-digital-board-governance
+
+      - name: Install Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: irpa-digital-board-governance
+
+      - name: Deploy Firestore Rules and Indexes only
+        if: github.event_name == 'workflow_dispatch' && inputs.confirm_production_firestore_rules_deployment == 'DEPLOY RULES'
+        run: |
+          set -euo pipefail
+          npx --yes firebase-tools deploy --project irpa-digital-board-governance --only firestore:rules,firestore:indexes --non-interactive
+
+      - name: Verify published rules release timestamp
+        id: rules
+        shell: bash
+        run: |
+          set -euo pipefail
+          access_token="$(gcloud auth print-access-token)"
+          release="$(curl --fail --silent --show-error -H "Authorization: Bearer $access_token" \
+            "https://firebaserules.googleapis.com/v1/projects/irpa-digital-board-governance/releases/cloud.firestore")"
+          ruleset_name="$(jq -r '.rulesetName // empty' <<< "$release")"
+          test -n "$ruleset_name"
+          ruleset_id="${ruleset_name##*/}"
+          ruleset="$(curl --fail --silent --show-error -H "Authorization: Bearer $access_token" \
+            "https://firebaserules.googleapis.com/v1/projects/irpa-digital-board-governance/rulesets/$ruleset_id")"
+          create_time="$(jq -r '.createTime // empty' <<< "$ruleset")"
+          test -n "$create_time"
+          release_date="$(date -u -d "$create_time" +%Y-%m-%d)"
+          today="$(date -u +%Y-%m-%d)"
+          if [[ "$release_date" != "$today" ]]; then
+            echo "::error::Live Firestore ruleset timestamp is not today's date ($today); got $create_time."
+            exit 1
+          fi
+          echo "ruleset=$ruleset_name" >> "$GITHUB_OUTPUT"
+          echo "created_at=$create_time" >> "$GITHUB_OUTPUT"
+          echo "LIVE_FIRESTORE_RULESET=$ruleset_name"
+          echo "LIVE_FIRESTORE_RULES_CREATED_AT=$create_time"
+
+      - name: Wait until every configured composite index is READY
+        shell: bash
+        run: |
+          set -euo pipefail
+          deadline=$((SECONDS + 1200))
+          while (( SECONDS < deadline )); do
+            indexes="$(gcloud firestore indexes composite list --project=irpa-digital-board-governance --database='(default)' --format=json)"
+            pending="$(jq '[.[] | select(.state != "READY")] | length' <<< "$indexes")"
+            failed="$(jq '[.[] | select(.state == "NEEDS_REPAIR")] | length' <<< "$indexes")"
+            total="$(jq 'length' <<< "$indexes")"
+            echo "COMPOSITE_INDEX_TOTAL=$total PENDING=$pending NEEDS_REPAIR=$failed"
+            if (( failed > 0 )); then
+              echo "::error::At least one composite index requires repair."
+              jq -r '.[] | select(.state == "NEEDS_REPAIR") | [.name,.state] | @tsv' <<< "$indexes"
+              exit 1
+            fi
+            if (( pending == 0 )); then
+              echo "LIVE_COMPOSITE_INDEXES_READY=true"
+              jq -r '.[] | [.name,.state] | @tsv' <<< "$indexes"
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "::error::Composite indexes did not all reach READY within 20 minutes."
+          exit 1
+
+      - name: Publish release evidence
+        if: always()
+        run: |
+          {
+            echo "### Production Firestore release evidence"
+            echo "- Project: irpa-digital-board-governance"
+            echo "- Ruleset: ${{ steps.rules.outputs.ruleset }}"
+            echo "- Ruleset created at: ${{ steps.rules.outputs.created_at }}"
+            echo "- Rules and indexes only; no Cloud Functions deployment was attempted."
+          } >> "$GITHUB_STEP_SUMMARY"

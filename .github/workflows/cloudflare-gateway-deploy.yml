@@ -79,7 +79,8 @@ jobs:
           const bindings = Array.isArray(response.result?.bindings) ? response.result.bindings : [];
           const managed = new Map([
             ["DRIVE_KV", "kv_namespace"],
-            ["ESIGN_DO", "durable_object_namespace"]
+            ["ESIGN_DO", "durable_object_namespace"],
+            ["FIREBASE_SERVICE_ACCOUNT", "secrets_store_secret"]
           ]);
           const resourceTypes = new Set([
             "kv_namespace", "durable_object_namespace", "r2_bucket", "d1", "service",
@@ -132,6 +133,16 @@ jobs:
             if (remoteId !== configuredDriveKvId) throw new Error("Safety stop: production DRIVE_KV differs from the controlled repository DRIVE_KV ID.");
           }
 
+          const firebaseAccountBindings = bindings.filter(b => b.name === "FIREBASE_SERVICE_ACCOUNT");
+          if (firebaseAccountBindings.length > 1) throw new Error("Safety stop: production Worker contains duplicate FIREBASE_SERVICE_ACCOUNT bindings.");
+          if (firebaseAccountBindings.length === 1) {
+            const binding = firebaseAccountBindings[0];
+            if (String(binding.store_id || "") !== "27d6d55c4704412bba09a56d1a999435" ||
+                String(binding.secret_name || "") !== "FIREBASE_SERVICE_ACCOUNT") {
+              throw new Error("Safety stop: existing production Firestore Secrets Store binding points to a different store or secret.");
+            }
+          }
+
           const esignBindings = bindings.filter(b => b.name === "ESIGN_DO");
           if (esignBindings.length > 1) throw new Error("Safety stop: production Worker contains more than one ESIGN_DO binding.");
           if (esignBindings.length === 1 && String(esignBindings[0].class_name || "") !== "EsignRecordDurableObject") {
@@ -149,6 +160,10 @@ jobs:
             main: "src/index.js",
             compatibility_date: "2026-09-24",
             vars: {
+              FIREBASE_PROJECT_ID: "irpa-digital-board-governance",
+              AUTHORIZED_DRIVE_EMAIL: "irpa2412@gmail.com",
+              IRPA_APP_URL: "https://irpa-digital-board-governance.web.app",
+              IRPA_ENVIRONMENT: "production",
               ESIGN_MODULE_ENABLED: "true",
               CLOUDFLARE_AUTH_FUNCTIONS_ENABLED: "true",
               IRPA_PRODUCTION_CUTOVER: "true",
@@ -160,6 +175,11 @@ jobs:
             durable_objects: {
               bindings: [{ name: "ESIGN_DO", class_name: "EsignRecordDurableObject" }]
             },
+            secrets_store_secrets: [{
+              binding: "FIREBASE_SERVICE_ACCOUNT",
+              store_id: "27d6d55c4704412bba09a56d1a999435",
+              secret_name: "FIREBASE_SERVICE_ACCOUNT"
+            }],
             migrations: [{
               tag: "esign-do-v1",
               new_sqlite_classes: ["EsignRecordDurableObject"]
@@ -177,6 +197,8 @@ jobs:
           const fs = require("fs");
           const c = JSON.parse(fs.readFileSync("wrangler.json", "utf8"));
           if (c.name !== "irpa-google-drive-gateway") throw new Error("Worker identity mismatch.");
+          if (c.vars?.FIREBASE_PROJECT_ID !== "irpa-digital-board-governance") throw new Error("Production Firebase project binding is incorrect. Deployment blocked.");
+          if (c.vars?.IRPA_ENVIRONMENT !== "production") throw new Error("Worker environment must be production. Deployment blocked.");
           if (c.vars?.ESIGN_MODULE_ENABLED !== "true") throw new Error("Production e-signature flag is not exactly true. Deployment blocked.");
           if (c.vars?.CLOUDFLARE_AUTH_FUNCTIONS_ENABLED !== "true") throw new Error("Production Cloudflare authentication cutover flag is not exactly true. Deployment blocked.");
           if (c.vars?.IRPA_PRODUCTION_CUTOVER !== "true") throw new Error("Explicit production cutover marker is missing. Deployment blocked.");
@@ -189,13 +211,20 @@ jobs:
           if (doBindings.length !== 1 || doBindings[0]?.name !== "ESIGN_DO" || doBindings[0]?.class_name !== "EsignRecordDurableObject") {
             throw new Error("Production ESIGN_DO binding is invalid. Deployment blocked.");
           }
+          const secretBindings = c.secrets_store_secrets || [];
+          if (secretBindings.length !== 1 ||
+              secretBindings[0]?.binding !== "FIREBASE_SERVICE_ACCOUNT" ||
+              secretBindings[0]?.store_id !== "27d6d55c4704412bba09a56d1a999435" ||
+              secretBindings[0]?.secret_name !== "FIREBASE_SERVICE_ACCOUNT") {
+            throw new Error("Production Firestore Secrets Store binding is missing or does not match the approved store and secret. Deployment blocked.");
+          }
           const migrations = Array.isArray(c.migrations) ? c.migrations : [];
           const migration = migrations.find(m => m?.tag === "esign-do-v1");
           if (!migration || !Array.isArray(migration.new_sqlite_classes) || migration.new_sqlite_classes.length !== 1 ||
               migration.new_sqlite_classes[0] !== "EsignRecordDurableObject") {
             throw new Error("ESIGN_DO migration is missing or invalid. Deployment blocked.");
           }
-          const topLevelKeys = new Set(["name", "main", "compatibility_date", "vars", "kv_namespaces", "durable_objects", "migrations"]);
+          const topLevelKeys = new Set(["name", "main", "compatibility_date", "vars", "kv_namespaces", "durable_objects", "secrets_store_secrets", "migrations"]);
           for (const key of Object.keys(c)) {
             if (!topLevelKeys.has(key)) throw new Error(`Safety stop: unexpected generated Wrangler configuration key "${key}".`);
           }
@@ -216,6 +245,34 @@ jobs:
           workingDirectory: drive-gateway
           command: deploy --keep-vars --var GIT_SHA:${{ github.sha }} --var ESIGN_MODULE_ENABLED:true --var CLOUDFLARE_AUTH_FUNCTIONS_ENABLED:true --var IRPA_PRODUCTION_CUTOVER:true
 
+      - name: Record production Worker deployment ID and version
+        id: production-worker-version
+        env:
+          CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          deployments="$(curl --fail --silent --show-error \
+            -H "Authorization: Bearer $CF_API_TOKEN" \
+            -H "Accept: application/json" \
+            "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/workers/scripts/irpa-google-drive-gateway/deployments")"
+          node - "$deployments" <<'NODE'
+          const a=JSON.parse(process.argv[2]);
+          const d=a?.result?.deployments?.[0];
+          const v=d?.versions?.find(x=>Number(x?.percentage)===100)?.version_id;
+          if(!a?.success || !d?.id || !v) throw new Error("Could not verify the active production Worker deployment and version.");
+          console.log("WORKER_DEPLOYMENT_ID="+d.id);
+          console.log("WORKER_VERSION_ID="+v);
+          console.log("WORKER_URL=https://irpa-google-drive-gateway.irpa-governance.workers.dev");
+          const fs=require("fs");
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, [
+            "### Production Worker deployment",
+            "- Deployment ID: "+d.id,
+            "- Version ID: "+v,
+            "- URL: https://irpa-google-drive-gateway.irpa-governance.workers.dev"
+          ].join("\n")+"\n");
+          NODE
+
       - name: Verify production gateway
         id: verify-production-gateway
         env:
@@ -235,6 +292,32 @@ jobs:
             exit 1
           fi
           echo "Cloudflare Gateway routed /api/meeting-transcripts/translate and enforced authentication (HTTP 401 without credentials)."
+
+      - name: Verify Worker token rejection for actual-data and attendance routes
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://irpa-google-drive-gateway.irpa-governance.workers.dev"
+          for route in "/api/system/actual-data-access" "/api/meeting-attendance/register"; do
+            method="GET"
+            data=""
+            if [[ "$route" == "/api/meeting-attendance/register" ]]; then
+              method="POST"
+              data='{"meetingId":"pcu-auth-negative-probe"}'
+            fi
+            for token_case in missing invalid; do
+              args=(-sS -o /tmp/pcu-auth-response.json -w "%{http_code}" -X "$method" -H "Content-Type: application/json")
+              if [[ "$token_case" == "invalid" ]]; then args+=(-H "Authorization: Bearer invalid.pcu.token"); fi
+              if [[ "$method" == "POST" ]]; then args+=(-d "$data"); fi
+              code="$(curl "${args[@]}" "$base$route")"
+              if [[ "$code" != "401" ]]; then
+                echo "::error::Expected HTTP 401 for $route with $token_case token; received HTTP $code."
+                cat /tmp/pcu-auth-response.json
+                exit 1
+              fi
+              echo "PASS: $route rejected $token_case token with HTTP 401."
+            done
+          done
 
       - name: Verify production CORS
         run: |
