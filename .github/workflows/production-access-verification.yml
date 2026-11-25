@@ -214,3 +214,49 @@ jobs:
             if(memberFailures.length){console.error("Member test failures: "+memberFailures.join(", "));process.exitCode=1;}
           }
           NODE
+      - name: Final test-profile cleanup (always)
+        if: always()
+        shell: bash
+        env:
+          SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
+          PROJECT: irpa-digital-board-governance
+          TEST_UID: 35DB21ai9ERpshQ3FKa51ilOqxm1
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const crypto=require("node:crypto");
+          const project=process.env.PROJECT, uid=process.env.TEST_UID, raw=process.env.SERVICE_ACCOUNT_JSON;
+          if(!raw) throw Error("Final cleanup blocked: production service-account secret is unavailable.");
+          const sa=JSON.parse(raw), now=Math.floor(Date.now()/1000);
+          if(sa.project_id!==project||!sa.client_email||!sa.private_key) throw Error("Final cleanup blocked: service-account project/key metadata mismatch.");
+          const enc=o=>Buffer.from(JSON.stringify(o)).toString("base64url");
+          const unsigned=enc({alg:"RS256",typ:"JWT"})+"."+enc({iss:sa.client_email,scope:"https://www.googleapis.com/auth/datastore",aud:sa.token_uri||"https://oauth2.googleapis.com/token",iat:now,exp:now+3600});
+          const assertion=unsigned+"."+crypto.sign("RSA-SHA256",Buffer.from(unsigned),sa.private_key).toString("base64url");
+          const tr=await fetch(sa.token_uri||"https://oauth2.googleapis.com/token",{method:"POST",headers:{"content-type":"application/x-www-form-urlencoded"},body:new URLSearchParams({grant_type:"urn:ietf:params:oauth:grant-type:jwt-bearer",assertion})});
+          const tj=await tr.json().catch(()=>({}));
+          if(!tr.ok||!tj.access_token) throw Error("Final cleanup OAuth failed (HTTP "+tr.status+").");
+          const base=`https://firestore.googleapis.com/v1/projects/${project}/databases/(default)/documents/members/${uid}`;
+          const headers={Authorization:"Bearer "+tj.access_token,"Content-Type":"application/json"};
+          const read=await fetch(base,{headers});
+          if(read.status===404){
+            const table="| production record | action | detail |\\n|---|---|---|\\n| members/"+uid+" | ABSENT | final cleanup verified no profile remains |";
+            console.log("FINAL PRODUCTION WRITES\\n"+table);
+            require("node:fs").appendFileSync(process.env.GITHUB_STEP_SUMMARY,"\\n## Final cleanup verification\\n\\n"+table+"\\n");
+            process.exit(0);
+          }
+          if(!read.ok) throw Error("Final cleanup profile read failed (HTTP "+read.status+").");
+          const doc=await read.json();
+          if(doc.fields?.testAccount?.booleanValue!==true){
+            const table="| production record | action | detail |\\n|---|---|---|\\n| members/"+uid+" | PRESERVED | testAccount is not exactly true; no deletion performed |";
+            console.error("FINAL PRODUCTION WRITES\\n"+table);
+            require("node:fs").appendFileSync(process.env.GITHUB_STEP_SUMMARY,"\\n## Final cleanup verification\\n\\n"+table+"\\n");
+            throw Error("Test profile remains but testAccount is not exactly true; safety guard preserved it.");
+          }
+          const del=await fetch(base,{method:"DELETE",headers});
+          if(!del.ok&&del.status!==404) throw Error("Final cleanup DELETE failed (HTTP "+del.status+").");
+          const verify=await fetch(base,{headers});
+          if(verify.status!==404) throw Error("Final cleanup verification failed; test profile still exists (HTTP "+verify.status+").");
+          const table="| production record | action | detail |\\n|---|---|---|\\n| members/"+uid+" | DELETED | deleted only after testAccount == true; absence verified |";
+          console.log("FINAL PRODUCTION WRITES\\n"+table);
+          require("node:fs").appendFileSync(process.env.GITHUB_STEP_SUMMARY,"\\n## Final cleanup verification\\n\\n"+table+"\\n");
+          NODE
