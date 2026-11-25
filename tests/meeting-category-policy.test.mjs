@@ -69,6 +69,15 @@ test("meeting archive access is universal for IRPA identities except Board-restr
   assert.match(gateway, /This account is not an IRPA identity or a verified invitee for the selected meeting/);
 });
 
+test("initiator edit authority ends at proceedings and meeting roles remain meeting-specific", () => {
+  const policy = readFileSync(new URL("../src/firebase/meetingPolicy.js", import.meta.url), "utf8");
+  assert.match(policy, /const initiator=String\(meeting\.initiatorUid\|\|""\)===uid&&!\["in progress","completed","cancelled","canceled"\]/);
+  assert.match(policy, /meeting\.meetingAdministratorUid/);
+  assert.match(policy, /return initiator\|\|assigned\.map/);
+  const worker = readFileSync(new URL("../drive-gateway/src/meetingServices.mjs", import.meta.url), "utf8");
+  assert.match(worker, /const initiatorCanManage=clean\(meeting\.initiatorUid\)===uid&&!\["in progress","completed","cancelled","canceled"\]/);
+});
+
 test("minutes editing and report distribution belong to the meeting-specific Chairperson and Secretary", () => {
   const meetings = readFileSync(new URL("../src/pages/Meetings.jsx", import.meta.url), "utf8");
   assert.match(meetings, /const meetingSecretariat=Boolean\(selected&&/);
