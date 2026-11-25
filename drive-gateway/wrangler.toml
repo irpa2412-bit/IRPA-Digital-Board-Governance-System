@@ -29,6 +29,11 @@ IRPA_ENVIRONMENT = "production"
 binding = "DRIVE_KV"
 id = "ccdbffa662ac48bfbdf7f4b1f62ca941"
 
+[[secrets_store_secrets]]
+binding = "FIREBASE_SERVICE_ACCOUNT"
+store_id = "27d6d55c4704412bba09a56d1a999435"
+secret_name = "FIREBASE_SERVICE_ACCOUNT"
+
 [[durable_objects.bindings]]
 name = "ESIGN_DO"
 class_name = "EsignRecordDurableObject"
