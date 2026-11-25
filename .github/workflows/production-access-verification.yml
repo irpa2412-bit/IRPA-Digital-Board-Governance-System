@@ -1,0 +1,111 @@
+name: Production access verification (no deployment)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: irpa-production-access-verification
+  cancel-in-progress: false
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PROJECT: irpa-digital-board-governance
+      API_KEY: ${{ secrets.FIREBASE_WEB_API_KEY }}
+      MEMBER_EMAIL: ${{ secrets.PROD_TEST_MEMBER_EMAIL }}
+      MEMBER_PASSWORD: ${{ secrets.PROD_TEST_MEMBER_PASSWORD }}
+      ADMIN_EMAIL: ${{ secrets.PROD_TEST_ADMIN_EMAIL }}
+      ADMIN_PASSWORD: ${{ secrets.PROD_TEST_ADMIN_PASSWORD }}
+      WORKER: https://irpa-google-drive-gateway.irpa-governance.workers.dev
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validate secrets (values are never printed)
+        shell: bash
+        run: |
+          set -euo pipefail
+          for n in API_KEY MEMBER_EMAIL MEMBER_PASSWORD ADMIN_EMAIL ADMIN_PASSWORD; do
+            if [ -z "${!n:-}" ]; then echo "Missing required secret: $n"; exit 1; fi
+          done
+          test "$MEMBER_EMAIL" != "$ADMIN_EMAIL"
+          echo "Production target and required secret names validated; credential values redacted."
+      - name: Run live production verification
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs=require("node:fs"), crypto=require("node:crypto");
+          const base=`https://firestore.googleapis.com/v1/projects/${process.env.PROJECT}/databases/(default)/documents`;
+          const worker=process.env.WORKER, rows=[];
+          let member,admin,probeField,probePath,probeOriginal,probeExisted=false,probeWritten=false;
+          const add=(t,e,a,p)=>rows.push({t,e,a:String(a),p:!!p});
+          const auth=async(email,password)=>{
+            const r=await fetch("https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key="+encodeURIComponent(process.env.API_KEY),{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({email,password,returnSecureToken:true})});
+            const j=await r.json().catch(()=>({}));
+            if(!r.ok||!j.idToken||!j.localId)throw Error("sign-in HTTP "+r.status);
+            return {token:j.idToken,uid:j.localId,email:String(j.email||email).toLowerCase()};
+          };
+          const req=(url,token,method="GET",body)=>fetch(url,{method,headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},...(body===undefined?{}:{body:JSON.stringify(body)})});
+          const get=async(path,token)=>{const r=await req(base+"/"+path,token);if(r.status===404)return null;if(!r.ok)throw Error("Firestore GET HTTP "+r.status);return r.json();};
+          const q=async(field,value,token)=>{const r=await req(base+":runQuery",token,"POST",{structuredQuery:{from:[{collectionId:"participants"}],where:{fieldFilter:{field:{fieldPath:field},op:"EQUAL",value:{stringValue:value}}},limit:10}});if(!r.ok)return[];return(await r.json()).filter(x=>x.document).map(x=>x.document);};
+          const call=(path,token,method="GET",body)=>req(worker+path,token,method,body);
+          try {
+            try { member=await auth(process.env.MEMBER_EMAIL,process.env.MEMBER_PASSWORD); add("Member Firebase sign-in","200","200",true); }
+            catch(e){add("Member Firebase sign-in","200",e.message,false);}
+            try { admin=await auth(process.env.ADMIN_EMAIL,process.env.ADMIN_PASSWORD); add("Admin Firebase sign-in","200","200",true); }
+            catch(e){add("Admin Firebase sign-in","200",e.message,false);}
+
+            if(member){
+              try {
+                const docs=[...await q("uid",member.uid,member.token),...await q("participantUid",member.uid,member.token),...await q("userId",member.uid,member.token)];
+                const d=docs.find(x=>x.fields?.meetingId?.stringValue);
+                if(!d)throw Error("No existing meeting participant found for member; no fixture created");
+                const r=await call("/api/meeting-attendance/register",member.token,"POST",{meetingId:d.fields.meetingId.stringValue});
+                add("Member attendance Worker call","2xx","HTTP "+r.status,r.ok);
+              }catch(e){add("Member attendance Worker call","2xx",e.message,false);}
+              try {
+                const r=await call("/api/system/actual-data-access",member.token,"POST",{enabled:true,confirmation:""});
+                add("Member actual-data write gate","403","HTTP "+r.status,r.status===403);
+              }catch(e){add("Member actual-data write gate","403",e.message,false);}
+              try {
+                const d=await get("members/"+member.uid,member.token); if(!d)throw Error("Member profile missing");
+                probePath="members/"+member.uid; probeField="productionProbe_"+crypto.randomUUID().replace(/-/g,"");
+                probeExisted=Object.hasOwn(d.fields||{},probeField); probeOriginal=d.fields?.[probeField];
+                const r=await req(base+"/"+probePath+"?updateMask.fieldPaths="+encodeURIComponent(probeField),member.token,"PATCH",{fields:{[probeField]:{stringValue:"temporary-verification"}}});
+                probeWritten=r.ok; add("Member allowed Firestore write","2xx","HTTP "+r.status,r.ok);
+              }catch(e){add("Member allowed Firestore write","2xx",e.message,false);}
+              try {
+                const id="production-probe-"+crypto.randomUUID();
+                const r=await req(base+"/systemResetPlans?documentId="+id,member.token,"POST",{fields:{probe:{booleanValue:true}}});
+                add("Member denied Firestore write","403","HTTP "+r.status,r.status===403);
+              }catch(e){add("Member denied Firestore write","403",e.message,false);}
+            }else{
+              for(const [t,e] of [["Member attendance Worker call","2xx"],["Member actual-data write gate","403"],["Member allowed Firestore write","2xx"],["Member denied Firestore write","403"]])add(t,e,"NOT RUN: member sign-in failed",false);
+            }
+            if(admin){
+              try {
+                const p=await get("adminProfiles/"+admin.uid,admin.token);
+                const isPrimary=admin.email==="irpa2412@gmail.com";
+                const authorised=isPrimary||(p?.fields?.active?.booleanValue===true&&p?.fields?.role?.stringValue==="Administrator");
+                const r=await call("/api/system/actual-data-access",admin.token,"GET");
+                add("Admin actual-data gate read","200 and admin identity verified","HTTP "+r.status+(authorised?" (profile verified)":" (profile not verified)"),r.ok&&authorised);
+              }catch(e){add("Admin actual-data gate read","200 and admin identity verified",e.message,false);}
+            }else add("Admin actual-data gate read","200 and admin identity verified","NOT RUN: admin sign-in failed",false);
+          } finally {
+            if(member&&probeWritten&&probePath&&probeField){
+              try{
+                const body=probeExisted?{fields:{[probeField]:probeOriginal}}:{fields:{}};
+                const r=await req(base+"/"+probePath+"?updateMask.fieldPaths="+encodeURIComponent(probeField),member.token,"PATCH",body);
+                const d=await get(probePath,member.token);
+                const restored=r.ok&&(probeExisted?JSON.stringify(d?.fields?.[probeField])===JSON.stringify(probeOriginal):!Object.hasOwn(d?.fields||{},probeField));
+                add("Allowed-write cleanup","exact restoration","HTTP "+r.status,restored);
+              }catch(e){add("Allowed-write cleanup","exact restoration",e.message,false);}
+            }else add("Allowed-write cleanup","no residual test data","not required",true);
+            const table=["| test | expected | actual | pass/fail |","|---|---|---|---|",...rows.map(x=>`| ${x.t} | ${x.e} | ${x.a.replace(/\|/g,"/")} | ${x.p?"PASS":"FAIL"} |`)].join("\n");
+            console.log(table); fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,"## Production verification\n\n"+table+"\n");
+            if(rows.some(x=>!x.p))process.exitCode=1;
+          }
+          NODE
