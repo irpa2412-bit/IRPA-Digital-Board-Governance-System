@@ -10,7 +10,9 @@ const ALLOWED_CONTENT_TYPES = new Set([
   "application/epub+zip","application/json","application/xml","text/xml","image/png","image/jpeg","image/webp","image/svg+xml",
   "image/gif","image/bmp","image/tiff","image/avif","application/zip","video/mp4","video/webm","video/quicktime","video/x-msvideo","video/x-matroska","audio/mpeg","audio/wav","audio/x-wav","audio/webm","audio/mp4","audio/x-m4a","audio/aac","audio/ogg","audio/flac"
 ]);
-const OAUTH_STATE_TTL = 600;\nconst FIREBASE_SECURE_TOKEN_JWKS = createRemoteJWKSet(new URL("https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com"));\nfunction getFirebaseJwks() { return FIREBASE_SECURE_TOKEN_JWKS; }
+const OAUTH_STATE_TTL = 600;
+const FIREBASE_SECURE_TOKEN_JWKS = createRemoteJWKSet(new URL("https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com"));
+function getFirebaseJwks() { return FIREBASE_SECURE_TOKEN_JWKS; }
 import { buildMailMimeMessage, escapeHtml as escapeMailHtml, normalizeRecipientEmail, recipientDomain, safeMailError, sendWithRetry, validateMailHeader } from "./mailDelivery.js";
 
 import { classifySmtpReplyCategory } from "./invitationEmail.mjs";
