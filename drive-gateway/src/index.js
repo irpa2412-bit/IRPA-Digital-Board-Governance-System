@@ -4043,6 +4043,7 @@ function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
+// Staging origins https://irpa-dbg-staging-a73ec.web.app and https://irpa-dbg-staging-a73ec.firebaseapp.com are intentionally excluded from this production CORS allowlist.
 function corsHeaders(request) {
   const origin = request.headers.get("Origin") || "";
   const allowed = origin === "https://irpa-digital-board-governance-frontend.irpa-governance.workers.dev" || origin === "https://irpa.or.tz" || origin === "https://www.irpa.or.tz" || origin === "https://irpa-digital-board-governance.web.app" || origin === "https://irpa-digital-board-governance.firebaseapp.com";
