@@ -29,6 +29,15 @@ const livekitConfig=fs.readFileSync("infra/livekit/livekit.yaml.template","utf8"
 const livekitCaddy=fs.readFileSync("infra/livekit/caddy.yaml.template","utf8");
 const livekitDeploy=fs.readFileSync("infra/livekit/deploy-staging.sh","utf8");
 const livekitWorkflow=fs.readFileSync(".github/workflows/deploy-livekit-staging.yml","utf8");
+const attendanceScreenSources = [
+ "src/pages/MeetingRoom.jsx",
+ "src/pages/Meetings.jsx",
+ "src/pages/MeetingEntryGateway.jsx",
+ "src/meeting/MeetingAccessControl.jsx",
+ "src/components/MeetingAccessControl.jsx",
+ "src/firebase/meetingRecords.js",
+].filter(path=>fs.existsSync(path)).map(path=>({path,source:fs.readFileSync(path,"utf8")}));
+const attendanceScreenCallableLeaks = attendanceScreenSources.filter(({source})=>/\bhttpsCallable\s*\(|\bgetFunctions\s*\(/.test(source));
 const checks=[
  ["Registration buttons use the authoritative active-role policy",meetingsCentre.includes('{canRegisterMeeting({...actorIdentity,isAdmin:admin})&&<button type="button" onClick={startCreate}>+ Register Meeting</button>}')&&meetingsCentre.includes('{canRegisterMeeting({...actorIdentity,isAdmin:admin})&&<button className="secondary-button" onClick={startCreate}>+ New Meeting</button>}')],
  ["Released meeting edits remain administrator-only",meetingsCentre.includes("if(editing&&!canEditMeeting(editing,{...actorIdentity,isAdmin:admin}))")&&meetingsCentre.includes("function edit(m){if(!canEditMeeting(m,{...actorIdentity,isAdmin:admin}))")&&meetingsCentre.includes("released. Only an authorised administrator may edit it.")],
@@ -50,6 +59,7 @@ const checks=[
  ["Self and host attendance marking use Worker route",meetingServices.includes("/api/meeting-attendance/mark")&&attendanceClient.includes("/api/meeting-attendance/mark")&&meetingRoom.includes("markMeetingAttendance")],
  ["Meeting gate queue and host admission decisions use Cloudflare Worker routes",meetingServices.includes("/api/meeting-entry-requests/list")&&meetingServices.includes("/api/meeting-entry-requests/resolve")&&meetingAccessControl.includes("/api/meeting-entry-requests/list")&&meetingAccessControl.includes("/api/meeting-entry-requests/resolve")&&!meetingAccessControl.includes("httpsCallable")],
  ["Migrated meeting records client no longer invokes Firebase callables",!attendanceClient.includes("httpsCallable")&&!attendanceClient.includes("getFunctions")],
+ ["Every attendance screen uses Worker APIs and contains no direct Firebase callable invocation",attendanceScreenSources.length>=4&&attendanceScreenCallableLeaks.length===0],
  ["Meeting working-document registration listing and review use Worker routes",meetingServices.includes("/api/meeting-working-documents/register")&&meetingServices.includes("/api/meeting-working-documents/list")&&meetingServices.includes("/api/meeting-working-documents/review")&&attendanceClient.includes("/api/meeting-working-documents/register")&&attendanceClient.includes("/api/meeting-working-documents/list")&&attendanceClient.includes("/api/meeting-working-documents/review")],
  ["Daily attendance uses Worker routes and the existing Signature Portal email-link workflow",meetingServices.includes("/api/meeting-attendance/daily/register")&&meetingServices.includes("/api/meeting-attendance/daily/mark")&&meetingServices.includes("/api/meeting-attendance/daily/dispatch")&&attendanceClient.includes("/api/meeting-attendance/daily/register")&&attendanceClient.includes("/api/meeting-attendance/daily/mark")&&fs.readFileSync("src/firebase/meetingAttendanceSigning.js","utf8").includes("createSignatureEnvelope")&&fs.readFileSync("src/firebase/meetingAttendanceSigning.js","utf8").includes("startSignatureWorkflow")&&!meetingServices.includes("/api/meeting-attendance/sign")],
  ["Live media token issuance uses the shared Meeting Worker gateway",mediaClient.includes("issueLiveMeetingToken")&&!mediaClient.includes("VITE_LIVEKIT_TOKEN_WORKER_URL")&&!mediaClient.includes("httpsCallable")],
