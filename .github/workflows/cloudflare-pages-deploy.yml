@@ -12,6 +12,13 @@ on:
       - ".github/workflows/*verification*.yml"
       - ".github/workflows/*verify*.yml"
       - ".github/workflows/*test*.yml"
+      - ".github/workflows/*smoke*.yml"
+      - ".github/workflows/*diagnostic*.yml"
+      - ".github/workflows/*regression*.yml"
+      - ".github/workflows/*acceptance*.yml"
+      - ".github/workflows/*validation*.yml"
+      - ".github/workflows/*fixture*.yml"
+      - ".github/workflows/*browser*.yml"
       - "tests/**"
       - "test/**"
       - "docs/**"
@@ -19,6 +26,9 @@ on:
       - "**/*.mdx"
       - "scripts/*verification*"
       - "scripts/*verify*"
+      - "scripts/*diagnostic*"
+      - "scripts/*smoke*"
+      - "scripts/*test*"
   workflow_dispatch:
 permissions:
   contents: read
