@@ -49,6 +49,15 @@ test("explicitly invited participants can access their meeting regardless of ins
   }, { isInvited: true }), true);
 });
 
+test("IRPA users receive every Meeting Portal module without organisational-role selection", () => {
+  const app = readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
+  assert.match(app, /const UNIVERSAL_MEETING_MODULES=\["Meetings","Meeting Room","Participants","Resolutions","Voting","Actions","Decisions"\]/);
+  assert.match(app, /if\(!selected\)return\["Dashboard",\.\.\.UNIVERSAL_MEETING_MODULES\]/);
+  assert.match(app, /const hasIRPAIdentity=Boolean\(profile\?\.uid\|\|profile\?\.id\|\|employee\?\.uid\|\|employee\?\.id\)/);
+  assert.match(app, /!hasIRPAIdentity&&authorityCategories\.length>0&&!selectedAuthority/);
+  assert.match(app, /const meetingPortalModules=hasIRPAIdentity\?\["Dashboard",\.\.\.UNIVERSAL_MEETING_MODULES\]/);
+});
+
 test("any authenticated IRPA identity may initiate a meeting without an active-status gate", () => {
   assert.equal(canRegisterMeeting({ active: true, role: "Departmental Director" }), true);
   assert.equal(canRegisterMeeting({ active: false, role: "Departmental Director" }), false);
