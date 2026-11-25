@@ -169,7 +169,7 @@ exports.updateMeetingRecordProtection=onCall({region:"us-central1",timeoutSecond
  }
  if(operation==="EXTEND_RETENTION"){
   const years=Number(req.data?.retentionYears);
-  if(!Number.isInteger(years)||years<10||years>30)throw new HttpsError("invalid-argument","Meeting record retention must be at least 10 years and no more than 30 years.");
+  if(!Number.isInteger(years)||years<1||years>30)throw new HttpsError("invalid-argument","Retention extension must be an integer from 1 to 30 years.");
   const until=addYears(new Date(),years);
   await ref.update({retentionYears:years,retainUntil:until,retentionPolicyVersion:"IRPA-MEETING-RETENTION-2.0-MINIMUM-10-YEARS-EXTENDED",retentionExtendedByUid:ctx.uid,retentionExtendedAt:FieldValue.serverTimestamp(),updatedAt:FieldValue.serverTimestamp()});
   await audit("MEETING_RECORD_RETENTION_EXTENDED",ctx,recordId,{retentionYears:years,retainUntil:until.toISOString()});
