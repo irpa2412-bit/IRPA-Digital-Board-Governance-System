@@ -57,7 +57,7 @@ test("production and staging Firestore rules apply universal IRPA Meeting Portal
     assert.match(rules, /function meetingRegistrar\(\)\{return meetingUser\(\);\}/);
     assert.match(rules, /function meetingCategoryReadAllowed\(data\)\{return meetingUser\(\)\|\|meetingParticipant\(data\);\}/);
     assert.match(rules, /function meetingInvitationManager\(data\)\{/);
-    assert.match(rules, /match \/participants\/\{id\}.*allow create:if meetingAttendanceController\(request\.resource\.data\)/);
+    assert.match(rules, /match \/participants\/\{id\}.*allow create:if meetingInvitationManager\(request\.resource\.data\)/);
     assert.match(rules, /function meetingSessionUpdateAllowed\(data\).*meetingSecretaryUid.*meetingAdministratorUid/);
   }
 });
