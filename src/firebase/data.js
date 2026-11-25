@@ -6,6 +6,7 @@ import { getFunctions, httpsCallable } from "firebase/functions";
 import { canAccessMeetingCategory, MEETING_CATEGORIES } from "./meetingPolicy.js";
 import { listLifecycleDocuments } from "./documentLifecycle.js";
 import { reconcileRegisteredIdentityUidsViaGateway } from "./registeredIdentityReconciliation";
+import { listMeetingInviteeDirectory as listMeetingInviteeDirectoryViaGateway } from "./meetingGatewayApi";
 
 const uniqueInductionValues=(values)=>[...new Set(values.flatMap(v=>Array.isArray(v)?v:String(v||"").split(",")).map(v=>String(v||"").trim()).filter(Boolean))];
 
@@ -538,9 +539,13 @@ export async function getResearchToolPermissions(){
 }
 
 export async function listMeetingInviteeDirectory(){
- if(!auth.currentUser?.uid)throw new Error("Authentication is required to load meeting participants.");
- const call=httpsCallable(getFunctions(undefined,"us-central1"),"listMeetingInviteeDirectory");const result=await call({});
- return {boardMembers:Array.isArray(result.data?.boardMembers)?result.data.boardMembers:[],members:Array.isArray(result.data?.members)?result.data.members:[],employees:Array.isArray(result.data?.employees)?result.data.employees:[]};
+  if(!auth.currentUser?.uid)throw new Error("Authentication is required to load meeting participants.");
+  const directory=await listMeetingInviteeDirectoryViaGateway();
+  return {
+    boardMembers:Array.isArray(directory?.boardMembers)?directory.boardMembers:[],
+    members:Array.isArray(directory?.members)?directory.members:[],
+    employees:Array.isArray(directory?.employees)?directory.employees:[]
+  };
 }
 
 /** Secure administrator-only removal through the existing Cloudflare gateway. */
