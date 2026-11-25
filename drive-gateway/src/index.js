@@ -1024,7 +1024,10 @@ async function getFirebaseAuthAdminAccessToken(env) {
   const now = Math.floor(Date.now() / 1000);
   if (firebaseAuthAdminTokenCache.token && firebaseAuthAdminTokenCache.expiresAt > now + 60) return firebaseAuthAdminTokenCache.token;
   let serviceAccount;
-  try { serviceAccount = JSON.parse(env.FIREBASE_SERVICE_ACCOUNT_JSON || ""); }
+  try { const storedCredential = env.FIREBASE_SERVICE_ACCOUNT && typeof env.FIREBASE_SERVICE_ACCOUNT.get === "function"
+      ? await env.FIREBASE_SERVICE_ACCOUNT.get()
+      : env.FIREBASE_SERVICE_ACCOUNT_JSON;
+    serviceAccount = JSON.parse(typeof storedCredential === "string" ? storedCredential : ""); }
   catch { throw new Error("Firebase Authentication service identity is not configured correctly."); }
   if (serviceAccount.project_id !== getFirebaseProjectId(env) || typeof serviceAccount.client_email !== "string" || !serviceAccount.client_email.endsWith(".iam.gserviceaccount.com") || typeof serviceAccount.private_key !== "string") {
     throw new Error("Firebase Authentication service identity is invalid for this Firebase project.");
