@@ -38,7 +38,7 @@ async function context(req,meetingId){
  });
  const subscribed=subResults.some(s=>!s.empty);
  const participant=listed||subscribed||participantRecord;
- if(!identityInIrpa)throw new HttpsError("permission-denied","An IRPA member or employee identity is required to use the Meeting Portal.");
+ if(!identityInIrpa&&!participant)throw new HttpsError("permission-denied","An IRPA member or employee identity or a verified invitation to this meeting is required.");
  const canManage=admin(req)||chair||secretary||text(meeting.meetingChairpersonUid)===uid||text(meeting.meetingSecretaryUid)===uid||text(meeting.createdByUid)===uid||text(meeting.initiatorUid)===uid;
  const member=memberSnap.data()||{},employee=employeeSnap.data()||{};
  const roles=[member.role,member.title,member.position,member.departmentalRole,member.boardPosition,employee.role,employee.title,employee.position,employee.departmentalRole,employee.boardPosition,...(Array.isArray(member.roles)?member.roles:[]),...(Array.isArray(employee.roles)?employee.roles:[])].map(v=>text(v).toLowerCase());
