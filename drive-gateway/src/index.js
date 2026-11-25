@@ -11,8 +11,6 @@ const ALLOWED_CONTENT_TYPES = new Set([
   "image/gif","image/bmp","image/tiff","image/avif","application/zip","video/mp4","video/webm","video/quicktime","video/x-msvideo","video/x-matroska","audio/mpeg","audio/wav","audio/x-wav","audio/webm","audio/mp4","audio/x-m4a","audio/aac","audio/ogg","audio/flac"
 ]);
 const OAUTH_STATE_TTL = 600;
-let jwksCache = null;
-let jwksFetchedAt = 0;
 async function getFirebaseJwks() {
   if (jwksCache && Date.now() - jwksFetchedAt < 60 * 60 * 1000) return jwksCache;
   const response = await fetch("https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com");
