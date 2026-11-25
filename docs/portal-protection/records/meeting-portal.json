@@ -6,7 +6,7 @@
     "affectedPortals": [
       "Meeting Portal"
     ],
-    "reason": "Owner-authorised 24 November 2026 meeting governance change for meeting-specific Chairperson, Secretary and Meeting Administrator appointments; temporary Transition Committee election workflow; server-enforced role separation; meeting-scoped invitations, ballots and media moderation; and immediate Transition Committee mandate expiry when formal proceedings begin. This change explicitly includes the necessary meeting-scoped Firestore authorization rules; no unrelated collection, portal or signature rules are changed.",
+    "reason": "Owner-authorised 25 November 2026 policy correction: EVERYONE IN IRPA MUST HAVE FULL MEETING PORTAL ACCESS. Every IRPA member/employee identity may access the complete Meeting Portal and initiate/register meetings regardless of membership/employment status, category, department, title, organisational authority, invitation or participant listing. External invitees remain limited to the meeting to which they are invited. Meeting-specific leadership, live-room admission, Board voting/quorum, protected Board records, audit and deletion controls remain separate and unchanged.",
     "files": [
       "drive-gateway/src/meetingServices.mjs",
       "drive-gateway/src/meetingDeletion.mjs",
@@ -31,9 +31,18 @@
       "src/firebase/data.js",
       "scripts/meeting-portal-fixture-isolation-guard.sh",
       "tests/fixtures/mocks.js",
-      "tests/meeting-portal-browser.test.mjs"
+      "tests/meeting-portal-browser.test.mjs",
+      "firestore.staging.rules",
+      "functions/meetingAttendanceRegister.js",
+      "functions/meetingRecords.js",
+      "src/App.jsx",
+      "src/meeting/IRPADGBSMeetingRoomMedia.jsx",
+      "src/meeting/MeetingAccessControl.jsx",
+      "src/pages/OperationalGatewaysParticipants.jsx",
+      "tests/meeting-working-documents-security.test.mjs",
+      "drive-gateway/src/index.js"
     ],
-    "expectedEffect": "Allow active registered IRPA members and employees to initiate meetings; permit initial registration with no permanent leadership appointments; require a complete temporary Transition Committee before leadership-election invitations and ballots; allow eligible participants to vote only in that election; require all three permanent meeting appointments and closed election ballots before proceedings; expire temporary authority atomically at proceedings start; keep Meeting Administrator authority operational only; preserve Board-only quorum, voting, resolutions, signature and record protections. The legacy Firebase LiveKit callable is also hardened so only the meeting-specific Meeting Administrator can receive room moderation or control recording; global administrators, initiators, Chairpersons and Secretaries cannot obtain technical moderation by legacy callable paths. The Voting Process page now opens and closes ballots through the meeting Worker using the current meeting's Chairperson/Secretary or active Transition Committee Chairperson/Secretary; global administrator status alone does not confer voting control. Ordinary governance votes remain Board-member-only, while pre-proceedings leadership-election ballots admit listed active members and employees.",
+    "expectedEffect": "Universal full Meeting Portal access for every IRPA identity across all categories, records, working documents and archives, with unrestricted meeting initiation/registration by an IRPA identity. No active-status, department, role, organisational-authority, invitation or participant-list gate may restrict ordinary portal access. External invitees receive only invited-meeting access. The meeting-specific Chairperson, Secretary and Administrator appointments and their distinct authorities remain in force; registration-stage appointments may be empty but all three are required before proceedings; Transition Committee authority expires at proceedings start. Board voting, quorum, resolutions, formal approvals, restricted Board records, audit protections, minimum ten-year retention and trial-only deletion remain protected.",
     "prohibitedChanges": [
       "Do not create portal-wide meeting leadership roles.",
       "Do not allow Meeting Administrator to chair, vote, establish quorum, approve resolutions or approve minutes by virtue of that role.",
@@ -108,6 +117,31 @@
         "tests/meeting-room-authorization-boundary.test.mjs",
         "tests/meeting-invitation-resend-quorum.test.mjs",
         "tests/meeting-quorum-reconciliation.test.mjs"
+      ]
+    },
+    {
+      "at": "2026-11-25T07:10:00Z",
+      "action": "owner-directed universal full Meeting Portal access and archive/record authorization correction",
+      "files": [
+        "drive-gateway/src/meetingServices.mjs",
+        "firestore.rules",
+        "firestore.staging.rules",
+        "functions/meetingAttendanceRegister.js",
+        "functions/meetingRecords.js",
+        "scripts/check-meeting-media-governance.mjs",
+        "src/App.jsx",
+        "src/firebase/data.js",
+        "src/firebase/meetingPolicy.js",
+        "src/meeting/IRPADGBSMeetingRoomMedia.jsx",
+        "src/meeting/MeetingAccessControl.jsx",
+        "src/pages/MeetingRoom.jsx",
+        "src/pages/Meetings.jsx",
+        "src/pages/OperationalGatewaysParticipants.jsx",
+        "tests/meeting-category-firestore-rules.test.cjs",
+        "tests/meeting-category-policy.test.mjs",
+        "tests/meeting-room-authorization-boundary.test.mjs",
+        "tests/meeting-working-documents-security.test.mjs",
+        "drive-gateway/src/index.js"
       ]
     }
   ],
@@ -223,15 +257,32 @@
   },
   "accessInitiationChange": {
     "changeId": "MP-2026-11-23-ORG-WIDE-INITIATION",
-    "relatedPullRequest": 941,
-    "status": "SUBMITTED_FOR_VALIDATION",
+    "relatedPullRequest": 959,
+    "status": "IMPLEMENTED_PENDING_VALIDATION",
     "scope": [
-      "tests/meeting-category-policy.test.mjs",
       "drive-gateway/src/meetingServices.mjs",
-      "src/pages/Meetings.jsx"
+      "firestore.rules",
+      "firestore.staging.rules",
+      "functions/meetingAttendanceRegister.js",
+      "functions/meetingRecords.js",
+      "scripts/check-meeting-media-governance.mjs",
+      "src/App.jsx",
+      "src/firebase/data.js",
+      "src/firebase/meetingPolicy.js",
+      "src/meeting/IRPADGBSMeetingRoomMedia.jsx",
+      "src/meeting/MeetingAccessControl.jsx",
+      "src/pages/MeetingRoom.jsx",
+      "src/pages/Meetings.jsx",
+      "src/pages/OperationalGatewaysParticipants.jsx",
+      "tests/meeting-category-firestore-rules.test.cjs",
+      "tests/meeting-category-policy.test.mjs",
+      "tests/meeting-room-authorization-boundary.test.mjs",
+      "tests/meeting-working-documents-security.test.mjs",
+      "drive-gateway/src/index.js"
     ],
-    "ownerInstruction": "23 November 2026: every active registered member may initiate meetings; staff and members must have access to the shared Meeting Portal; meetings operate at multiple organisational levels.",
-    "governanceBoundary": "Meeting initiation and participation do not grant Board voting, quorum, resolutions, formal approval, or unrestricted access to restricted Board records.",
-    "validation": "Worker functional tests and Meeting Centre initiation tests added to the existing Meeting Portal policy test file; direct Firestore rules and shared policy file unchanged; CI pending."
+    "ownerInstruction": "25 November 2026: EVERYONE IN IRPA MUST HAVE FULL MEETING PORTAL ACCESS. Any person with an IRPA member or employee identity may initiate/register meetings, regardless of status, title, department, membership/employment category, invitation or participant listing. External invitees are limited to invited meetings.",
+    "governanceBoundary": "Universal portal access and meeting initiation do not grant live-room admission, meeting-specific Chairperson/Secretary/Administrator powers, Board voting eligibility, quorum, resolutions, formal approvals or unrestricted access to Board-restricted records.",
+    "validation": "Cross-layer implementation is under CI validation. Production deployment and live verification remain pending.",
+    "policyCorrectionPullRequest": 959
   }
 }
