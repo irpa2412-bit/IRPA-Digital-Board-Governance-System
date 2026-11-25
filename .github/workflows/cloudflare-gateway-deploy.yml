@@ -259,6 +259,32 @@ jobs:
           fi
           echo "Cloudflare Gateway routed /api/meeting-transcripts/translate and enforced authentication (HTTP 401 without credentials)."
 
+      - name: Verify Worker token rejection for actual-data and attendance routes
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://irpa-google-drive-gateway.irpa-governance.workers.dev"
+          for route in "/api/system/actual-data-access" "/api/meeting-attendance/register"; do
+            method="GET"
+            data=""
+            if [[ "$route" == "/api/meeting-attendance/register" ]]; then
+              method="POST"
+              data='{"meetingId":"pcu-auth-negative-probe"}'
+            fi
+            for token_case in missing invalid; do
+              args=(-sS -o /tmp/pcu-auth-response.json -w "%{http_code}" -X "$method" -H "Content-Type: application/json")
+              if [[ "$token_case" == "invalid" ]]; then args+=(-H "Authorization: Bearer invalid.pcu.token"); fi
+              if [[ "$method" == "POST" ]]; then args+=(-d "$data"); fi
+              code="$(curl "${args[@]}" "$base$route")"
+              if [[ "$code" != "401" ]]; then
+                echo "::error::Expected HTTP 401 for $route with $token_case token; received HTTP $code."
+                cat /tmp/pcu-auth-response.json
+                exit 1
+              fi
+              echo "PASS: $route rejected $token_case token with HTTP 401."
+            done
+          done
+
       - name: Verify production CORS
         run: |
           set -euo pipefail
