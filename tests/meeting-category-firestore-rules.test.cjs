@@ -87,6 +87,40 @@ test("departmental registrar cannot edit a released meeting", async () => {
   }).firestore();
   await assertFails(db.doc("meetings/departmental-meeting").update({ title: "Unauthorised edit" }));
 });
+test("only the meeting-specific Administrator can create invitations and participant records", async () => {
+  await testEnv.withSecurityRulesDisabled(async context => {
+    await context.firestore().doc("meetings/admin-controlled-meeting").set(meeting({
+      meetingCategory: "GENERAL",
+      meetingPolicyId: "GENERAL",
+      meetingType: "General Meeting",
+      initiatorUid: "staff-user",
+      meetingAdministratorUid: "meeting-admin"
+    }));
+  });
+  const initiatorDb = testEnv.authenticatedContext("staff-user", { email: "staff@example.test" }).firestore();
+  const administratorDb = testEnv.authenticatedContext("meeting-admin", { email: "admin@example.test" }).firestore();
+  await assertFails(initiatorDb.doc("participants/initiator-added").set({
+    meetingId: "admin-controlled-meeting",
+    participantUid: "external-1",
+    participantName: "External Participant"
+  }));
+  await assertSucceeds(administratorDb.doc("participants/admin-added").set({
+    meetingId: "admin-controlled-meeting",
+    participantUid: "external-1",
+    participantName: "External Participant"
+  }));
+  await assertFails(initiatorDb.doc("invitations/initiator-invite").set({
+    meetingId: "admin-controlled-meeting",
+    email: "external@example.test",
+    status: "Pending"
+  }));
+  await assertSucceeds(administratorDb.doc("invitations/admin-invite").set({
+    meetingId: "admin-controlled-meeting",
+    email: "external@example.test",
+    status: "Pending"
+  }));
+});
+
 test("real meetings cannot be deleted even by an administrator", async () => {
   await testEnv.withSecurityRulesDisabled(async context => {
     await context.firestore().doc("meetings/departmental-meeting").set(meeting({
