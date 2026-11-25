@@ -110,6 +110,7 @@ test("legacy invitee-directory export delegates to the authenticated Cloudflare 
   assert.ok(match,"legacy export remains available to existing callers");
   assert.match(match[1],/listMeetingInviteeDirectoryViaGateway\(\)/);
   assert.doesNotMatch(match[1],/httpsCallable|getFunctions/);
+  assert.doesNotMatch(data,/httpsCallable\(getFunctions\(undefined,"us-central1"\),"listMeetingInviteeDirectory"\)/);
   assert.match(api,/\/api\/meeting-invitee-directory\/list/);
   assert.match(service,/\/api\/meeting-invitee-directory\/list/);
 });
