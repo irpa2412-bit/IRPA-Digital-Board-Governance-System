@@ -46,6 +46,15 @@ test("production Firebase Hosting workflow requires explicit yes confirmation fo
   assert.match(source.slice(start, next < 0 ? source.length : next), /github\.event_name == 'workflow_dispatch' && inputs\.confirm_production_firestore_rules_deployment == 'yes'/);
 });
 
+
+test("standalone production Firestore workflow requires exact typed DEPLOY RULES confirmation and reports rejected input", () => {
+  const source = readWorkflow(".github/workflows/firestore-production-no-billing.yml");
+  assert.match(source, /confirm_production_firestore_rules_deployment:[\\s\\S]*?description:.*Type exactly DEPLOY RULES[\\s\\S]*?type: string[\\s\\S]*?default: ""/);
+  assert.match(source, /RECEIVED_CONFIRMATION: \\$\\{\\{ github\\.event\\.inputs\\.confirm_production_firestore_rules_deployment \\}\\}/);
+  assert.match(source, /Received: '\\$RECEIVED_CONFIRMATION'. Expected: 'DEPLOY RULES'/);
+  assert.match(source, /inputs\\.confirm_production_firestore_rules_deployment == 'DEPLOY RULES'/);
+});
+
 test("isolated staging Firestore rules publisher requires manual DEPLOY RULES confirmation", () => {
   const source = readWorkflow(".github/workflows/publish-staging-firestore-rules-only.yml");
   assert.match(source, /^\s{2}workflow_dispatch:/m);
