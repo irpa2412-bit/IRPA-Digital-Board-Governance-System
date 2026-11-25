@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: cloudflare-production-gateway
   cancel-in-progress: false
 
 permissions:
