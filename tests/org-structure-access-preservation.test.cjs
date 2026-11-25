@@ -78,6 +78,7 @@ test("active admin profile remains authoritative across role-title changes", asy
       });
       await db.doc(`meetings/${meetingId}`).set({
         title: "Administrator preservation test",
+        recordOrigin: "TRIAL",
         meetingCategory: "ADMINISTRATIVE",
         meetingPolicyId: "ADMINISTRATIVE",
         meetingType: "Management Meeting",
