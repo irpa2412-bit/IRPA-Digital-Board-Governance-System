@@ -360,6 +360,10 @@ test("universal access is enforced in Firestore and Worker while live-room admis
   assert.match(rules, /function meetingRegistrar\(\)\{return meetingUser\(\);\}/);
   assert.match(rules, /function meetingCategoryReadAllowed\(data\)\{return meetingUser\(\);\}/);
   assert.match(worker, /canRead:true/);
+  const legacy = readFileSync(new URL("../functions/meetingRecords.js", import.meta.url), "utf8");
+  assert.match(legacy, /const identityInIrpa=admin\(req\)\|\|memberSnap\.exists\|\|employeeSnap\.exists/);
+  assert.match(legacy, /canRead:true/);
+  assert.doesNotMatch(legacy, /if\(!ctx\.canRead\|\|!ctx\.participant/);
   assert.match(worker, /An IRPA member or employee identity is required to initiate a meeting/);
   assert.match(worker, /if\(!c\.participant\)throw Object\.assign\(new Error\("Live meeting admission is restricted to invited participants/);
   assert.match(worker, /Only the Chairperson appointed to this meeting may open formal proceedings/);
