@@ -62,6 +62,17 @@ test("production and staging Firestore rules apply universal IRPA Meeting Portal
   }
 });
 
+test("minutes editing and report distribution belong to the meeting-specific Chairperson and Secretary", () => {
+  const meetings = readFileSync(new URL("../src/pages/Meetings.jsx", import.meta.url), "utf8");
+  assert.match(meetings, /const meetingSecretariat=Boolean\(selected&&/);
+  assert.match(meetings, /readOnly=\{!meetingSecretariat\}/);
+  assert.match(meetings, /meetingSecretariat&&<button type="button" onClick=\{compileAndDistributeReport/);
+  assert.match(meetings, /async function generateAISummary\(\)/);
+  assert.match(meetings, /async function generateAIMinutes\(\)/);
+  assert.match(meetings, /recordType:"AI_MINUTES_DRAFT"/);
+  assert.match(meetings, /recordType:"AI_SUMMARY_DRAFT"/);
+});
+
 test("IRPA users receive every Meeting Portal module without organisational-role selection", () => {
   const app = readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
   assert.match(app, /const UNIVERSAL_MEETING_MODULES=\["Meetings","Meeting Room","Participants","Resolutions","Voting","Actions","Decisions"\]/);
