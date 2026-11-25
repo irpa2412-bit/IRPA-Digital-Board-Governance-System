@@ -1,0 +1,93 @@
+{
+  "schemaVersion": 1,
+  "tenantId": "irpa",
+  "organisationName": "Improvement of Rangeland in Pastoral Areas",
+  "nodeTypes": [
+    {
+      "id": "directorate",
+      "label": "Directorate"
+    },
+    {
+      "id": "department",
+      "label": "Department"
+    },
+    {
+      "id": "division",
+      "label": "Division"
+    },
+    {
+      "id": "section",
+      "label": "Section"
+    },
+    {
+      "id": "branch",
+      "label": "Branch"
+    },
+    {
+      "id": "unit",
+      "label": "Unit"
+    },
+    {
+      "id": "team",
+      "label": "Team"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "executive-directorate",
+      "tenantId": "irpa",
+      "typeId": "directorate",
+      "name": "Executive Directorate",
+      "parentIds": []
+    },
+    {
+      "id": "internal-insight-directorate",
+      "tenantId": "irpa",
+      "typeId": "directorate",
+      "name": "Internal Insight Directorate",
+      "parentIds": []
+    },
+    {
+      "id": "finance-administration-directorate",
+      "tenantId": "irpa",
+      "typeId": "directorate",
+      "name": "Finance and Administration Directorate",
+      "parentIds": []
+    },
+    {
+      "id": "rangeland-management-directorate",
+      "tenantId": "irpa",
+      "typeId": "directorate",
+      "name": "Rangeland Management Directorate",
+      "parentIds": []
+    },
+    {
+      "id": "livestock-directorate",
+      "tenantId": "irpa",
+      "typeId": "directorate",
+      "name": "Livestock Directorate",
+      "parentIds": []
+    },
+    {
+      "id": "market-processing-directorate",
+      "tenantId": "irpa",
+      "typeId": "directorate",
+      "name": "Market and Processing Directorate",
+      "parentIds": []
+    },
+    {
+      "id": "human-resources-directorate",
+      "tenantId": "irpa",
+      "typeId": "directorate",
+      "name": "Human Resources Directorate",
+      "parentIds": []
+    }
+  ],
+  "reportingEdges": [],
+  "policy": {
+    "defaultEffect": "DENY",
+    "assignmentGrantsPermissions": false,
+    "approvalPathsMustBeUnique": true,
+    "auditEventsImmutable": true
+  }
+}
