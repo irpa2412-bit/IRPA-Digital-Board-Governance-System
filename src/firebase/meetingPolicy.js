@@ -42,8 +42,8 @@ export function canEditMeeting(meeting={},identity={}){
   const transitionActive=meeting.transitionCommitteeActive===true&&!["in progress","completed","cancelled","canceled"].includes(status)&&proceedings!=="in progress";
   const initiator=String(meeting.initiatorUid||"")===uid&&!["in progress","completed","cancelled","canceled"].includes(status)&&proceedings!=="in progress";
   const assigned=transitionActive
-    ?[meeting.transitionChairpersonUid,meeting.transitionSecretaryUid,meeting.transitionAdministratorUid]
-    :[meeting.meetingChairpersonUid||meeting.chairpersonUid,meeting.meetingSecretaryUid||meeting.secretaryUid,meeting.meetingAdministratorUid];
+    ?[meeting.transitionChairpersonUid,meeting.transitionSecretaryUid]
+    :[meeting.meetingChairpersonUid||meeting.chairpersonUid,meeting.meetingSecretaryUid||meeting.secretaryUid];
   return initiator||assigned.map(value=>String(value||"")).includes(uid);
 }
 function leadershipElectionActive(meeting={}){
