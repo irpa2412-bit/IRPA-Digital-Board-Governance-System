@@ -87,6 +87,44 @@ test("departmental registrar cannot edit a released meeting", async () => {
   }).firestore();
   await assertFails(db.doc("meetings/departmental-meeting").update({ title: "Unauthorised edit" }));
 });
+test("formal proceedings cannot begin until all three meeting-specific appointments are validated", async () => {
+  await testEnv.withSecurityRulesDisabled(async context => {
+    await context.firestore().doc("meetings/missing-leaders").set(meeting({
+      meetingCategory: "GENERAL",
+      meetingPolicyId: "GENERAL",
+      meetingType: "General Meeting",
+      registerStatus: "Registered",
+      status: "Scheduled",
+      proceedingsStatus: "Not Started",
+      meetingChairpersonUid: "chair-user",
+      meetingSecretaryUid: "",
+      meetingAdministratorUid: "",
+      transitionCommitteeActive: false
+    }));
+    await context.firestore().doc("meetings/complete-leaders").set(meeting({
+      meetingCategory: "GENERAL",
+      meetingPolicyId: "GENERAL",
+      meetingType: "General Meeting",
+      registerStatus: "Registered",
+      status: "Scheduled",
+      proceedingsStatus: "Not Started",
+      meetingChairpersonUid: "chair-user",
+      meetingSecretaryUid: "secretary-user",
+      meetingAdministratorUid: "administrator-user",
+      transitionCommitteeActive: false
+    }));
+  });
+  const chairDb = testEnv.authenticatedContext("chair-user", { email: "chair@example.test" }).firestore();
+  await assertFails(chairDb.doc("meetings/missing-leaders").update({
+    status: "In Progress",
+    proceedingsStatus: "In Progress"
+  }));
+  await assertSucceeds(chairDb.doc("meetings/complete-leaders").update({
+    status: "In Progress",
+    proceedingsStatus: "In Progress"
+  }));
+});
+
 test("only the meeting-specific Administrator can create invitations and participant records", async () => {
   await testEnv.withSecurityRulesDisabled(async context => {
     await context.firestore().doc("meetings/admin-controlled-meeting").set(meeting({
