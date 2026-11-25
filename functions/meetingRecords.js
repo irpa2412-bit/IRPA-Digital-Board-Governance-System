@@ -39,19 +39,20 @@ async function context(req,meetingId){
  const subscribed=subResults.some(s=>!s.empty);
  const participant=listed||subscribed||participantRecord;
  if(!identityInIrpa&&!participant)throw new HttpsError("permission-denied","An IRPA member or employee identity or a verified invitation to this meeting is required.");
- const canManage=admin(req)||chair||secretary||text(meeting.meetingChairpersonUid)===uid||text(meeting.meetingSecretaryUid)===uid||text(meeting.createdByUid)===uid||text(meeting.initiatorUid)===uid;
+ const canSecretariat=chair||secretary||text(meeting.meetingChairpersonUid)===uid||text(meeting.meetingSecretaryUid)===uid||text(meeting.chairpersonUid)===uid||text(meeting.secretaryUid)===uid;
+ const canManage=admin(req)||canSecretariat;
  const member=memberSnap.data()||{},employee=employeeSnap.data()||{};
  const roles=[member.role,member.title,member.position,member.departmentalRole,member.boardPosition,employee.role,employee.title,employee.position,employee.departmentalRole,employee.boardPosition,...(Array.isArray(member.roles)?member.roles:[]),...(Array.isArray(employee.roles)?employee.roles:[])].map(v=>text(v).toLowerCase());
  const governanceReader=admin(req)||member.boardMember===true||employee.boardMember===true||Boolean(text(member.boardPosition)||text(employee.boardPosition))||roles.some(v=>["board member","board chairperson","board secretary","secretary to the board","executive director","director internal oversight"].includes(v));
  const confidentiality=text(meeting.confidentialityClass)||(cat==="GOVERNANCE"?"BOARD_RESTRICTED":"INTERNAL");
- return {uid,email,meeting,category:cat,participant,subscribed,canManage,canRead:true,canReadRestrictedRecords:confidentiality!=="BOARD_RESTRICTED"||governanceReader,confidentiality};
+ return {uid,email,meeting,category:cat,participant,subscribed,canManage,canSecretariat,canRead:true,canReadRestrictedRecords:confidentiality!=="BOARD_RESTRICTED"||governanceReader,confidentiality};
 }
 function recordLabel(type){return ({TRANSCRIPT:"Meeting Transcript",MINUTES_DRAFT:"Draft Minutes",MINUTES_FINAL:"Approved / Final Minutes",AI_MINUTES_DRAFT:"AI-Assisted Draft Minutes",AI_SUMMARY_DRAFT:"AI-Assisted Meeting Summary Draft",SUBSCRIBER_TRANSCRIPT_DRAFT:"Subscriber Proceedings Draft",DECISION_REGISTER:"Decision Register",ATTENDANCE_REGISTER:"Attendance Register",OTHER:"Other Meeting Record"})[type]||"Meeting Record";}
 async function audit(action,ctx,recordId,details={}){await db.collection("audit").add({action,collection:"meetingRecords",recordId:recordId||null,details:{meetingId:ctx.meeting.id,meetingCategory:ctx.category,confidentialityClass:ctx.confidentiality,...details},actorUid:ctx.uid,actorEmail:ctx.email||null,createdAt:FieldValue.serverTimestamp()});}
 exports.captureMeetingRecord=onCall({region:"us-central1",timeoutSeconds:30},async req=>{
  const meetingId=text(req.data?.meetingId),type=text(req.data?.recordType).toUpperCase(),content=text(req.data?.content),title=text(req.data?.title);
  const ctx=await context(req,meetingId);
- if(!ctx.canManage)throw new HttpsError("permission-denied","Only the appointed Chairperson or Secretary may capture an authoritative meeting record.");
+ if(!ctx.canSecretariat)throw new HttpsError("permission-denied","Only the appointed Chairperson or Secretary may capture an authoritative meeting record.");
  if(!["TRANSCRIPT","MINUTES_DRAFT","MINUTES_FINAL","DECISION_REGISTER","ATTENDANCE_REGISTER","OTHER"].includes(type))throw new HttpsError("invalid-argument","Unsupported meeting record type.");
  if(!content)throw new HttpsError("invalid-argument","Record content is empty.");
  if(content.length>900000)throw new HttpsError("invalid-argument","Text record exceeds the 900,000 character limit. Store large files through the controlled Documents Portal.");
@@ -352,7 +353,7 @@ function workingDocumentId(meetingId,documentId){return hash(String(meetingId)+"
 exports.registerMeetingWorkingDocument=onCall({region:"us-central1",timeoutSeconds:30},async req=>{
  const meetingId=text(req.data?.meetingId),documentId=text(req.data?.documentId);
  const ctx=await context(req,meetingId);
- if(!ctx.canManage)throw new HttpsError("permission-denied","Only the meeting host, chairperson or secretary may add working documents.");
+ if(!ctx.canSecretariat)throw new HttpsError("permission-denied","Only the appointed Chairperson or Secretary may register meeting working documents.");
  if(!documentId)throw new HttpsError("invalid-argument","Document ID is required.");
  const snap=await db.collection("documents").doc(documentId).get();
  if(!snap.exists)throw new HttpsError("not-found","The controlled document was not found.");
