@@ -372,6 +372,13 @@ test("universal Meeting Portal access includes attendance registers and working-
   assert.match(worker, /Only the Meeting Administrator appointed to this meeting may update another participant's attendance/);
 });
 
+test("legacy attendance callable preserves universal reads and Meeting Administrator-only control", () => {
+  const source = readFileSync(new URL("../functions/meetingAttendanceRegister.js", import.meta.url), "utf8");
+  assert.match(source, /return text\(m\.meetingAdministratorUid\)===uid\|\|\(transitionActive&&text\(m\.transitionAdministratorUid\)===uid\)/);
+  assert.match(source, /const identityInIrpa=isAdmin\(req\)\|\|memberSnap\.exists\|\|employeeSnap\.exists/);
+  assert.match(source, /filter\(p=>identityInIrpa\|\|manager\|\|matchesIdentity\(req,p\)\)/);
+});
+
 test("universal access is enforced in Firestore and Worker while live-room admission stays meeting-scoped", () => {
   const rules = readFileSync(new URL("../firestore.rules", import.meta.url), "utf8");
   const worker = readFileSync(new URL("../drive-gateway/src/meetingServices.mjs", import.meta.url), "utf8");
