@@ -10,7 +10,8 @@ export function validateOrganisation(c){
  const map=new Map(nodes.map(x=>[x.id,x]));
  for(const n of nodes){if(n.tenantId!==tenant)throw new PcuValidationError("Cross-tenant node rejected","TENANT_MISMATCH");if(!typeIds.includes(n.typeId))throw new PcuValidationError("Unknown node type","UNKNOWN_NODE_TYPE");for(const p of n.parentIds||[])if(!map.has(p))throw new PcuValidationError("Unknown parent","UNKNOWN_PARENT");}
  const state=new Map(); const visit=id=>{if(state.get(id)===1)throw new PcuValidationError("Circular hierarchy","CIRCULAR_HIERARCHY");if(state.get(id)===2)return;state.set(id,1);for(const p of map.get(id).parentIds||[])visit(p);state.set(id,2);}; for(const id of ids)visit(id);
- for(const e of edges){if(e.tenantId!==tenant)throw new PcuValidationError("Cross-tenant reporting edge rejected","TENANT_MISMATCH");if(!map.has(e.fromNodeId)||!map.has(e.toNodeId))throw new PcuValidationError("Unknown reporting node","UNKNOWN_REPORTING_NODE");}
+ for(const e of edges){if(e.tenantId!==tenant)throw new PcuValidationError("Cross-tenant reporting edge rejected","TENANT_MISMATCH");if(!map.has(e.fromNodeId)||!map.has(e.toNodeId))throw new PcuValidationError("Unknown reporting node","UNKNOWN_REPORTING_NODE");if(e.fromNodeId===e.toNodeId)throw new PcuValidationError("Self-reporting is not allowed","CIRCULAR_REPORTING");}
+ const reportState=new Map();const visitReport=id=>{if(reportState.get(id)===1)throw new PcuValidationError("Circular reporting graph","CIRCULAR_REPORTING");if(reportState.get(id)===2)return;reportState.set(id,1);for(const e of edges.filter(x=>x.fromNodeId===id&&x.active!==false))visitReport(e.toNodeId);reportState.set(id,2);};for(const id of ids)visitReport(id);
  return {tenantId:tenant,nodeTypes:types,nodes,nodeMap:map,reportingEdges:edges};
 }
 export function resolveApprovalPath({tenantId,fromNodeId,toNodeId,edges=[]}){
