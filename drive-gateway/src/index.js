@@ -1,4 +1,4 @@
-import { createRemoteJWKSet, jwtVerify } from "jose";
+import { createLocalJWKSet, jwtVerify } from "jose";
 const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
 const MAX_BYTES = 10 * 1024 * 1024;
 const ALLOWED_CONTENT_TYPES = new Set([
@@ -11,8 +11,18 @@ const ALLOWED_CONTENT_TYPES = new Set([
   "image/gif","image/bmp","image/tiff","image/avif","application/zip","video/mp4","video/webm","video/quicktime","video/x-msvideo","video/x-matroska","audio/mpeg","audio/wav","audio/x-wav","audio/webm","audio/mp4","audio/x-m4a","audio/aac","audio/ogg","audio/flac"
 ]);
 const OAUTH_STATE_TTL = 600;
-const FIREBASE_SECURE_TOKEN_JWKS = createRemoteJWKSet(new URL("https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com"));
-function getFirebaseJwks() { return FIREBASE_SECURE_TOKEN_JWKS; }
+let jwksCache = null;
+let jwksFetchedAt = 0;
+async function getFirebaseJwks() {
+  if (jwksCache && Date.now() - jwksFetchedAt < 60 * 60 * 1000) return jwksCache;
+  const response = await fetch("https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com");
+  if (!response.ok) throw new Error("Unable to retrieve Firebase signing keys.");
+  const data = await response.json();
+  if (!Array.isArray(data.keys) || data.keys.length === 0) throw new Error("Firebase signing keys were not returned.");
+  jwksCache = Object.fromEntries(data.keys.map(key => [key.kid, key]));
+  jwksFetchedAt = Date.now();
+  return jwksCache;
+}
 import { buildMailMimeMessage, escapeHtml as escapeMailHtml, normalizeRecipientEmail, recipientDomain, safeMailError, sendWithRetry, validateMailHeader } from "./mailDelivery.js";
 
 import { classifySmtpReplyCategory } from "./invitationEmail.mjs";
@@ -1690,7 +1700,7 @@ async function controlledDocumentUploadPolicyCheck(request, env) {
   try {
     const claims = await authenticateFirebaseRequest(request, env);
     step = "Resolve active institutional profile";
-    const { memberRecord, employeeRecord } = await getInstitutionalProfileForUser(env, claims);
+    const { memberRecord, employeeRecord } = await getInstitutionalProfileForUser(env, claims, adminToken);
     const adminRecord = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, await getFirestoreAdminAccessToken(env));
     if (!memberRecord && !employeeRecord && !adminRecord?.fields?.active?.booleanValue) {
       return json({ ok: false, step, error: "An active IRPA member, employee or administrator profile is required for controlled document upload policy checks." }, 403, corsHeaders(request));
@@ -3525,43 +3535,52 @@ async function driveFetch(env, accessToken, path, options = {}) {
 
 async function authenticateFirebaseRequest(request, env, options = {}) {
   const header = request.headers.get("Authorization") || "";
-  const match = header.match(/^Bearer\s+([^\s]+)$/i);
+  const match = header.match(/^Bearer\\s+([^\\s]+)$/i);
   if (!match) {
     const error = new Error("Firebase authentication is required.");
     error.status = 401;
     throw error;
   }
 
+  let payload;
   try {
-    const { payload } = await jwtVerify(match[1], await getFirebaseJwks(), {
+    const jwks = await getFirebaseJwks();
+    const keySet = createLocalJWKSet({ keys: Object.values(jwks) });
+    const verified = await jwtVerify(match[1], keySet, {
       issuer: `https://securetoken.google.com/${getFirebaseProjectId(env)}`,
       audience: getFirebaseProjectId(env),
       algorithms: ["RS256"],
       requiredClaims: ["exp", "iat", "sub", "aud", "iss"],
       clockTolerance: 5
     });
-    const uid = String(payload.user_id || payload.sub || "").trim();
-    if (!uid || uid !== String(payload.sub || "").trim()) throw new Error("Firebase token subject is invalid.");
-    const claims = {
-      token: match[1],
-      user_id: uid,
-      email: typeof payload.email === "string" ? payload.email : null,
-      firebaseClaims: {
-        admin: payload.admin === true,
-        irpaRoles: Array.isArray(payload.irpaRoles) ? payload.irpaRoles : [],
-        name: payload.name || "",
-        phoneNumber: payload.phone_number || "",
-        emailDeliveryService: payload.irpaEmailDeliveryService === true
-      }
-    };
-    if (options.skipActivation !== true) await assertActivatedPortalUser(claims, env);
-    return claims;
+    payload = verified.payload;
   } catch (cause) {
     const error = new Error("Firebase ID token is invalid, expired, or not issued for this production project.");
     error.status = 401;
     error.cause = cause;
     throw error;
   }
+
+  const uid = String(payload.user_id || payload.sub || "").trim();
+  if (!uid || uid !== String(payload.sub || "").trim()) {
+    const error = new Error("Firebase ID token subject is invalid.");
+    error.status = 401;
+    throw error;
+  }
+  const claims = {
+    token: match[1],
+    user_id: uid,
+    email: typeof payload.email === "string" ? payload.email : null,
+    firebaseClaims: {
+      admin: payload.admin === true,
+      irpaRoles: Array.isArray(payload.irpaRoles) ? payload.irpaRoles : [],
+      name: payload.name || "",
+      phoneNumber: payload.phone_number || "",
+      emailDeliveryService: payload.irpaEmailDeliveryService === true
+    }
+  };
+  if (options.skipActivation !== true) await assertActivatedPortalUser(claims, env);
+  return claims;
 }
 
 async function assertActivatedPortalUser(claims, env) {
@@ -3691,8 +3710,8 @@ async function getFirestoreDocumentsByEmail(env, collectionName, email, firebase
 async function getInstitutionalProfileForUser(env, claims, adminToken) {
   const uid = claims.user_id;
   const email = String(claims.email || "").trim().toLowerCase();
-  const directMember = await getFirestoreDocument(env, `members/${uid}`, claims.token);
-  const directEmployee = await getFirestoreDocument(env, `employees/${uid}`, claims.token);
+  const directMember = await getFirestoreDocument(env, `members/${uid}`, adminToken);
+  const directEmployee = await getFirestoreDocument(env, `employees/${uid}`, adminToken);
   if (directMember || directEmployee) return { memberRecord: directMember, employeeRecord: directEmployee };
   const [memberMatches, employeeMatches] = await Promise.all([
     getFirestoreDocumentsByEmail(env, "members", email, adminToken),
