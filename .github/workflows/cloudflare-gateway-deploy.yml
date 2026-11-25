@@ -264,7 +264,7 @@ jobs:
           console.log("WORKER_DEPLOYMENT_ID="+d.id);
           console.log("WORKER_VERSION_ID="+v);
           console.log("WORKER_URL=https://irpa-google-drive-gateway.irpa-governance.workers.dev");
-          fs=require("fs");
+          const fs=require("fs");
           fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, [
             "### Production Worker deployment",
             "- Deployment ID: "+d.id,
