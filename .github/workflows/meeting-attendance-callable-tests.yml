@@ -1,0 +1,26 @@
+name: Meeting Attendance Callable Tests
+
+on:
+  push:
+    branches:
+      - test/meeting-attendance-callables-20261123
+    paths:
+      - "functions/meetingAttendanceRegister.js"
+      - "functions/meetingAttendanceRegister.test.cjs"
+      - ".github/workflows/meeting-attendance-callable-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  meeting-attendance-callables:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Test Meeting attendance callable authorization and integrity
+        run: node --test functions/meetingAttendanceRegister.test.cjs
