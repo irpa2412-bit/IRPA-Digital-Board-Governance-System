@@ -189,3 +189,16 @@ try {
 }
 if (failures) process.exit(1);
 console.log("PASS: four viewport sizes covered meeting scheduling, participant identities, agenda, voting, decisions, actions, outsider denial, TEST attendance signing, and minutes-to-Signature-Portal navigation. No real records or emails were created.");
+
+
+test("universal Meeting Portal repair regression paths are enumerated in the isolation guard", () => {
+  assert.ok(readFileSync(new URL("../scripts/meeting-portal-fixture-isolation-guard.sh", import.meta.url), "utf8").includes('"drive-gateway/tests/meeting-translation-cloudflare.test.mjs"'));
+  assert.ok(readFileSync(new URL("../scripts/meeting-portal-fixture-isolation-guard.sh", import.meta.url), "utf8").includes('"firestore.staging.rules"'));
+  assert.ok(readFileSync(new URL("../scripts/meeting-portal-fixture-isolation-guard.sh", import.meta.url), "utf8").includes('"functions/meetingAttendanceRegister.js"'));
+  assert.ok(readFileSync(new URL("../scripts/meeting-portal-fixture-isolation-guard.sh", import.meta.url), "utf8").includes('"scripts/firestore-rules-approval.mjs"'));
+  assert.ok(readFileSync(new URL("../scripts/meeting-portal-fixture-isolation-guard.sh", import.meta.url), "utf8").includes('"src/meeting/IRPADGBSMeetingRoomMedia.jsx"'));
+  assert.ok(readFileSync(new URL("../scripts/meeting-portal-fixture-isolation-guard.sh", import.meta.url), "utf8").includes('"src/meeting/MeetingAccessControl.jsx"'));
+  assert.ok(readFileSync(new URL("../scripts/meeting-portal-fixture-isolation-guard.sh", import.meta.url), "utf8").includes('"tests/firestore-rules-approval.test.mjs"'));
+  assert.ok(readFileSync(new URL("../scripts/meeting-portal-fixture-isolation-guard.sh", import.meta.url), "utf8").includes('"tests/org-structure-access-preservation.test.cjs"'));
+  assert.ok(readFileSync(new URL("../scripts/meeting-portal-fixture-isolation-guard.sh", import.meta.url), "utf8").includes('"tests/staging-admin-access-preservation.test.cjs"'));
+});
