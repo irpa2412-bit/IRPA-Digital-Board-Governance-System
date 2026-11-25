@@ -53,6 +53,7 @@ exports.captureMeetingRecord=onCall({region:"us-central1",timeoutSeconds:30},asy
  const meetingId=text(req.data?.meetingId),type=text(req.data?.recordType).toUpperCase(),content=text(req.data?.content),title=text(req.data?.title);
  const ctx=await context(req,meetingId);
  if(!ctx.canSecretariat)throw new HttpsError("permission-denied","Only the appointed Chairperson or Secretary may capture an authoritative meeting record.");
+ if(text(ctx.confidentiality).toUpperCase()==="BOARD_RESTRICTED"&&!ctx.canReadRestrictedRecords)throw new HttpsError("permission-denied","This Board-restricted meeting record is available only to authorised governance readers.");
  if(!["TRANSCRIPT","MINUTES_DRAFT","MINUTES_FINAL","DECISION_REGISTER","ATTENDANCE_REGISTER","OTHER"].includes(type))throw new HttpsError("invalid-argument","Unsupported meeting record type.");
  if(!content)throw new HttpsError("invalid-argument","Record content is empty.");
  if(content.length>900000)throw new HttpsError("invalid-argument","Text record exceeds the 900,000 character limit. Store large files through the controlled Documents Portal.");
@@ -69,7 +70,7 @@ exports.captureMeetingRecord=onCall({region:"us-central1",timeoutSeconds:30},asy
 exports.translateMeetingTranscript=onCall({region:"us-central1",timeoutSeconds:120,memory:"512MiB"},async req=>{
  const meetingId=text(req.data?.meetingId),content=text(req.data?.content),targetLanguage=text(req.data?.targetLanguage).toLowerCase();
  const ctx=await context(req,meetingId);
- if(!ctx.canRead)throw new HttpsError("permission-denied","Only an authorised meeting participant or subscriber may translate these proceedings.");
+ if(!ctx.canRead||(text(ctx.confidentiality).toUpperCase()==="BOARD_RESTRICTED"&&!ctx.canReadRestrictedRecords))throw new HttpsError("permission-denied","Meeting Portal access and the applicable Board confidentiality authority are required to translate these proceedings.");
  if(!content)throw new HttpsError("invalid-argument","Transcript text is required.");
  if(content.length>30000)throw new HttpsError("invalid-argument","Translate transcript sections of 30,000 characters or fewer.");
  const allowed=new Set(["sw","en","fr","es","pt","ar","hi","zh","de","it","ja"]);
@@ -92,7 +93,7 @@ exports.translateMeetingTranscript=onCall({region:"us-central1",timeoutSeconds:1
 exports.saveLiveMeetingProceedings=onCall({region:"us-central1",timeoutSeconds:30},async req=>{
  const meetingId=text(req.data?.meetingId),content=text(req.data?.content);
  const ctx=await context(req,meetingId);
- if(!ctx.canRead)throw new HttpsError("permission-denied","Only an authorised meeting participant or subscriber may save live proceedings.");
+ if(!ctx.canRead||(text(ctx.confidentiality).toUpperCase()==="BOARD_RESTRICTED"&&!ctx.canReadRestrictedRecords))throw new HttpsError("permission-denied","Meeting Portal access and the applicable Board confidentiality authority are required to save these proceedings.");
  if(text(ctx.meeting.status).toLowerCase()!=="in progress")throw new HttpsError("failed-precondition","Live proceedings auto-save is only available while the registered meeting status is In Progress.");
  if(TERMINAL.has(text(ctx.meeting.status).toLowerCase()))throw new HttpsError("failed-precondition","Proceedings cannot be appended to a closed or cancelled meeting.");
  if(!content)throw new HttpsError("invalid-argument","Live proceedings transcript is empty.");
@@ -108,7 +109,7 @@ exports.saveLiveMeetingProceedings=onCall({region:"us-central1",timeoutSeconds:3
 exports.saveMeetingAssistantDraft=onCall({region:"us-central1",timeoutSeconds:30},async req=>{
  const meetingId=text(req.data?.meetingId),type=text(req.data?.recordType).toUpperCase(),content=text(req.data?.content),title=text(req.data?.title);
  const ctx=await context(req,meetingId);
- if(!ctx.canRead)throw new HttpsError("permission-denied","Only an authorised participant or subscriber may save an AI Meeting Assistant draft.");
+ if(!ctx.canRead||(text(ctx.confidentiality).toUpperCase()==="BOARD_RESTRICTED"&&!ctx.canReadRestrictedRecords))throw new HttpsError("permission-denied","Meeting Portal access and the applicable Board confidentiality authority are required to save this assistant draft.");
  if(!["AI_MINUTES_DRAFT","AI_SUMMARY_DRAFT","SUBSCRIBER_TRANSCRIPT_DRAFT"].includes(type))throw new HttpsError("invalid-argument","Only assistant drafts and subscriber transcript drafts may be saved through this operation.");
  if(!content)throw new HttpsError("invalid-argument","Draft content is empty.");
  if(content.length>900000)throw new HttpsError("invalid-argument","Draft exceeds the 900,000 character limit.");
