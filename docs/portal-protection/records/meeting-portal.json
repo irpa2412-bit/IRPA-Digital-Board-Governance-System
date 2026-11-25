@@ -232,6 +232,6 @@
     ],
     "ownerInstruction": "24-25 November 2026: everyone in IRPA must have full access to the entire Meeting Portal; anyone in IRPA may initiate/register a meeting; access is not restricted by role, department, membership/employment status, invitation or participant listing. Meeting-specific leadership and live-room admission remain separate controls.",
     "governanceBoundary": "Universal Meeting Portal access and meeting initiation do not bypass meeting-specific live-room admission, Chairperson/Secretary/Administrator responsibilities, Board voting eligibility, quorum, resolutions, formal approvals, or protected governance-record safeguards.",
-    "validation": "Universal access implemented in the shared client policy, Meeting Centre query selection, Worker read authorization, Worker meeting initiation and meeting-specific Firestore rules; regression tests added. Production promotion and live verification must be recorded separately."
+    "validation": "Universal access implemented in the shared client policy, Meeting Centre query selection, Worker read authorization, Worker meeting initiation, meeting-specific Firestore rules, attendance register reads and working-document review; Board-restricted records remain protected. Meeting records are reconciled to a minimum ten-year retention period. Regression tests added. Production promotion and live verification must be recorded separately."
   }
 }
