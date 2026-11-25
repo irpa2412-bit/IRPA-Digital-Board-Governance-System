@@ -22,29 +22,16 @@ const productionDeployWorkflows = [
 test("production Firebase data mutations and Functions deployments require explicit owner dispatch approval", () => {
   const source = readWorkflow(".github/workflows/firebase-deploy.yml");
   assert.match(source, /authorize_production_data_migration:[\s\S]*?default: "no"/);
-  assert.match(source, /authorize_production_functions_deployment:[\s\S]*?default: "no"/);
-  for (const step of [
-    "Bootstrap primary administrator authorization",
-    "Synchronize server-controlled authorization claims",
-    "Backfill signer authorization metadata",
-    "Migrate retained Signature Profiles to Signer Identity records"
-  ]) {
-    const start = source.indexOf("- name: " + step);
-    assert.ok(start >= 0, "Missing production data operation: " + step);
-    const next = source.indexOf("\n      - name:", start + 1);
-    assert.match(source.slice(start, next < 0 ? source.length : next), /if: github\.event_name == 'workflow_dispatch' && inputs\.authorize_production_data_migration == 'yes'/, step + " must require owner approval");
-  }
+  assert.doesNotMatch(source, /authorize_production_functions_deployment/);
   for (const step of [
     "Deploy login authorization resolver",
     "Deploy retained Firebase password-reset function",
     "Deploy actual-data access control callables",
     "Deploy signed meeting attendance register callables"
   ]) {
-    const start = source.indexOf("- name: " + step);
-    assert.ok(start >= 0, "Missing production Functions operation: " + step);
-    const next = source.indexOf("\n      - name:", start + 1);
-    assert.match(source.slice(start, next < 0 ? source.length : next), /if: github\.event_name == 'workflow_dispatch' && inputs\.authorize_production_functions_deployment == 'yes'/, step + " must require owner approval");
+    assert.equal(source.indexOf("- name: " + step), -1, step + " must not be deployed as a Firebase Function");
   }
+  assert.doesNotMatch(source, /--only\\s+[^\\n]*functions:/);
   assert.match(source, /- name: Deploy Firebase Hosting independently/);
 });
 
