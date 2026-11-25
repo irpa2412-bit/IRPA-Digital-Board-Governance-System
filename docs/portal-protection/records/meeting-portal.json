@@ -53,33 +53,7 @@
     "commit": "331201cb3c626cc96cd006fe8263bf69bafea9b1",
     "rollbackCommit": "331201cb3c626cc96cd006fe8263bf69bafea9b1"
   },
-  "validation": {
-    "baselineSmoke": "PASS",
-    "portalSmoke": {
-      "Meeting Portal": "PASS"
-    },
-    "fullRegression": "PASS",
-    "behaviourDifferences": [
-      "Environment is immutable after creation.",
-      "Only the exact TRIAL marker at creation qualifies; REAL, missing, invalid, lowercase or whitespace-padded values are non-deletable."
-    ],
-    "evidence": [
-      "Owner's exact conditional approval is recorded in PR #845 issue comment 7068716176.",
-      "Baseline smoke executed from exact pre-change base SHA 5fa8d46deeeb96c3172a1798411c18f57991855d: PR #849 run 44948792716, job 136982110084. npm run test:protected-portals reported PASS for all seven registered portals, including Meeting Portal.",
-      "Meeting Portal baseline smoke evidence: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/44948792716/job/136982110084",
-      "Full regression executed from exact pre-change base SHA 5fa8d46deeeb96c3172a1798411c18f57991855d: PR #849 run 44948792716, job 136982110196. npm run test:all FAILED: tests/workflow-production-deploy-policy.test.mjs — production Firebase CLI rules and Worker deployments require explicit owner dispatch approval (8 passed, 1 failed).",
-      "Full regression failure evidence: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/44948792716/job/136982110196",
-      "Baseline smoke and full regression were rerun after PR #846 was merged, both on the exact PR #845 base SHA 7f285df5437f96a58e4fcf9e7d2a85b8a9ee112c. Run 44952176019: baseline-protection-smoke job 136992981056 reported all seven registered portals PASS; baseline-full-regression job 136992981099 checked out the same SHA, ran npm run test:all inside the Firestore emulator, and exited successfully (code 0).",
-      "Baseline smoke PASS for Meeting Portal on exact baseline 7f285df5437f96a58e4fcf9e7d2a85b8a9ee112c: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/44952176019/job/136992981056",
-      "Full regression PASS on exact baseline 7f285df5437f96a58e4fcf9e7d2a85b8a9ee112c: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/44952176019/job/136992981099; npm run test:all completed in the Firestore emulator with exit code 0.",
-      "Meeting Portal portal smoke PASS on exact baseline 7f285df5437f96a58e4fcf9e7d2a85b8a9ee112c: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/44952176019/job/136992981056",
-      "Baseline smoke PASS on exact pre-change PR #955 base SHA 331201cb3c626cc96cd006fe8263bf69bafea9b1: run 45385986460, job 138416884257 checked out that SHA and ran npm run test:protected-portals for all seven registered portals.",
-      "Baseline smoke evidence on exact PR #955 base 331201cb3c626cc96cd006fe8263bf69bafea9b1: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/45385986460/job/138416884257",
-      "Full regression PASS on exact PR #955 base 331201cb3c626cc96cd006fe8263bf69bafea9b1: run 45385986460, job 138416884498 checked out that SHA and completed npm run test:all in the Firestore emulator successfully.",
-      "Full regression evidence on exact PR #955 base 331201cb3c626cc96cd006fe8263bf69bafea9b1: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/45385986460/job/138416884498",
-      "Meeting Portal portal smoke PASS on exact PR #955 base 331201cb3c626cc96cd006fe8263bf69bafea9b1: run 45385986460 job 138416884257 checked out the exact baseline and executed npm run test:protected-portals, which reported PASS for all seven registered portals including Meeting Portal. https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/45385986460/job/138416884257"
-    ]
-  },
+  "validation": "Universal access implemented in App navigation (including access without organisational-role selection), shared client policy, Meeting Centre queries, Worker and legacy callable read paths, production and staging Firestore meeting rules, attendance register reads and working-document review. Verified external invitees retain access only to their invited meeting and live-room entry remains invitation/appointment controlled. The Meeting Administrator alone controls participant admission/removal, attendance marking and technical media moderation; Chairperson/Secretary retain proceedings and secretariat authority. Board-restricted records remain protected. Worker and legacy record paths enforce minimum ten-year retention and reconcile existing records when the register is retrieved. CI and production verification pending.",
   "renewals": [
     {
       "at": "2026-11-23T19:55:00Z",
@@ -250,5 +224,16 @@
     "governanceBoundary": "Universal Meeting Portal access and meeting initiation do not bypass meeting-specific live-room admission, Chairperson/Secretary/Administrator responsibilities, Board voting eligibility, quorum, resolutions, formal approvals, or protected governance-record safeguards.",
     "validation": "Universal portal access now applies across all meeting categories and meeting-record access paths for IRPA identities; active-status and participant-list gates are not used for portal entry, meeting initiation, meeting record listing or working-document review. Ongoing live-room admission and protected Board records remain separately governed. CI and production verification pending.",
     "policyCorrectionPullRequest": 959
-  }
+  },
+  "scope": [
+    "src/App.jsx",
+    "src/meeting/MeetingAccessControl.jsx",
+    "src/meeting/IRPADGBSMeetingRoomMedia.jsx",
+    "src/pages/OperationalGatewaysParticipants.jsx",
+    "functions/meetingAttendanceRegister.js",
+    "firestore.staging.rules",
+    "scripts/check-meeting-media-governance.mjs",
+    "tests/meeting-category-firestore-rules.test.cjs",
+    "tests/meeting-room-authorization-boundary.test.mjs"
+  ]
 }
