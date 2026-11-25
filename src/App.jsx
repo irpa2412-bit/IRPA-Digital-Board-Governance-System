@@ -194,7 +194,7 @@ function isFinancePortalMember(p,e){return hasRole(p,FINANCE_ROLES)||hasRole(e,F
 function isProcurementPortalMember(p,e){return hasRole(p,PROCUREMENT_ROLES)||hasRole(p,PROCUREMENT_APPROVAL_ROLES)||hasRole(e,PROCUREMENT_ROLES)||hasRole(e,PROCUREMENT_APPROVAL_ROLES)||(["Finance & Administration","Finance and Administration"].includes(p?.department)&&p?.unit==="Procurement Unit")||(["Finance & Administration","Finance and Administration"].includes(e?.department)&&e?.unit==="Procurement Unit");}
 function memberModules(p,e,selectedAuthority){
   const selected=String(selectedAuthority||"").trim();
-  if(!selected)return["Dashboard"];
+  if(!selected)return["Dashboard",...UNIVERSAL_MEETING_MODULES];
   const roles=[selected];
   const m=selected==="Administrator"?["Dashboard","Role Descriptions"]:(RESEARCH_AUTHORITY_ROLES.includes(selected)?["Dashboard","Documents","Policies and Strategic Plans","Research, Statistics and Knowledge","Grant Intelligence & Funding Opportunities"]:[...BASE_MEMBER_MODULES]);
   const authorityProfile={...(p||{}),roles,role:selected};
