@@ -62,6 +62,8 @@ jobs:
         run: npm install
       - name: PWA install/offline contract tests
         run: node --test tests/pwa-install-offline.test.mjs
+      - name: PCU governance engine unit tests
+        run: npm run test:pcu-engine
       - name: Upload runtime regression test
         run: node --test tests/upload-circular-import-runtime.test.mjs
       - name: Upload dependency circular-import gate
