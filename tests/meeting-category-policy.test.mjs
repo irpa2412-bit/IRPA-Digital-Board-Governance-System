@@ -72,7 +72,7 @@ test("meeting archive access is universal for IRPA identities except Board-restr
 test("initiator edit authority ends at proceedings and meeting roles remain meeting-specific", () => {
   const policy = readFileSync(new URL("../src/firebase/meetingPolicy.js", import.meta.url), "utf8");
   assert.match(policy, /const initiator=String\(meeting\.initiatorUid\|\|""\)===uid&&!\["in progress","completed","cancelled","canceled"\]/);
-  assert.match(policy, /meeting\.meetingAdministratorUid/);
+  assert.match(policy, /meeting\.meetingChairpersonUid\|\|meeting\.chairpersonUid/);\n  assert.match(policy, /meeting\.meetingSecretaryUid\|\|meeting\.secretaryUid/);
   assert.match(policy, /return initiator\|\|assigned\.map/);
   assert.doesNotMatch(policy.match(/const assigned=transitionActive[\s\S]*?return initiator/)[0], /transitionAdministratorUid|meetingAdministratorUid/);
   const worker = readFileSync(new URL("../drive-gateway/src/meetingServices.mjs", import.meta.url), "utf8");
@@ -115,7 +115,7 @@ test("released meeting general details remain protected while the initiator may 
   assert.equal(canEditMeeting({ ...governance, registerStatus: "Registered", initiatorUid: "secretary-1", status: "In Progress" }, {
     uid: "secretary-1", active: true, role: "Board Secretary"
   }), false);
-  assert.equal(canEditMeeting({ ...governance, registerStatus: "Registered" }, { isAdmin: true }), true);
+  assert.equal(canEditMeeting({ ...governance, registerStatus: "Registered" }, { uid: "global-admin", isAdmin: true }), false);
 });
 
 test("a designated initiator may edit only an unreleased meeting they initiated", () => {
@@ -422,7 +422,7 @@ test("universal access is enforced in Firestore and Worker while live-room admis
   const worker = readFileSync(new URL("../drive-gateway/src/meetingServices.mjs", import.meta.url), "utf8");
   assert.match(rules, /function meetingUser\(\)\{return admin\(\)\|\|memberProfileExists\(\)\|\|employeeProfileExists\(\);\}/);
   assert.match(rules, /function meetingRegistrar\(\)\{return meetingUser\(\);\}/);
-  assert.match(rules, /function meetingCategoryReadAllowed\(data\)\{return meetingUser\(\);\}/);
+  assert.match(rules, /function meetingCategoryReadAllowed\(data\)\{return meetingUser\(\)\|\|meetingParticipant\(data\);\}/);
   assert.match(worker, /canRead:true/);
   const legacy = readFileSync(new URL("../functions/meetingRecords.js", import.meta.url), "utf8");
   assert.match(legacy, /const identityInIrpa=admin\(req\)\|\|memberSnap\.exists\|\|employeeSnap\.exists/);
@@ -490,7 +490,7 @@ test("leadership election ballots are operable by the Transition Committee throu
 });
 
 test("leadership-election invitation management cannot be bypassed by the initiator or global administrator", () => {
-  assert.match(meetingServicesGovernanceSource, /const canManageParticipants=meeting\.leadershipElectionRequired===true\?\(chair\|\|secretary\|\|meetingAdministrator\)/);
+  assert.match(meetingServicesGovernanceSource, /const canManageParticipants=meetingAdministrator;/);
   assert.match(meetingServicesGovernanceSource, /if\(!c\.canManageParticipants\)return fail/);
   assert.match(meetingServicesGovernanceSource, /function meetingTransitionElectionAuthority\(meeting,uid\)/);
 });
