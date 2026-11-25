@@ -37,7 +37,7 @@ test("production Firebase data mutations and Functions deployments require expli
 
 
 
-test("production Firebase Hosting deployment workflow requires exact DEPLOY RULES confirmation", () => {
+test("production Firebase Hosting workflow requires explicit yes confirmation for Firestore deployment", () => {
   const source = readWorkflow(".github/workflows/firebase-deploy.yml");
   assert.match(source, /confirm_production_firestore_rules_deployment:[\s\S]*?default: "no"/);
   const start = source.indexOf("- name: Deploy Firestore Rules and Indexes");
@@ -88,7 +88,7 @@ test("production deployment workflows are not triggered by pull requests", () =>
   }
 });
 
-test("production Firebase CLI rules and Worker deployments require explicit owner dispatch approval", () => {
+test("production Firebase CLI rules require explicit yes and Worker deployment retains its separate owner approval", () => {
   const source = readWorkflow(".github/workflows/firebase-cli-deploy.yml");
   assert.match(source, /confirm_production_firestore_rules_deployment:[\s\S]*?default: "no"/);
   assert.match(source, /authorize_production_worker_deployment:[\s\S]*?default: "no"/);
