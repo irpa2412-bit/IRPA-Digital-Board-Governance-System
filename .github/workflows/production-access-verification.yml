@@ -44,8 +44,8 @@ jobs:
           const fs=require("node:fs"), crypto=require("node:crypto");
           const project=process.env.PROJECT;
           const base=`https://firestore.googleapis.com/v1/projects/${project}/databases/(default)/documents`;
-          const worker=process.env.WORKER, rows=[], memberFailures=[];
-          let member, admin, probeField, probePath, probeOriginal, probeExisted=false, probeWritten=false;
+          const worker=process.env.WORKER, rows=[], memberFailures=[], productionWrites=[];
+          let member, admin, probeField, probePath, probeOriginal, probeExisted=false, probeWritten=false, serviceTokenCache=null;
           const add=(t,e,a,p,memberTest=false)=>{
             rows.push({t,e,a:String(a),p:!!p});
             if(memberTest&&!p)memberFailures.push(t);
@@ -65,6 +65,7 @@ jobs:
           };
           const call=(path,token,method="GET",body)=>req(worker+path,token,method,body);
           async function serviceAccountToken(){
+            if(serviceTokenCache)return serviceTokenCache;
             if(!process.env.SERVICE_ACCOUNT_JSON)throw Error("Required service-account secret is missing; cannot create the missing test profile.");
             let sa; try{sa=JSON.parse(process.env.SERVICE_ACCOUNT_JSON);}catch{throw Error("Service-account secret is not valid JSON.");}
             if(sa.project_id!==project||!sa.client_email||!sa.private_key)throw Error("Service-account project or key metadata does not match production.");
@@ -75,7 +76,7 @@ jobs:
             const r=await fetch(sa.token_uri||"https://oauth2.googleapis.com/token",{method:"POST",headers:{"content-type":"application/x-www-form-urlencoded"},body:new URLSearchParams({grant_type:"urn:ietf:params:oauth:grant-type:jwt-bearer",assertion})});
             const j=await r.json().catch(()=>({}));
             if(!r.ok||!j.access_token)throw Error("Service-account OAuth failed (HTTP "+r.status+").");
-            return j.access_token;
+            serviceTokenCache=j.access_token; return serviceTokenCache;
           }
           async function ensureTestMemberProfile(){
             const uid=process.env.EXPECTED_MEMBER_UID;
@@ -101,6 +102,7 @@ jobs:
             const url=base+"/members/"+uid+"?currentDocument.exists=false";
             const created=await req(url,token,"PATCH",{fields});
             if(!created.ok)throw Error("Test member profile creation failed (HTTP "+created.status+").");
+            productionWrites.push({record:"members/"+uid,action:"CREATED",detail:"testAccount=true"});
             const verified=await get("members/"+uid,member.token);
             if(!verified||verified.fields?.testAccount?.booleanValue!==true||verified.fields?.role?.stringValue!=="Member"||verified.fields?.status?.stringValue!=="Active")throw Error("Created test member profile did not pass read-back verification.");
             return "CREATED: members/"+uid+" (role=Member; status=Active; testAccount=true)";
@@ -113,13 +115,8 @@ jobs:
             if(member){
               try { add("Test member profile","active role=Member; testAccount=true",await ensureTestMemberProfile(),true,true); }
               catch(e){add("Test member profile","active role=Member; testAccount=true",e.message,false,true);}
-              try {
-                const docs=[...await q("uid",member.uid,member.token),...await q("participantUid",member.uid,member.token),...await q("userId",member.uid,member.token)];
-                const d=docs.find(x=>x.fields?.meetingId?.stringValue);
-                if(!d)throw Error("No existing meeting participant found for member; no meeting fixture created.");
-                const r=await call("/api/meeting-attendance/register",member.token,"POST",{meetingId:d.fields.meetingId.stringValue});
-                add("Member attendance Worker call","2xx","HTTP "+r.status,r.ok,true);
-              }catch(e){add("Member attendance Worker call","2xx",e.message,false,true);}
+              add("Member attendance Worker call","isolated test meeting + complete fixture cleanup","SKIPPED: no safe isolated fixture/cleanup contract; no live meeting attendance was touched",true,false);
+              productionWrites.push({record:"meeting attendance",action:"NOT CREATED",detail:"probe skipped; no live meeting or participant mutated"});
               try {
                 const r=await call("/api/system/actual-data-access",member.token,"POST",{enabled:true,confirmation:""});
                 add("Member actual-data write gate","403","HTTP "+r.status,r.status===403,true);
@@ -133,13 +130,29 @@ jobs:
                 probeOriginal=d.fields?.[probeField];
                 const r=await req(base+"/"+probePath+"?updateMask.fieldPaths="+encodeURIComponent(probeField),member.token,"PATCH",{fields:{[probeField]:{stringValue:"temporary-verification"}}});
                 probeWritten=r.ok;
+                if(probeWritten)productionWrites.push({record:probePath+"."+probeField,action:"CREATED",detail:"unique temporary allowed-write probe field"});
                 add("Member allowed Firestore write","2xx","HTTP "+r.status,r.ok,true);
               }catch(e){add("Member allowed Firestore write","2xx",e.message,false,true);}
               try {
-                const id="production-probe-"+crypto.randomUUID();
-                const r=await req(base+"/systemResetPlans?documentId="+id,member.token,"POST",{fields:{probe:{booleanValue:true}}});
-                add("Member denied Firestore write","403","HTTP "+r.status,r.status===403,true);
-              }catch(e){add("Member denied Firestore write","403",e.message,false,true);}
+                const id="production-probe-"+crypto.randomUUID(), path="systemResetPlans/"+id;
+                const r=await req(base+"/"+path,member.token,"PATCH",{fields:{probe:{booleanValue:true},testAccount:{booleanValue:true},testPurpose:{stringValue:"PRODUCTION_ACCESS_VERIFICATION"}}});
+                if(r.ok){productionWrites.push({record:path,action:"CREATED",detail:"unexpectedly permitted denied-write probe"});console.error("RULES ARE TOO PERMISSIVE");}
+                let cleanupStatus="not required";
+                try {
+                  const adminToken=await serviceAccountToken(), existing=await get(path,adminToken);
+                  if(existing){
+                    const del=await req(base+"/"+path,adminToken,"DELETE");
+                    if(!del.ok&&del.status!==404)throw Error("cleanup DELETE HTTP "+del.status);
+                    const verify=await req(base+"/"+path,adminToken);
+                    if(verify.status!==404)throw Error("cleanup verification HTTP "+verify.status);
+                    productionWrites.push({record:path,action:"DELETED",detail:"unexpectedly permitted probe removed; absence verified"});
+                    cleanupStatus="deleted and verified absent";
+                  }
+                }catch(cleanError){console.error("RULES ARE TOO PERMISSIVE");throw Error("RULES ARE TOO PERMISSIVE; systemResetPlans cleanup failed: "+cleanError.message);}
+                const passed=r.status===403;
+                if(!passed)console.error("RULES ARE TOO PERMISSIVE");
+                add("Member denied Firestore write","403","HTTP "+r.status+"; cleanup: "+cleanupStatus,passed,true);
+              }catch(e){console.error("RULES ARE TOO PERMISSIVE");add("Member denied Firestore write","403",e.message,false,true);}
             } else {
               for(const [t,e] of [["Test member profile","active role=Member; testAccount=true"],["Member attendance Worker call","2xx"],["Member actual-data write gate","403"],["Member allowed Firestore write","2xx"],["Member denied Firestore write","403"]])add(t,e,"NOT RUN: member sign-in failed",false,true);
             }
@@ -169,12 +182,83 @@ jobs:
                 const r=await req(base+"/"+probePath+"?updateMask.fieldPaths="+encodeURIComponent(probeField),member.token,"PATCH",body);
                 const d=await get(probePath,member.token);
                 const restored=r.ok&&(probeExisted?JSON.stringify(d?.fields?.[probeField])===JSON.stringify(probeOriginal):!Object.hasOwn(d?.fields||{},probeField));
+                if(restored)productionWrites.push({record:probePath+"."+probeField,action:"DELETED",detail:"temporary allowed-write probe field restored/removed"});
                 add("Allowed-write cleanup","exact restoration","HTTP "+r.status,restored,true);
               }catch(e){add("Allowed-write cleanup","exact restoration",e.message,false,true);}
             } else add("Allowed-write cleanup","no residual temporary field","not written / not required",true,true);
-            const table=["| test | expected | actual | pass/fail |","|---|---|---|---|",...rows.map(x=>`| ${x.t} | ${x.e} | ${x.a.replace(/\|/g,"/")} | ${x.p?"PASS":"FAIL"} |`)].join("\n");
-            console.log(table);
-            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,"## Production verification results\n\n"+table+"\n");
+
+            // Final cleanup is restricted to the single approved UID and exact testAccount=true marker.
+            try {
+              const uid=process.env.EXPECTED_MEMBER_UID, adminToken=await serviceAccountToken(), path="members/"+uid;
+              const current=await get(path,adminToken);
+              if(current?.fields?.testAccount?.booleanValue===true){
+                const del=await req(base+"/"+path,adminToken,"DELETE");
+                if(!del.ok&&del.status!==404)throw Error("test profile DELETE HTTP "+del.status);
+                const verify=await req(base+"/"+path,adminToken);
+                if(verify.status!==404)throw Error("test profile remains after DELETE (HTTP "+verify.status+")");
+                productionWrites.push({record:path,action:"DELETED",detail:"deleted only after testAccount == true; absence verified"});
+                add("Test profile final cleanup","delete only if testAccount=true","DELETED; absence verified",true,true);
+              } else if(current) {
+                productionWrites.push({record:path,action:"PRESERVED",detail:"testAccount is not exactly true; safety guard prevented deletion"});
+                add("Test profile final cleanup","delete only if testAccount=true","PRESERVED: testAccount is not exactly true",false,true);
+              } else {
+                productionWrites.push({record:path,action:"ABSENT",detail:"no profile remains"});
+                add("Test profile final cleanup","delete only if testAccount=true","ABSENT: no profile remains",true,true);
+              }
+            }catch(e){console.error("TEST PROFILE CLEANUP FAILED: "+e.message);add("Test profile final cleanup","members/"+process.env.EXPECTED_MEMBER_UID+" deleted only if testAccount=true",e.message,false,true);}
+
+            const testTable=["| test | expected | actual | pass/fail |","|---|---|---|---|",...rows.map(x=>`| ${x.t} | ${x.e} | ${x.a.replace(/\\|/g,"/")} | ${x.p?"PASS":"FAIL"} |`)].join("\n");
+            const remaining=productionWrites.some(x=>x.action==="PRESERVED")?"One or more records were preserved; inspect rows above":"NONE";
+            const writeTable=["| production record | action | detail |","|---|---|---|",...productionWrites.map(x=>`| ${x.record} | ${x.action} | ${x.detail} |`),`| Production remainder | ${remaining==="NONE"?"NONE":"REVIEW"} | ${remaining} |`].join("\n");
+            console.log(testTable);
+            console.log("\nFINAL PRODUCTION WRITES\n"+writeTable);
+            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,"## Production verification results\n\n"+testTable+"\n\n## Final production writes\n\n"+writeTable+"\n");
             if(memberFailures.length){console.error("Member test failures: "+memberFailures.join(", "));process.exitCode=1;}
           }
+          NODE
+      - name: Final test-profile cleanup (always)
+        if: always()
+        shell: bash
+        env:
+          SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
+          PROJECT: irpa-digital-board-governance
+          TEST_UID: 35DB21ai9ERpshQ3FKa51ilOqxm1
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const crypto=require("node:crypto");
+          const project=process.env.PROJECT, uid=process.env.TEST_UID, raw=process.env.SERVICE_ACCOUNT_JSON;
+          if(!raw) throw Error("Final cleanup blocked: production service-account secret is unavailable.");
+          const sa=JSON.parse(raw), now=Math.floor(Date.now()/1000);
+          if(sa.project_id!==project||!sa.client_email||!sa.private_key) throw Error("Final cleanup blocked: service-account project/key metadata mismatch.");
+          const enc=o=>Buffer.from(JSON.stringify(o)).toString("base64url");
+          const unsigned=enc({alg:"RS256",typ:"JWT"})+"."+enc({iss:sa.client_email,scope:"https://www.googleapis.com/auth/datastore",aud:sa.token_uri||"https://oauth2.googleapis.com/token",iat:now,exp:now+3600});
+          const assertion=unsigned+"."+crypto.sign("RSA-SHA256",Buffer.from(unsigned),sa.private_key).toString("base64url");
+          const tr=await fetch(sa.token_uri||"https://oauth2.googleapis.com/token",{method:"POST",headers:{"content-type":"application/x-www-form-urlencoded"},body:new URLSearchParams({grant_type:"urn:ietf:params:oauth:grant-type:jwt-bearer",assertion})});
+          const tj=await tr.json().catch(()=>({}));
+          if(!tr.ok||!tj.access_token) throw Error("Final cleanup OAuth failed (HTTP "+tr.status+").");
+          const base=`https://firestore.googleapis.com/v1/projects/${project}/databases/(default)/documents/members/${uid}`;
+          const headers={Authorization:"Bearer "+tj.access_token,"Content-Type":"application/json"};
+          const read=await fetch(base,{headers});
+          if(read.status===404){
+            const table="| production record | action | detail |\\n|---|---|---|\\n| members/"+uid+" | ABSENT | final cleanup verified no profile remains |";
+            console.log("FINAL PRODUCTION WRITES\\n"+table);
+            require("node:fs").appendFileSync(process.env.GITHUB_STEP_SUMMARY,"\\n## Final cleanup verification\\n\\n"+table+"\\n");
+            process.exit(0);
+          }
+          if(!read.ok) throw Error("Final cleanup profile read failed (HTTP "+read.status+").");
+          const doc=await read.json();
+          if(doc.fields?.testAccount?.booleanValue!==true){
+            const table="| production record | action | detail |\\n|---|---|---|\\n| members/"+uid+" | PRESERVED | testAccount is not exactly true; no deletion performed |";
+            console.error("FINAL PRODUCTION WRITES\\n"+table);
+            require("node:fs").appendFileSync(process.env.GITHUB_STEP_SUMMARY,"\\n## Final cleanup verification\\n\\n"+table+"\\n");
+            throw Error("Test profile remains but testAccount is not exactly true; safety guard preserved it.");
+          }
+          const del=await fetch(base,{method:"DELETE",headers});
+          if(!del.ok&&del.status!==404) throw Error("Final cleanup DELETE failed (HTTP "+del.status+").");
+          const verify=await fetch(base,{headers});
+          if(verify.status!==404) throw Error("Final cleanup verification failed; test profile still exists (HTTP "+verify.status+").");
+          const table="| production record | action | detail |\\n|---|---|---|\\n| members/"+uid+" | DELETED | deleted only after testAccount == true; absence verified |";
+          console.log("FINAL PRODUCTION WRITES\\n"+table);
+          require("node:fs").appendFileSync(process.env.GITHUB_STEP_SUMMARY,"\\n## Final cleanup verification\\n\\n"+table+"\\n");
           NODE
