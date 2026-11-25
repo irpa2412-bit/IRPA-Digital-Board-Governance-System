@@ -3592,35 +3592,6 @@ async function assertActivatedPortalUser(claims, env) {
   }
 }
 
-async function getFirebaseJwks() {
-  if (jwksCache && Date.now() - jwksFetchedAt < 60 * 60 * 1000) {
-    return jwksCache;
-  }
-
-  const response = await fetch(
-    "https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com"
-  );
-
-  if (!response.ok) {
-    throw new Error("Unable to retrieve Firebase signing keys.");
-  }
-
-  const data = await response.json();
-
-  if (!Array.isArray(data.keys) || data.keys.length === 0) {
-    throw new Error("Firebase signing keys were not returned.");
-  }
-
-  jwksCache = Object.fromEntries(
-    data.keys.map((key) => [key.kid, key])
-  );
-
-  jwksFetchedAt = Date.now();
-
-  return jwksCache;
-}
-
-
 async function queryFirestoreByEmail(env, collectionName, fieldName, email, firebaseToken) {
   const value = String(email || "").trim().toLowerCase();
   if (!value) return [];
