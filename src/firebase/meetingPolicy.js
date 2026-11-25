@@ -35,10 +35,16 @@ export function canAccessMeetingCategory(meeting={},identity={},options={}){
   return Boolean(identity.uid||identity.authenticated===true||identity.active===true);
 }
 export function canEditMeeting(meeting={},identity={}){
-  if(identity.isAdmin===true||identity.admin===true)return true;
-  if(!identity.uid||String(meeting.initiatorUid||"")!==String(identity.uid))return false;
-  return !["in progress","completed","cancelled","canceled"].includes(String(meeting.status||"").trim().toLowerCase())&&
-    String(meeting.proceedingsStatus||"").trim().toLowerCase()!=="in progress";
+  const uid=String(identity.uid||"").trim();
+  if(!uid)return false;
+  const status=String(meeting.status||"").trim().toLowerCase();
+  const proceedings=String(meeting.proceedingsStatus||"").trim().toLowerCase();
+  const transitionActive=meeting.transitionCommitteeActive===true&&!["in progress","completed","cancelled","canceled"].includes(status)&&proceedings!=="in progress";
+  const initiator=String(meeting.initiatorUid||"")===uid&&!["in progress","completed","cancelled","canceled"].includes(status)&&proceedings!=="in progress";
+  const assigned=transitionActive
+    ?[meeting.transitionChairpersonUid,meeting.transitionSecretaryUid,meeting.transitionAdministratorUid]
+    :[meeting.meetingChairpersonUid||meeting.chairpersonUid,meeting.meetingSecretaryUid||meeting.secretaryUid,meeting.meetingAdministratorUid];
+  return initiator||assigned.map(value=>String(value||"")).includes(uid);
 }
 function leadershipElectionActive(meeting={}){
   return meeting.leadershipElectionRequired===true&&meeting.transitionCommitteeActive===true&&
