@@ -53,7 +53,7 @@
     "commit": "331201cb3c626cc96cd006fe8263bf69bafea9b1",
     "rollbackCommit": "331201cb3c626cc96cd006fe8263bf69bafea9b1"
   },
-  "validation": "Universal access implemented in App navigation (including access without organisational-role selection), shared client policy, Meeting Centre queries, Worker and legacy callable read paths, production and staging Firestore meeting rules, attendance register reads and working-document review. Verified external invitees retain access only to their invited meeting and live-room entry remains invitation/appointment controlled. The Meeting Administrator alone controls participant admission/removal, attendance marking and technical media moderation; Chairperson/Secretary retain proceedings and secretariat authority. Board-restricted records remain protected. Worker and legacy record paths enforce minimum ten-year retention and reconcile existing records when the register is retrieved. CI and production verification pending.",
+  "validation": "Universal access implemented in App navigation (including access without organisational-role selection), shared client policy, Meeting Centre queries, Worker and legacy callable read paths, production and staging Firestore meeting rules, attendance register reads and working-document review. Verified external invitees retain access only to their invited meeting and live-room entry remains invitation/appointment controlled. The Meeting Administrator alone controls participant admission/removal, attendance marking and technical media moderation; Chairperson/Secretary retain proceedings and secretariat authority. All three meeting-specific appointments are required before proceedings; Transition Committee authority ends at proceedings start. Board-restricted records remain protected. Worker and legacy record paths enforce minimum ten-year retention and reconcile existing records when the register is retrieved. Real meetings and linked governance records cannot be directly deleted; only TRIAL meetings/children may be deleted. CI and production verification pending.",
   "renewals": [
     {
       "at": "2026-11-23T19:55:00Z",
@@ -122,6 +122,24 @@
         "tests/meeting-category-firestore-rules.test.cjs",
         "tests/meeting-category-policy.test.mjs",
         "tests/meeting-room-authorization-boundary.test.mjs"
+      ]
+    },
+    {
+      "at": "2026-11-25T06:55:00Z",
+      "action": "closed remaining direct Firestore and legacy authorization bypasses",
+      "pullRequest": 959,
+      "files": [
+        "firestore.rules",
+        "firestore.staging.rules",
+        "functions/meetingAttendanceRegister.js",
+        "functions/meetingRecords.js",
+        "drive-gateway/src/meetingServices.mjs",
+        "src/meeting/IRPADGBSMeetingRoomMedia.jsx",
+        "src/pages/MeetingRoom.jsx",
+        "tests/meeting-category-firestore-rules.test.cjs",
+        "tests/meeting-category-policy.test.mjs",
+        "tests/meeting-room-authorization-boundary.test.mjs",
+        "tests/meeting-working-documents-security.test.mjs"
       ]
     }
   ],
@@ -258,7 +276,8 @@
       "src/pages/OperationalGatewaysParticipants.jsx",
       "tests/meeting-category-firestore-rules.test.cjs",
       "tests/meeting-category-policy.test.mjs",
-      "tests/meeting-room-authorization-boundary.test.mjs"
+      "tests/meeting-room-authorization-boundary.test.mjs",
+      "tests/meeting-working-documents-security.test.mjs"
     ],
     "ownerInstruction": "24-25 November 2026: everyone in IRPA must have full access to the entire Meeting Portal; anyone in IRPA may initiate/register a meeting; access is not restricted by role, department, membership/employment status, invitation or participant listing. Meeting-specific leadership and live-room admission remain separate controls.",
     "governanceBoundary": "Universal Meeting Portal access and meeting initiation do not bypass meeting-specific live-room admission, Chairperson/Secretary/Administrator responsibilities, Board voting eligibility, quorum, resolutions, formal approvals, or protected governance-record safeguards.",
@@ -284,6 +303,7 @@
     "src/pages/OperationalGatewaysParticipants.jsx",
     "tests/meeting-category-firestore-rules.test.cjs",
     "tests/meeting-category-policy.test.mjs",
-    "tests/meeting-room-authorization-boundary.test.mjs"
+    "tests/meeting-room-authorization-boundary.test.mjs",
+    "tests/meeting-working-documents-security.test.mjs"
   ]
 }
