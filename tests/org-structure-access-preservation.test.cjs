@@ -111,7 +111,8 @@ test("administrator portal navigation includes every registered app module witho
   assert.match(appSource, /storedAuthority!=="Administrator"/);
   assert.match(appSource, /sessionAdministrator\|\|authority==="Administrator"/);
   assert.match(appSource, /if\(sessionAdministrator\)return true/);
-  assert.match(appSource, /const UNIVERSAL_MEETING_MODULES=\["Meetings","Meeting Room","Participants","Resolutions","Voting","Actions","Decisions"\]/);\n  assert.match(appSource, /const meetingPortalModules=hasIRPAIdentity\?\["Dashboard",\.\.\.UNIVERSAL_MEETING_MODULES\]/);\n  assert.match(appSource, /const BASE_MEMBER_MODULES=\["Dashboard","Role Descriptions",\.\.\.UNIVERSAL_MEETING_MODULES/);
+  assert.match(appSource, /const UNIVERSAL_MEETING_MODULES=\["Meetings","Meeting Room","Participants","Resolutions","Voting","Actions","Decisions"\]/);
+  assert.match(appSource, /const meetingPortalModules=hasIRPAIdentity\?\["Dashboard",\.\.\.UNIVERSAL_MEETING_MODULES\]/);\n  assert.match(appSource, /const BASE_MEMBER_MODULES=\["Dashboard","Role Descriptions",\.\.\.UNIVERSAL_MEETING_MODULES/);
   assert.match(appSource, /modules=sessionAdministrator\?\[\.\.\.ALL_MODULES,\.\.\.registeredPortalModules\]/);
   assert.ok(appSource.includes("const ALL_MODULES="));
   assert.ok(appSource.includes("RoleJobDescriptionPortal"));
