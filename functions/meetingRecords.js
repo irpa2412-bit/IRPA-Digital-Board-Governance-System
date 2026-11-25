@@ -228,8 +228,7 @@ exports.compileAndEmailMeetingReport=onCall({
  const meeting=ctx.meeting;
  if(!ctx.canSecretariat)throw new HttpsError("permission-denied","Only the appointed Chairperson or Secretary may compile and distribute the meeting report.");
  if(text(ctx.confidentiality).toUpperCase()==="BOARD_RESTRICTED"&&!ctx.canReadRestrictedRecords)throw new HttpsError("permission-denied","This Board-restricted meeting report is available only to authorised governance readers.");
- const uid=ctx.uid,email=ctx.email||"";
- if(!text(meeting.registerStatus))throw new HttpsError("failed-precondition","The meeting is not registered and cannot be reported.");
+  if(!text(meeting.registerStatus))throw new HttpsError("failed-precondition","The meeting is not registered and cannot be reported.");
  const [resolutionSnap,decisionSnap,voteSnap,subscriptionSnap,participantSnap,recordSnap]=await Promise.all([
   db.collection("resolutions").where("meetingId","==",meetingId).get().catch(()=>({docs:[]})),
   db.collection("decisions").where("meetingId","==",meetingId).get().catch(()=>({docs:[]})),
