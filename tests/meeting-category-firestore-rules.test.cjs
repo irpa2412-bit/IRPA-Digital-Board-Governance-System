@@ -109,7 +109,7 @@ test("meeting creation rejects missing or invalid category metadata", async () =
 });
 
 
-test("meeting register is readable while meeting writes remain role-controlled", async () => {
+test("everyone in IRPA can read all meeting categories while meeting writes remain governed", async () => {
   await testEnv.withSecurityRulesDisabled(async context => {
     const db = context.firestore();
     await db.doc("meetings/governance-record").set(meeting({
@@ -129,12 +129,12 @@ test("meeting register is readable while meeting writes remain role-controlled",
   const boardDb = testEnv.authenticatedContext("board-member", {
     email: "board@example.test"
   }).firestore();
-  await assertFails(staffDb.doc("meetings/governance-record").get());
+  await assertSucceeds(staffDb.doc("meetings/governance-record").get());
   await assertSucceeds(boardDb.doc("meetings/governance-record").get());
   await assertSucceeds(staffDb.doc("meetings/staff-record").get());
 });
 
-test("authenticated users can query the read-only meeting register across categories", async () => {
+test("every authenticated IRPA identity can query the meeting register across categories", async () => {
   await testEnv.withSecurityRulesDisabled(async context => {
     await context.firestore().doc("meetings/governance-record").set(meeting({
       meetingCategory: "GOVERNANCE",
@@ -148,12 +148,12 @@ test("authenticated users can query the read-only meeting register across catego
   const boardDb = testEnv.authenticatedContext("board-member", {
     email: "board@example.test"
   }).firestore();
-  await assertFails(staffDb.collection("meetings").where("meetingCategory", "==", "GOVERNANCE").get());
+  await assertSucceeds(staffDb.collection("meetings").where("meetingCategory", "==", "GOVERNANCE").get());
   await assertSucceeds(boardDb.collection("meetings").where("meetingCategory", "==", "GOVERNANCE").get());
   await assertSucceeds(staffDb.collection("meetings").where("meetingCategory", "==", "STAFF").get());
 });
 
-test("explicit category metadata overrides a conflicting legacy meeting type", async () => {
+test("universal portal access is not narrowed by conflicting legacy meeting-type metadata", async () => {
   await testEnv.withSecurityRulesDisabled(async context => {
     await context.firestore().doc("meetings/category-mismatch").set(meeting({
       meetingCategory: "STAFF",
@@ -167,7 +167,7 @@ test("explicit category metadata overrides a conflicting legacy meeting type", a
   const staffDb = testEnv.authenticatedContext("staff-user", {
     email: "staff@example.test"
   }).firestore();
-  await assertFails(boardDb.doc("meetings/category-mismatch").get());
+  await assertSucceeds(boardDb.doc("meetings/category-mismatch").get());
   await assertSucceeds(staffDb.doc("meetings/category-mismatch").get());
 });
 
@@ -251,8 +251,8 @@ test("participant and invitation registers follow the linked meeting category po
   }).firestore();
   await assertSucceeds(boardDb.doc("participants/governance-participant").get());
   await assertSucceeds(boardDb.doc("invitations/governance-invitation").get());
-  await assertFails(staffDb.doc("participants/governance-participant").get());
-  await assertFails(staffDb.doc("invitations/governance-invitation").get());
+  await assertSucceeds(staffDb.doc("participants/governance-participant").get());
+  await assertSucceeds(staffDb.doc("invitations/governance-invitation").get());
 });
 
 test("active institutional users can read the organisation-wide member and employee directories", async () => {
