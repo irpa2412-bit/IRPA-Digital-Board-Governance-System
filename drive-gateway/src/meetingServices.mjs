@@ -378,6 +378,7 @@ if(pathname==="/api/meeting-attendance/daily/mark"){
 const meetingId=clean(data.meetingId),date=clean(data.date),participantId=clean(data.participantId),attendanceStatus=clean(data.attendanceStatus);
 if(!meetingId||!participantId||!/^\d{4}-\d{2}-\d{2}$/.test(date)||!["Present","Absent","Excused","N/A"].includes(attendanceStatus))return fail(ctx,request,"Meeting, date, participant and valid daily attendance status are required.",400);
 const c=await context(ctx,env,token,claims,meetingId);
+if(lower(c.confidentiality)==="board_restricted"&&!c.canReadRestrictedRecords)return fail(ctx,request,"This Board-restricted attendance register is available only to authorised governance readers.",403);
 if(!meetingRoleAssigned(c.meeting,c.uid,"administrator")&&!(transitionCommitteeActive(c.meeting)&&meetingRoleAssigned(c.meeting,c.uid,"transitionAdministrator")))return fail(ctx,request,"Only the Meeting Administrator appointed to this meeting may update the daily attendance sheet.",403);
 const participant=await getDoc(ctx,env,token,"participants",participantId);
 if(!participant||participant.meetingId!==meetingId||denied.has(lower(participant.status||participant.registrationStatus)))return fail(ctx,request,"An active registered participant for this meeting is required.",404);
@@ -393,6 +394,7 @@ if(pathname==="/api/meeting-attendance/daily/dispatch"){
 const meetingId=clean(data.meetingId),date=clean(data.date),phase=clean(data.phase).toUpperCase(),envelopeId=clean(data.envelopeId),documentId=clean(data.documentId),ownerUid=clean(data.ownerUid),uid=clean(claims.user_id);
 if(!meetingId||!/^\d{4}-\d{2}-\d{2}$/.test(date)||!["PREPARE","SENT","FAILED"].includes(phase)||!envelopeId||!documentId)return fail(ctx,request,"Meeting, date, phase, envelope and controlled document are required.",400);
 const c=await context(ctx,env,token,claims,meetingId);
+if(lower(c.confidentiality)==="board_restricted"&&!c.canReadRestrictedRecords)return fail(ctx,request,"This Board-restricted attendance register is available only to authorised governance readers.",403);
 const hostUid=clean(c.meeting.meetingAdministratorUid||(transitionCommitteeActive(c.meeting)?c.meeting.transitionAdministratorUid:""));
 if(!meetingAdministratorAuthority(c.meeting,uid)||!hostUid||ownerUid!==uid||hostUid!==uid)return fail(ctx,request,"The appointed Meeting Administrator must own the attendance document and dispatch the signing request.",403);
 const id=await hash(meetingId+"\\0"+date),existing=await getDoc(ctx,env,token,"meetingAttendanceDispatches",id),now=new Date();
@@ -827,8 +829,9 @@ const meetingId=clean(data.meetingId),incoming=data.event&&typeof data.event==="
 const eventType=clean(incoming.eventType);
 if(!meetingId||!eventType)return fail(ctx,request,"Meeting ID and event type are required.",400);
 const c=await context(ctx,env,token,claims,meetingId);
+if(lower(c.confidentiality)==="board_restricted"&&!c.canReadRestrictedRecords)return fail(ctx,request,"This Board-restricted meeting is available only to authorised governance readers.",403);
 const controller=meetingRoleAssigned(c.meeting,c.uid,"chair")||meetingRoleAssigned(c.meeting,c.uid,"secretary")||(transitionCommitteeActive(c.meeting)&&(meetingRoleAssigned(c.meeting,c.uid,"transitionChair")||meetingRoleAssigned(c.meeting,c.uid,"transitionSecretary")));
-if(!controller)return fail(ctx,request,"Only the authorised meeting administrator, initiator, chairperson or secretary may record meeting-room events.",403);
+if(!controller)return fail(ctx,request,"Only the appointed Chairperson or Secretary may record meeting-room events.",403);
 if(terminal.has(lower(c.meeting.status))&&eventType!=="LIVE_SESSION_ENDED")return fail(ctx,request,"No new activity can be recorded after the meeting is closed.",409);
 const allowed=["LIVE_SESSION_STARTED","LIVE_SESSION_PAUSED","LIVE_SESSION_ENDED","AGENDA_ITEM_OPENED","AGENDA_ITEM_STATUS_CHANGED","MOTION_RECORDED","VOTE_OPENED","DECISION_RECORDED","ACTION_RECORDED","TRANSCRIPT_SAVED"];
 if(!allowed.includes(eventType))return fail(ctx,request,"Unsupported meeting-room event type.",400);
