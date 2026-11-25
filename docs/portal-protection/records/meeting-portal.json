@@ -99,6 +99,30 @@
         "src/pages/MeetingRoom.jsx",
         "tests/meeting-category-policy.test.mjs"
       ]
+    },
+    {
+      "at": "2026-11-25T06:40:00Z",
+      "action": "completed cross-layer universal Meeting Portal access and role-boundary implementation",
+      "pullRequest": 959,
+      "files": [
+        "drive-gateway/src/meetingServices.mjs",
+        "firestore.rules",
+        "firestore.staging.rules",
+        "functions/meetingAttendanceRegister.js",
+        "functions/meetingRecords.js",
+        "scripts/check-meeting-media-governance.mjs",
+        "src/App.jsx",
+        "src/firebase/data.js",
+        "src/firebase/meetingPolicy.js",
+        "src/meeting/IRPADGBSMeetingRoomMedia.jsx",
+        "src/meeting/MeetingAccessControl.jsx",
+        "src/pages/MeetingRoom.jsx",
+        "src/pages/Meetings.jsx",
+        "src/pages/OperationalGatewaysParticipants.jsx",
+        "tests/meeting-category-firestore-rules.test.cjs",
+        "tests/meeting-category-policy.test.mjs",
+        "tests/meeting-room-authorization-boundary.test.mjs"
+      ]
     }
   ],
   "attendanceCallableAudit": {
@@ -216,9 +240,25 @@
     "relatedPullRequest": 941,
     "status": "IMPLEMENTED_IN_PR_959_PENDING_VALIDATION",
     "scope": [
-      "tests/meeting-category-policy.test.mjs",
+      "docs/portal-protection/records/meeting-portal.json",
+      "docs/portal-protection/windows/meeting-portal.json",
       "drive-gateway/src/meetingServices.mjs",
-      "src/pages/Meetings.jsx"
+      "firestore.rules",
+      "firestore.staging.rules",
+      "functions/meetingAttendanceRegister.js",
+      "functions/meetingRecords.js",
+      "scripts/check-meeting-media-governance.mjs",
+      "src/App.jsx",
+      "src/firebase/data.js",
+      "src/firebase/meetingPolicy.js",
+      "src/meeting/IRPADGBSMeetingRoomMedia.jsx",
+      "src/meeting/MeetingAccessControl.jsx",
+      "src/pages/MeetingRoom.jsx",
+      "src/pages/Meetings.jsx",
+      "src/pages/OperationalGatewaysParticipants.jsx",
+      "tests/meeting-category-firestore-rules.test.cjs",
+      "tests/meeting-category-policy.test.mjs",
+      "tests/meeting-room-authorization-boundary.test.mjs"
     ],
     "ownerInstruction": "24-25 November 2026: everyone in IRPA must have full access to the entire Meeting Portal; anyone in IRPA may initiate/register a meeting; access is not restricted by role, department, membership/employment status, invitation or participant listing. Meeting-specific leadership and live-room admission remain separate controls.",
     "governanceBoundary": "Universal Meeting Portal access and meeting initiation do not bypass meeting-specific live-room admission, Chairperson/Secretary/Administrator responsibilities, Board voting eligibility, quorum, resolutions, formal approvals, or protected governance-record safeguards.",
@@ -226,14 +266,24 @@
     "policyCorrectionPullRequest": 959
   },
   "scope": [
-    "src/App.jsx",
-    "src/meeting/MeetingAccessControl.jsx",
-    "src/meeting/IRPADGBSMeetingRoomMedia.jsx",
-    "src/pages/OperationalGatewaysParticipants.jsx",
-    "functions/meetingAttendanceRegister.js",
+    "docs/portal-protection/records/meeting-portal.json",
+    "docs/portal-protection/windows/meeting-portal.json",
+    "drive-gateway/src/meetingServices.mjs",
+    "firestore.rules",
     "firestore.staging.rules",
+    "functions/meetingAttendanceRegister.js",
+    "functions/meetingRecords.js",
     "scripts/check-meeting-media-governance.mjs",
+    "src/App.jsx",
+    "src/firebase/data.js",
+    "src/firebase/meetingPolicy.js",
+    "src/meeting/IRPADGBSMeetingRoomMedia.jsx",
+    "src/meeting/MeetingAccessControl.jsx",
+    "src/pages/MeetingRoom.jsx",
+    "src/pages/Meetings.jsx",
+    "src/pages/OperationalGatewaysParticipants.jsx",
     "tests/meeting-category-firestore-rules.test.cjs",
+    "tests/meeting-category-policy.test.mjs",
     "tests/meeting-room-authorization-boundary.test.mjs"
   ]
 }
