@@ -3,6 +3,7 @@ import {collection,doc,getDocs,getDoc,setDoc,addDoc,serverTimestamp} from "fireb
 import {db} from "../firebase/config";
 import seed from "../../config/pcu/irpa-organisation.seed.json";
 import {validateOrganisation,createDutyDefinition,createDutyAssignment} from "../governance/pcuEngine";
+import PcuGovernanceConsole from "./PcuGovernanceConsole";
 const tenant="irpa",base="pcuTenants/"+tenant;
 export default function PortalsControlUnit({user,isAdmin=false}){
  const [org,setOrg]=useState(null),[duties,setDuties]=useState([]),[assignments,setAssignments]=useState([]),[busy,setBusy]=useState(false),[error,setError]=useState(""),[message,setMessage]=useState("");
@@ -41,5 +42,7 @@ export default function PortalsControlUnit({user,isAdmin=false}){
  <h3>Add node</h3><label>Name <input value={name} onChange={e=>setName(e.target.value)} maxLength={180}/></label><label>Type <select value={type} onChange={e=>setType(e.target.value)}>{org.nodeTypes.map(t=><option key={t.id} value={t.id}>{t.label}</option>)}</select></label><label>Parent <select value={parent} onChange={e=>setParent(e.target.value)}><option value="">None</option>{org.nodes.map(n=><option key={n.id} value={n.id}>{n.name}</option>)}</select></label><button disabled={busy||!name.trim()} onClick={addNode}>Add node</button></section>
  <section><h2>Duty catalogue</h2><ul>{duties.map(d=><li key={d.id}>{d.title} · {d.cadence} · v{d.version}</li>)}</ul><label>Title <input value={title} onChange={e=>setTitle(e.target.value)} maxLength={180}/></label><label>Description <textarea value={description} onChange={e=>setDescription(e.target.value)}/></label><label>Cadence <select value={cadence} onChange={e=>setCadence(e.target.value)}>{["AD_HOC","DAILY","WEEKLY","MONTHLY","QUARTERLY","ANNUALLY"].map(x=><option key={x}>{x}</option>)}</select></label><button disabled={busy||!title.trim()} onClick={addDuty}>Create duty</button></section>
  <section><h2>Duty assignments</h2><label>Duty <select value={dutyId} onChange={e=>setDutyId(e.target.value)}><option value="">Select</option>{duties.map(d=><option key={d.id} value={d.id}>{d.title}</option>)}</select></label><label>Assignee type <select value={assigneeType} onChange={e=>setAssigneeType(e.target.value)}><option value="ORG_NODE">Organisation node</option><option value="IDENTITY">Named staff UID</option></select></label><label>Assignee UID or node ID <input value={assigneeId} onChange={e=>setAssigneeId(e.target.value)}/></label><button disabled={busy||!dutyId||!assigneeId.trim()} onClick={assign}>Assign duty</button><ul>{assignments.map(a=><li key={a.id}>{a.dutyId} → {a.assigneeType} {a.assigneeId} · {a.status} · permissions: No</li>)}</ul></section>
- </>}</main>;
+ </>}
+ <PcuGovernanceConsole user={user} isAdmin={isAdmin}/>
+ </main>;
 }
