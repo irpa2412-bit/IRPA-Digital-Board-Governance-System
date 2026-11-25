@@ -49,3 +49,55 @@ export function revokeDutyAssignment(assignment,actorUid,reason){
 export function createAuditEvent(input){
  return Object.freeze({id:validId(input.id,"audit event id"),tenantId:validId(input.tenantId,"tenantId"),actorUid:validId(input.actorUid,"actorUid"),action:validId(input.action,"audit action"),entityType:validId(input.entityType,"entityType"),entityId:validId(input.entityId,"entityId"),occurredAt:input.occurredAt||new Date().toISOString(),details:Object.freeze({...input.details}),immutable:true});
 }
+
+
+export function createDelegation(input){
+ const tenantId=validId(input?.tenantId,"tenantId"),delegatorId=validId(input?.delegatorId,"delegatorId"),delegateId=validId(input?.delegateId,"delegateId");
+ if(delegatorId===delegateId)throw new PcuValidationError("A person cannot delegate to themselves","INVALID_DELEGATION");
+ const startsAt=new Date(input.startsAt),endsAt=new Date(input.endsAt);
+ if(!Number.isFinite(startsAt.getTime())||!Number.isFinite(endsAt.getTime())||endsAt<=startsAt)throw new PcuValidationError("Delegation requires a valid start and later end date","INVALID_DELEGATION_DATES");
+ const scopes=[...new Set((input.scopes||[]).map(x=>clean(x)).filter(Boolean))];
+ if(!scopes.length)throw new PcuValidationError("Delegation scope must be explicit","EMPTY_DELEGATION_SCOPE");
+ return Object.freeze({id:validId(input.id,"delegation id"),tenantId,delegatorId,delegateId,scopes,startsAt:startsAt.toISOString(),endsAt:endsAt.toISOString(),limits:clean(input.limits),evidenceReference:clean(input.evidenceReference),status:"PENDING_APPROVAL",permissionsActivated:false,grantedClaims:[],createdBy:validId(input.createdBy,"createdBy")});
+}
+export function validateEscalationPolicy(input){
+ const tenantId=validId(input?.tenantId,"tenantId"),levels=input.levels||[];
+ if(!levels.length)throw new PcuValidationError("At least one escalation level is required","EMPTY_ESCALATION_POLICY");
+ const seen=new Set();
+ const normalized=levels.map((x,i)=>{const afterHours=Number(x.afterHours);if(!Number.isFinite(afterHours)||afterHours<0||(i&&afterHours<=Number(levels[i-1].afterHours)))throw new PcuValidationError("Escalation thresholds must increase","INVALID_ESCALATION_ORDER");const actor=validId(x.actor,"escalation actor");if(seen.has(actor))throw new PcuValidationError("Escalation actors must be distinct","DUPLICATE_ESCALATION_ACTOR");seen.add(actor);return Object.freeze({level:i+1,afterHours,actor,action:clean(x.action)||"NOTIFY_AND_REVIEW"});});
+ return Object.freeze({id:validId(input.id,"policy id"),tenantId,name:clean(input.name)||"Escalation policy",levels:normalized,enabled:input.enabled!==false,createdBy:validId(input.createdBy,"createdBy"),version:Number(input.version||1)});
+}
+export function getEscalationTarget(policy,elapsedHours){
+ if(!policy?.enabled)return null;
+ const eligible=(policy.levels||[]).filter(x=>Number(elapsedHours)>=x.afterHours);
+ return eligible.length?eligible[eligible.length-1]:null;
+}
+export function validateApprovalWorkflow(input){
+ const tenantId=validId(input?.tenantId,"tenantId"),name=clean(input.name),steps=input.steps||[];
+ if(!name||!steps.length)throw new PcuValidationError("Workflow name and at least one step are required","INVALID_WORKFLOW");
+ const ids=new Set();
+ const normalized=steps.map((s,i)=>{const id=validId(s.id||"step-"+(i+1),"step id");if(ids.has(id))throw new PcuValidationError("Duplicate workflow step","DUPLICATE_WORKFLOW_STEP");ids.add(id);const actorType=s.actorType||"IDENTITY";if(!["IDENTITY","ORG_NODE","ROLE"].includes(actorType))throw new PcuValidationError("Invalid workflow actor type","INVALID_WORKFLOW_ACTOR");return Object.freeze({id,order:i+1,label:clean(s.label)||"Step "+(i+1),actorType,actorId:validId(s.actorId,"workflow actor"),action:s.action||"APPROVE",required:s.required!==false});});
+ const actorIds=normalized.map(x=>x.actorId);
+ if(new Set(actorIds).size!==actorIds.length)throw new PcuValidationError("Approval actors must be distinct","SEPARATION_OF_DUTIES");
+ return Object.freeze({id:validId(input.id,"workflow id"),tenantId,name,description:clean(input.description),steps:normalized,status:"ACTIVE",version:Number(input.version||1),createdBy:validId(input.createdBy,"createdBy")});
+}
+export function advanceApprovalWorkflow(instance,actorId,decision,note=""){
+ if(!instance||instance.status!=="PENDING")throw new PcuValidationError("Workflow instance is not pending","INVALID_WORKFLOW_STATE");
+ const step=instance.steps?.[instance.currentStep||0];
+ if(!step||step.actorId!==clean(actorId))throw new PcuValidationError("Actor is not assigned to the current approval step","WORKFLOW_ACTOR_FORBIDDEN");
+ if(!["APPROVE","REJECT","RETURN"].includes(decision))throw new PcuValidationError("Invalid workflow decision","INVALID_WORKFLOW_DECISION");
+ const history=[...(instance.history||[]),Object.freeze({stepId:step.id,actorId:clean(actorId),decision,note:clean(note),at:new Date().toISOString()})];
+ if(decision!=="APPROVE")return Object.freeze({...instance,status:decision==="REJECT"?"REJECTED":"RETURNED",history});
+ const next=(instance.currentStep||0)+1;
+ return Object.freeze({...instance,currentStep:next,status:next>=instance.steps.length?"APPROVED":"PENDING",history});
+}
+export function summarizePcuPerformance({assignments=[],workflows=[],now=Date.now()}={}){
+ const active=assignments.filter(x=>x.status!=="REVOKED"),completed=active.filter(x=>x.status==="COMPLETED"),due=active.filter(x=>x.dueAt&&new Date(x.dueAt).getTime()<now&&x.status!=="COMPLETED");
+ const decided=workflows.filter(x=>["APPROVED","REJECTED"].includes(x.status));
+ const avgCycle=decided.length?decided.reduce((sum,x)=>sum+Math.max(0,new Date(x.completedAt||x.updatedAt||now).getTime()-new Date(x.createdAt||now).getTime()),0)/decided.length:0;
+ return Object.freeze({totalAssignments:active.length,completed:completed.length,completionRate:active.length?completed.length/active.length:0,overdue:due.length,acknowledged:active.filter(x=>x.status==="ACKNOWLEDGED").length,pending:active.filter(x=>["ASSIGNED","ACKNOWLEDGED"].includes(x.status)).length,workflowTotal:workflows.length,workflowPending:workflows.filter(x=>x.status==="PENDING").length,workflowApproved:workflows.filter(x=>x.status==="APPROVED").length,workflowRejected:workflows.filter(x=>x.status==="REJECTED").length,averageDecisionCycleMs:avgCycle});
+}
+export function summarizePcuAudit(events=[]){
+ const byAction={};for(const e of events){const key=clean(e.action)||"UNKNOWN";byAction[key]=(byAction[key]||0)+1;}
+ return Object.freeze({total:events.length,byAction:Object.freeze(byAction),actors:new Set(events.map(x=>x.actorUid).filter(Boolean)).size,latest:[...events].sort((a,b)=>new Date(b.occurredAt||0)-new Date(a.occurredAt||0)).slice(0,25)});
+}
