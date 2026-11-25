@@ -1,0 +1,86 @@
+{
+  "schemaVersion": 1,
+  "changeId": "MEETING-ATTENDANCE-WORKER-ONLY-2026-11-22",
+  "portal": "Meeting Portal",
+  "purpose": "Guard the Meeting Attendance screens against calling Firebase callable functions that cannot be deployed in the Firebase Spark project.",
+  "repairWindow": {
+    "durationHours": 72,
+    "openedAt": "2026-11-21T20:23:03Z",
+    "expiresAt": "2026-11-24T20:23:03Z",
+    "source": "Existing active Meeting Portal repair window"
+  },
+  "baseline": {
+    "commit": "5e3c7969913343d7c56c1785ac570029505219f4",
+    "rollbackCommit": "5e3c7969913343d7c56c1785ac570029505219f4"
+  },
+  "findings": {
+    "callableUiActions": [],
+    "legacyCallableExportsRemainServerSideOnly": [
+      "functions/meetingAttendanceRegister.js: signMeetingAttendance and getMeetingAttendanceRegister",
+      "functions/meetingRecords.js: legacy onCall exports for meeting records and working documents"
+    ],
+    "disposition": "No attendance screen or attendance client module invokes Firebase callable APIs. The UI actions below use authenticated Cloudflare Worker routes; signing uses the existing Signature Portal API."
+  },
+  "actionRouting": [
+    {
+      "action": "Self / automatic attendance registration and host status update",
+      "client": "markMeetingAttendance",
+      "method": "POST",
+      "route": "/api/meeting-attendance/mark"
+    },
+    {
+      "action": "Retrieve or refresh daily attendance sheet",
+      "client": "getDailyMeetingAttendance",
+      "method": "POST",
+      "route": "/api/meeting-attendance/daily/register"
+    },
+    {
+      "action": "Mark daily attendance Present / Absent / Excused",
+      "client": "markDailyMeetingAttendance",
+      "method": "POST",
+      "route": "/api/meeting-attendance/daily/mark"
+    },
+    {
+      "action": "Assess quorum",
+      "client": "assessMeetingQuorum",
+      "method": "POST",
+      "route": "/api/meeting-quorum/assess"
+    },
+    {
+      "action": "Prepare / resume controlled attendance signing dispatch",
+      "client": "callMeetingService",
+      "method": "POST",
+      "route": "/api/meeting-attendance/daily/dispatch"
+    },
+    {
+      "action": "Create and start email-link attendance signing",
+      "client": "createSignatureEnvelope / startSignatureWorkflow",
+      "method": "Existing Signature Portal API",
+      "route": "/api/signature-workflow/mutate and /api/signature-invitations/send"
+    }
+  ],
+  "exactFiles": [
+    "package.json",
+    "tests/meeting-attendance-worker-only.test.mjs",
+    "docs/portal-protection/records/meeting-attendance-worker-only.json"
+  ],
+  "prohibitedChanges": [
+    "No Firebase Cloud Functions deployment or server callable changes.",
+    "No Firestore rules, signing rules, tokens, link format, sessions, signer identity, field assignment, stamping, PDF, hash, certificate, archive logic, secrets, environment variables, SMTP settings or branch protection changes."
+  ],
+  "tests": [
+    "No httpsCallable/getFunctions/server Functions imports in MeetingRoom, Meetings, MeetingEntryGateway, and attendance/signature client modules.",
+    "Self/host marking, daily sheet retrieval/marking, quorum and dispatch each map to a registered Worker route and handler.",
+    "Attendance signing uses the existing Signature Portal API; no Firebase callable invocation."
+  ],
+  "expectedEffect": "A future attendance-screen dependency on an undeployed callable fails CI. Existing Worker routes and Signature Portal workflow remain the execution paths.",
+  "validation": {
+    "status": "PENDING",
+    "requiredChecks": [
+      "security-baseline",
+      "integrity",
+      "Readability Checker and Independent Verifier"
+    ],
+    "deployment": "After merge, deploy using the existing no-secret-sync Worker and frontend workflows. Do not deploy Firebase Functions."
+  }
+}
