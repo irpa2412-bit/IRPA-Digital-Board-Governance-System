@@ -9,6 +9,16 @@ import { buildSignedPdf, MAX_PDF_BYTES } from "./pdf.mjs";
 import { verifyCertificateInput, verifyCertificatePageText, extractPdfText } from "./recoveryCertificateVerifier.mjs";
 
 const isOwner=(envelope,user)=>Boolean(user?.uid)&&(envelope.createdBy===user.uid||envelope.createdByUid===user.uid||envelope.ownerUid===user.uid||user.isAdmin===true);
+async function getEnvelopeRecord(ctx,id){
+  const primary=await getEnvelopeRecord(ctx,id);
+  if(primary)return primary;
+  return await ctx.meta.get("signatureEnvelopes",id);
+}
+async function listEnvelopeRecords(ctx){
+  const primary=await ctx.meta.list("envelopes");
+  if(Array.isArray(primary)&&primary.length)return primary;
+  return await ctx.meta.list("signatureEnvelopes");
+}
 async function validChain(events){
   if(!Array.isArray(events))return false;
   let previous="GENESIS";
@@ -27,7 +37,7 @@ export async function getRecoveryQueue(ctx,user,{limit=25,offset=0}={}){
   if(!user?.uid)throw new HttpError(401,"Authentication required.");
   const safeLimit=Math.max(1,Math.min(50,limit==null?25:(Number.isInteger(Number(limit))?Number(limit):25)));
   const safeOffset=Math.max(0,Math.min(10000,Number.isInteger(Number(offset))?Number(offset):0));
-  const rows=await ctx.meta.list("envelopes");
+  const rows=await listEnvelopeRecords(ctx);
   const eligible=(rows||[]).filter(row=>row.status!=="Completed"&&isOwner(row,user))
     .sort((a,b)=>String(b.updatedAt||b.createdAt||"").localeCompare(String(a.updatedAt||a.createdAt||"")));
   const page=eligible.slice(safeOffset,safeOffset+safeLimit);for(const envelope of page)await appendRecoveryAccessEvent(ctx,user,envelope.id,"recovery.queue.viewed");return {ok:true,total:eligible.length,limit:safeLimit,offset:safeOffset,items:page.map(e=>({
@@ -45,7 +55,7 @@ async function appendRecoveryAccessEvent(ctx,user,id,type,details={}){
 }
 async function loadOwnedIncompleteEnvelope(ctx,user,id){
   if(!user?.uid)throw new HttpError(401,"Authentication required.");
-  const envelope=await ctx.meta.get("envelopes",id);
+  const envelope=await getEnvelopeRecord(ctx,id);
   if(!envelope)throw new HttpError(404,"Recovery record not found.");
   if(!isOwner(envelope,user))throw new HttpError(403,"This envelope belongs to another owner.");
   if(envelope.status==="Completed")throw new HttpError(409,"Completed envelopes do not require recovery assessment.");
@@ -437,12 +447,12 @@ export function createSignatureRecoveryRouter({authenticateFirebaseRequest,getFi
         const url=new URL(request.url);
         const limit=url.searchParams.get("limit");
         const offset=url.searchParams.get("offset");
-        const result=await getRecoveryQueue(ctx,user,{limit,offset});
+        const result=await getRecoveryQueue(ctx,user,{limit,offset,recordAccess:false});
         return json(result,200,corsHeaders(request));
       }
       const evidence=matchRecoveryEvidenceRoute(request.method,pathname);
       if(evidence) {
-        const result=await assessRecoveryEvidence(ctx,user,decodeURIComponent(evidence[1]));
+        const result=await assessRecoveryEvidence(ctx,user,decodeURIComponent(evidence[1]),{recordAccess:false});
         return json(result,200,corsHeaders(request));
       }
       const completedCopy=pathname.match(/^\/api\/recovery\/envelopes\/([A-Za-z0-9_-]{3,64})\/completed-copy\.pdf$/);
