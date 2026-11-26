@@ -24,21 +24,27 @@ function signedEvent(envelope,signerId){
 }
 export async function getRecoveryQueue(ctx,user,{limit=25,offset=0,recordAccess=true}={}){
   if(!user?.uid)throw new HttpError(401,"Authentication required.");
+  if(typeof ctx.firestore?.query!=="function")throw new HttpError(503,"Owner-scoped Firestore queries are unavailable.");
   const safeLimit=Math.max(1,Math.min(50,limit==null?25:(Number.isInteger(Number(limit))?Number(limit):25)));
   const safeOffset=Math.max(0,Math.min(10000,Number.isInteger(Number(offset))?Number(offset):0));
-  const [legacyRows,signatureRows,firestoreLegacyRows,firestoreSignatureRows]=await Promise.all([
-    ctx.meta.list("envelopes"),ctx.meta.list("signatureEnvelopes"),
-    ctx.firestore?.list?ctx.firestore.list("envelopes"):Promise.resolve([]),
-    ctx.firestore?.list?ctx.firestore.list("signatureEnvelopes"):Promise.resolve([])
-  ]);
   const byId=new Map();
-  for(const row of legacyRows||[])byId.set("envelopes/"+row.id,{...row,__collection:"envelopes",__source:"durable-object"});
-  for(const row of signatureRows||[])byId.set("signatureEnvelopes/"+row.id,{...row,__collection:"signatureEnvelopes",__source:"durable-object"});
-  for(const row of firestoreLegacyRows||[])byId.set("envelopes/"+row.id,{...row,__collection:"envelopes",__source:"firestore"});
-  for(const row of firestoreSignatureRows||[])byId.set("signatureEnvelopes/"+row.id,{...row,__collection:"signatureEnvelopes",__source:"firestore"});
+  for(const collection of ["envelopes","signatureEnvelopes"]){
+    const [byOwner,bySender,byParticipant]=await Promise.all([
+      ctx.firestore.query(collection,"ownerUid","EQUAL",user.uid),
+      ctx.firestore.query(collection,"senderUid","EQUAL",user.uid),
+      ctx.firestore.query(collection,"participantUids","ARRAY_CONTAINS",user.uid)
+    ]);
+    for(const row of [...(byOwner||[]),...(bySender||[]),...(byParticipant||[])]){
+      if(!row?.id)continue;
+      const key=collection+"/"+row.id;
+      byId.set(key,{...row,__collection:collection,__source:"firestore"});
+    }
+  }
   const eligible=[...byId.values()].filter(row=>row.status!=="Completed"&&isOwner(row,user))
     .sort((a,b)=>String(b.updatedAt||b.createdAt||"").localeCompare(String(a.updatedAt||a.createdAt||"")));
-  const page=eligible.slice(safeOffset,safeOffset+safeLimit);if(recordAccess)for(const envelope of page)await appendRecoveryAccessEvent(ctx,user,envelope.id,"recovery.queue.viewed", {collection:envelope.__collection});return {ok:true,total:eligible.length,limit:safeLimit,offset:safeOffset,items:page.map(e=>({
+  const page=eligible.slice(safeOffset,safeOffset+safeLimit);
+  if(recordAccess)for(const envelope of page)await appendRecoveryAccessEvent(ctx,user,envelope.id,"recovery.queue.viewed",{collection:envelope.__collection});
+  return {ok:true,total:eligible.length,limit:safeLimit,offset:safeOffset,items:page.map(e=>({
     collection:e.__collection,envelopeId:e.id,documentId:e.documentId,title:e.title||"",status:e.status,
     failedAt:e.completionFailure?.failedAt||null,stage:e.completionFailure?.stage||"NOT_RECORDED",
     signerCount:Array.isArray(e.signers)?e.signers.length:0
