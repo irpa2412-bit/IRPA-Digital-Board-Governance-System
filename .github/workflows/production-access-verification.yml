@@ -193,7 +193,7 @@ jobs:
                 probeWritten=r.ok;
                 if(probeWritten)productionWrites.push({record:probePath+"."+probeField,action:"TEMPORARILY UPDATED",detail:"own-profile displayName updated for the access probe and restored in finally cleanup"});
                 add("Member allowed Firestore self-profile update","2xx","HTTP "+r.status,r.ok,true);
-              }catch(e){add("Member allowed Firestore write","2xx",e.message,false,true);}
+              }catch(e){add("Member allowed Firestore self-profile update","2xx",e.message,false,true);}
               try {
                 const id="production-probe-"+crypto.randomUUID(), path="systemResetPlans/"+id;
                 const r=await req(base+"/"+path,member.token,"PATCH",{fields:{probe:{booleanValue:true},testAccount:{booleanValue:true},testPurpose:{stringValue:"PRODUCTION_ACCESS_VERIFICATION"}}});
@@ -215,7 +215,7 @@ jobs:
                 add("Member denied Firestore write","403","HTTP "+r.status+"; cleanup: "+cleanupStatus,passed,true);
               }catch(e){console.error("RULES ARE TOO PERMISSIVE");add("Member denied Firestore write","403",e.message,false,true);}
             } else {
-              for(const [t,e] of [["Test member profile","active role=Member; testAccount=true"],["Member attendance Worker call","2xx"],["Member actual-data write gate","403"],["Member allowed Firestore write","2xx"],["Member denied Firestore write","403"]])add(t,e,"NOT RUN: member sign-in failed",false,true);
+              for(const [t,e] of [["Test member profile","active role=Member; testAccount=true"],["Member attendance Worker call","2xx"],["Member actual-data write gate","403"],["Member allowed Firestore self-profile update","2xx"],["Member denied Firestore write","403"]])add(t,e,"NOT RUN: member sign-in failed",false,true);
             }
 
             if(!process.env.ADMIN_EMAIL||!process.env.ADMIN_PASSWORD){
