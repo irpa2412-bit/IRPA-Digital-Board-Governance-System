@@ -129,21 +129,34 @@ jobs:
                     return local.slice(0,2)+"***@"+domain;
                   };
                   const applied=field=>Boolean(field?.applied===true||field?.isApplied===true||field?.signed===true||field?.valueApplied===true||field?.appliedAt||field?.signedAt||field?.completedAt||field?.signatureApplied===true||field?.signatureData||field?.signatureImage||field?.signatureUrl||field?.signatureImageUrl||field?.signatureDataUrl||field?.signedValue);
+                  const ownerUid=String(envelope.ownerUid||envelope.senderUid||envelope.createdByUid||envelope.createdBy||"");
+                  const ownerEmail=String(envelope.ownerEmail||envelope.senderEmail||"").trim().toLowerCase();
                   const safeSigners=signers.map((signer,index)=>{
                     const uid=String(signer.uid||signer.signerUid||"");
                     const email=String(signer.email||signer.signerEmail||"").trim().toLowerCase();
-                    const assigned=fields.filter(field=>(uid&&String(field.signerUid||"")===uid)||(email&&String(field.signerEmail||"").trim().toLowerCase()===email));
-                    const linkMetadataPresent=["tokenHash","linkTokenHash","emailLinkTokenHash","signingLinkHash","linkSentAt","emailLinkSentAt","emailSentAt","sentAt"].some(key=>Boolean(signer[key]));
+                    const signerId=String(signer.id||signer.signerId||"");
+                    const assigned=fields.filter(field=>
+                      (uid&&String(field.signerUid||field.assigneeUid||"")===uid)||
+                      (email&&String(field.signerEmail||field.assigneeEmail||"").trim().toLowerCase()===email)||
+                      (signerId&&String(field.signerId||field.recipientId||"")===signerId)
+                    );
+                    const isOwner=(uid&&uid===ownerUid)||(email&&email===ownerEmail);
+                    const rawLinkStatus=String(signer.emailLinkStatus||signer.linkStatus||"").trim();
+                    const linkStatus=rawLinkStatus?rawLinkStatus.toUpperCase().replace(/[^A-Z0-9 _-]/g,""):"UNKNOWN";
+                    const deliveryStatus=String(signer.invitation||signer.deliveryStatus||"").trim().toUpperCase()||"UNKNOWN";
+                    const hashPresent=["tokenHash","linkTokenHash","emailLinkTokenHash","signingLinkHash"].some(key=>Boolean(signer[key]));
                     return{
-                      order:signer.order??signer.signingOrder??signer.level??index+1,
-                      orderSource:["order","signingOrder","level"].some(key=>signer[key]!==undefined)?"stored":"array-position",
-                      role:signer.role||signer.signerRole||"UNSPECIFIED",
+                      order:signer.order??signer.routingOrder??signer.signingOrder??signer.level??index+1,
+                      orderSource:["order","routingOrder","signingOrder","level"].some(key=>signer[key]!==undefined)?"stored":"array-position",
+                      role:signer.role||signer.signerRole||signer.institutionalRole||(isOwner?"Document Owner":"Signature"),
                       status:String(signer.status||(signer.signedAt?"SIGNED":"PENDING")).toUpperCase(),
                       signedAt:signer.signedAt||signer.completedAt||null,
                       email:maskEmail(email),
-                      fieldsAssigned:assigned.length,
-                      fieldsCompleted:assigned.filter(applied).length,
-                      linkStatus:linkMetadataPresent?"LINK_METADATA_PRESENT_VALIDITY_NOT_CHECKED":"UNKNOWN_NO_LINK_METADATA",
+                      fieldsAssigned:assigned.length||null,
+                      fieldsCompleted:assigned.length?assigned.filter(applied).length:null,
+                      linkStatus,
+                      deliveryStatus,
+                      tokenHashPresent:hashPresent,
                       tokenExposed:false
                     };
                   });
@@ -155,7 +168,7 @@ jobs:
                     signedCount:safeSigners.filter(s=>s.status==="SIGNED"||s.signedAt).length,
                     pendingCount:safeSigners.filter(s=>!s.signedAt&&s.status!=="SIGNED").length,
                     totalFields:fields.length,
-                    fieldsCompleted:safeSigners.reduce((n,s)=>n+s.fieldsCompleted,0),
+                    fieldsCompleted:safeSigners.every(s=>s.fieldsCompleted===null)?null:safeSigners.reduce((n,s)=>n+(s.fieldsCompleted||0),0),\n                    fieldMappingStatus:safeSigners.every(s=>s.fieldsAssigned===null)?"UNRESOLVED":"PARTIAL_OR_COMPLETE",
                     signers:safeSigners,
                     tokenValuesReadOrReturned:false
                   };
@@ -178,7 +191,7 @@ jobs:
             `- Stored owner UID: ${out.candidate?.ownerUid||"NOT_RETURNED"}`,`- Stored owner email: ${out.candidate?.ownerEmail||"NOT_RETURNED"}`,"",
             "## Route results","| Route | HTTP | Error code | Request ID | Evidence / source hash | SHA-256 |","|---|---:|---|---|---|---|",
             ...out.routes.map(x=>`| ${x.route} | ${x.status} | ${x.code||""} | ${x.requestId||""} | ${x.auditChainStatus||x.sourceHashStatus||x.total||""} ${x.auditChainCode||x.sourceHashCode||""} | ${x.sha256||x.sourceHash||""} |`),"",
-            "## Court snapshot",...(out.courtSnapshot?.signers||[]).map(x=>`- Order ${x.order} (${x.role}) | ${x.status} | ${x.email||"masked"} | fields ${x.fieldsCompleted}/${x.fieldsAssigned} | link: ${x.linkStatus}`),`- Signers: ${out.courtSnapshot?.signedCount??"unknown"} signed / ${out.courtSnapshot?.pendingCount??"unknown"} pending / ${out.courtSnapshot?.totalSigners??"unknown"} total`,`- Fields: ${out.courtSnapshot?.fieldsCompleted??"unknown"}/${out.courtSnapshot?.totalFields??"unknown"} completed`,`- Token values exposed: NO`,"",
+            "## Court snapshot",...(out.courtSnapshot?.signers||[]).map(x=>`- Order ${x.order} (${x.role}; ${x.orderSource}) | ${x.status} | ${x.email||"masked"} | fields ${x.fieldsCompleted??"UNMAPPED"}/${x.fieldsAssigned??"UNMAPPED"} | link: ${x.linkStatus} | delivery: ${x.deliveryStatus}`),`- Signers: ${out.courtSnapshot?.signedCount??"unknown"} signed / ${out.courtSnapshot?.pendingCount??"unknown"} pending / ${out.courtSnapshot?.totalSigners??"unknown"} total`,`- Fields: ${out.courtSnapshot?.fieldsCompleted??"UNVERIFIED"}/${out.courtSnapshot?.totalFields??"unknown"} completed; mapping: ${out.courtSnapshot?.fieldMappingStatus||"UNKNOWN"}`,`- Token values exposed: NO`,"",
             "## PDF outputs",...(out.pdfs.length?out.pdfs.map(x=>`- ${x.file}: SHA-256 ${x.sha256} (${x.bytes} bytes)`):["- No PDF was returned by the read-only routes."])];
           fs.writeFileSync("docs-results.md",lines.join("\n")+"\n");
           console.log(JSON.stringify({status:out.status,candidate:out.candidate||null,routes:out.routes,pdfs:out.pdfs}));
