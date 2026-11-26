@@ -819,7 +819,8 @@ test("inactive canonical institutional records remain blocked by portal activati
 
     if(target.endsWith("/documents/adminProfiles/inactive-board-uid") ||
        target.endsWith("/documents/members/inactive-board-uid") ||
-       target.endsWith("/documents/employees/inactive-board-uid") ||\n       target.endsWith("/documents/signatureProfiles/inactive-board-uid")){
+       target.endsWith("/documents/employees/inactive-board-uid") ||
+       target.endsWith("/documents/signatureProfiles/inactive-board-uid")){
       return new Response(JSON.stringify({error:{status:"NOT_FOUND"}}),{status:404});
     }
 
