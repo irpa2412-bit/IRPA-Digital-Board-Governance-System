@@ -8,7 +8,7 @@ const fixturePassword = "FixtureOnly-Password-2026!";
 test("Signature Recovery refresh makes two fresh authenticated requests on mobile standalone PWA", async ({ page, context }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const cdp = await context.newCDPSession(page);
-  await cdp.send("Emulation.setEmulatedMedia", { features: [{ name: "display-mode", value: "standalone" }] });
+  await cdp.send("Emulation.setEmulatedMedia", { media: "screen", features: [{ name: "display-mode", value: "standalone" }] });
   const gateway = "https://irpa-google-drive-gateway.irpa-governance.workers.dev";
   let queueRequests = [];
   let failNext = false;
@@ -76,7 +76,12 @@ test("installed-PWA worker activates the deployed build and removes the previous
     const deadline = Date.now() + 20000;
     while (Date.now() < deadline) {
       const current = await navigator.serviceWorker.getRegistration("/");
-      if (current?.active?.scriptURL.includes("new-deploy-fixture")) break;
+      const cacheKeys = await caches.keys();
+      if (
+        current?.active?.scriptURL.includes("new-deploy-fixture") &&
+        current.active.state === "activated" &&
+        !cacheKeys.includes(oldCache)
+      ) break;
       await new Promise(resolve => setTimeout(resolve, 100));
     }
     const current = await navigator.serviceWorker.getRegistration("/");
