@@ -866,7 +866,10 @@ test("inactive canonical institutional records remain blocked by portal activati
     });
 
     assert.equal(response.status,403);
-    assert.deepEqual(await response.json(),{ok:false,error:"IRPA_INVITATION_FAILURE:PORTAL_ACTIVATION_REQUIRED"});
+    const body=await response.json();
+    assert.equal(body.ok,false);
+    assert.equal(body.code,"NOT_ACTIVATED");
+    assert.match(body.requestId,/^[0-9a-f-]{36}$/i);
   } finally {
     global.fetch=originalFetch;
   }
