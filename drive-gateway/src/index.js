@@ -207,13 +207,29 @@ const smtpSelfcheckRoute = async (request, env) => {
 const signatureRecoveryRouter = createSignatureRecoveryRouter({
   authenticateFirebaseRequest,
   getFirestoreDocument,
-  buildContext: (env,claims,user) => buildEsignContext({
-    env,
-    verifyUser: async () => user,
-    sendInvitation: async () => { throw new Error("Read-only recovery routes do not send invitations."); },
-    logger: console,
-    driveHelpers: { getDriveAccessToken, driveFetch }
-  }),
+  buildContext: async (env,claims,user) => {
+    const ctx = buildEsignContext({
+      env,
+      verifyUser: async () => user,
+      sendInvitation: async () => { throw new Error("Read-only recovery routes do not send invitations."); },
+      logger: console,
+      driveHelpers: { getDriveAccessToken, driveFetch }
+    });
+    const adminToken = await getFirestoreAdminAccessToken(env);
+    const allowedCollections = new Set(["envelopes","signatureEnvelopes","documents"]);
+    ctx.firestore = {
+      async get(collection,id) {
+        if (!allowedCollections.has(collection)) throw new Error("Recovery Firestore collection is not permitted.");
+        const raw = await getFirestoreDocument(env, collection + "/" + id, adminToken);
+        return raw ? { id, ...(firestoreDocumentToPlain(raw) || {}) } : null;
+      },
+      async list(collection) {
+        if (!allowedCollections.has(collection)) throw new Error("Recovery Firestore collection is not permitted.");
+        return listFirestoreCollectionDocuments(env, collection, adminToken);
+      }
+    };
+    return ctx;
+  },
   json,
   corsHeaders
 });
