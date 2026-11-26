@@ -776,9 +776,11 @@ export default {
         message === "Firebase token is expired." ||
         message === "Firebase token signing key not found.";
 
+      const authCode=["TOKEN_INVALID","PROFILE_LOOKUP_FAILED","NOT_ACTIVATED"].includes(error?.code)?error.code:null;
       return json({
         ok: false,
         error: message,
+        ...(authCode?{code:authCode,requestId:error.requestId||crypto.randomUUID()}:{}),
         ...(error?.googleStatus ? {googleStatus:error.googleStatus} : {}),
         ...(error?.googleMessage ? {googleMessage:error.googleMessage} : {})
       }, Number(error?.status || 0) || (isAuthError ? 401 : 500), corsHeaders(request));
