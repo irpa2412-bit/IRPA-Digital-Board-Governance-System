@@ -149,7 +149,8 @@ test("Firestore profile lookup failure returns PROFILE_LOOKUP_FAILED with a requ
   global.fetch = async url => {
     const target = String(url);
     if (target.includes("securetoken@system.gserviceaccount.com")) return new Response(JSON.stringify({ keys: [jwk] }), { status: 200 });
-    if (target === "https://oauth2.googleapis.com/token") return new Response(JSON.stringify({ error: "temporarily_unavailable" }), { status: 503 });
+    if (target === "https://oauth2.googleapis.com/token") return new Response(JSON.stringify({ access_token: "portal-auth-test-admin-token", expires_in: 3600 }), { status: 200 });
+    if (target.includes("/documents/adminProfiles/portal-lookup-failure-uid")) return new Response(JSON.stringify({ error: { status: "INTERNAL" } }), { status: 500 });
     throw new Error("Unexpected external request in lookup-failure test: " + target);
   };
   try {
