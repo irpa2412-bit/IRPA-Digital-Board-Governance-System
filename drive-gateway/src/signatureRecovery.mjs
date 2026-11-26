@@ -5,6 +5,7 @@ import { cleanText, randomHex, validateEmail, validateName } from "./util.mjs";
 import { matchRecoveryEvidenceRoute } from "./esignPathPolicy.mjs";
 import { buildUnarchivedCompletedCopy } from "./courtRecoveryCopy.mjs";
 import { buildSignedPdf, MAX_PDF_BYTES } from "./pdf.mjs";
+import { normalizeSignatureEnvironment } from "./signatureEnvironment.mjs";
 import { verifyCertificateInput, verifyCertificatePageText, extractPdfText } from "./recoveryCertificateVerifier.mjs";
 
 const isOwner=(envelope,user)=>Boolean(user?.uid)&&(envelope.createdBy===user.uid||envelope.createdByUid===user.uid||envelope.ownerUid===user.uid||envelope.senderUid===user.uid||user.isAdmin===true);
@@ -164,26 +165,22 @@ export async function assessRecoveryEvidence(ctx,user,id,{recordAccess=true}={})
   const pendingRecord=envelope.completion?.archivePending&&typeof envelope.completion.archivePending==="object"?envelope.completion.archivePending:null;
   const pendingHash=String(pendingRecord?.finalHash||"").trim().toLowerCase();
   const pendingFileName=String(pendingRecord?.fileName||"").split(/[\\\\/]/).pop().slice(0,120)||null;
-  const environmentClass=value=>{
-    const normalized=String(value||"").trim().toUpperCase();
-    if(["ACTUAL","TRIAL","TEST"].includes(normalized))return normalized;
-    if(normalized==="PRODUCTION")return "LEGACY_PRODUCTION";
-    if(!normalized)return "MISSING";
-    return "UNRECOGNIZED";
-  };
-  const runtimeEnvironment=String(ctx.env?.IRPA_ENVIRONMENT||"").trim().toLowerCase()||"unknown";
-  const envelopeEnvironment=environmentClass(envelope.dataEnvironment||envelope.environment||envelope.recordOrigin);
-  const pendingEnvironment=environmentClass(pendingRecord?.environment);
-  let runtimeCompatible=false;
-  try{
-    if(envelope.externalReference)await resolveEnvelopeFinalisationEnvironment(ctx,envelope);
-    else{
-      const workerDefault=runtimeEnvironment==="staging"?"TRIAL":runtimeEnvironment==="production"?"ACTUAL":runtimeEnvironment==="trial"?"TRIAL":runtimeEnvironment==="actual"?"ACTUAL":runtimeEnvironment==="test"?"TEST":null;
-      runtimeCompatible=Boolean(workerDefault)&&workerDefault===envelopeEnvironment;
-    }
-    if(envelope.externalReference)runtimeCompatible=true;
-  }catch{runtimeCompatible=false;}
-  const environmentDiagnostics={envelope:envelopeEnvironment,preservedCopy:pendingEnvironment,gatewayRuntime:runtimeEnvironment,gatewayExpected:envelopeEnvironment,allMatch:runtimeCompatible&&["ACTUAL","TRIAL","TEST"].includes(envelopeEnvironment)&&envelopeEnvironment===pendingEnvironment};
+  const envelopeEnvironment=normalizeSignatureEnvironment(envelope).environment;
+  const pendingEnvironment=normalizeSignatureEnvironment({
+    dataEnvironment:pendingRecord?.environment
+  }).environment;
+  const runtimeMarkers=[ctx.env?.IRPA_ENVIRONMENT,ctx.env?.IRPA_WORKER_ENVIRONMENT]
+    .map(value=>String(value||"").trim().toLowerCase()).filter(Boolean);
+  const runtimeDistinct=[...new Set(runtimeMarkers)];
+  const runtimeEnvironment=runtimeDistinct.length===1?runtimeDistinct[0]:"unknown";
+  const runtimeCompatible=runtimeEnvironment==="production"
+    ? ["TRIAL","ACTUAL"].includes(envelopeEnvironment)
+    : runtimeEnvironment==="staging"||runtimeEnvironment==="trial"
+      ? envelopeEnvironment==="TRIAL"
+      : runtimeEnvironment==="actual"
+        ? envelopeEnvironment==="ACTUAL"
+        : false;
+  const environmentDiagnostics={envelope:envelopeEnvironment,preservedCopy:pendingEnvironment,gatewayRuntime:runtimeEnvironment,gatewayExpected:envelopeEnvironment,allMatch:runtimeCompatible&&envelopeEnvironment!=="UNKNOWN"&&pendingEnvironment!=="UNKNOWN"&&envelopeEnvironment===pendingEnvironment};
   let artifactIntegrityStatus="NOT_CHECKED";
   if(pendingRecord?.storageId&&/^[a-f0-9]{64}$/.test(pendingHash)){
     try{
