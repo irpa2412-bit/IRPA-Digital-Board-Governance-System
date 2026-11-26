@@ -45,7 +45,7 @@ jobs:
           const excluded=new Set(["IRPA-ENV-2026-11501354","ENV-4b06e60941f8eb1d"]);
           const out={status:"PENDING",ownerUid:uid,candidateId,routes:[],pdfs:[]};
           const callRaw=(path,options={})=>fetch(base+path,options);
-          const prResponse=await fetch(`https://api.github.com/repos/${repo}/pulls/985`,{headers:{Authorization:"Bearer "+process.env.GH_TOKEN,Accept:"application/vnd.github+json"}});
+          const prResponse=await fetch(`https://api.github.com/repos/${repo}/pulls/987`,{headers:{Authorization:"Bearer "+process.env.GH_TOKEN,Accept:"application/vnd.github+json"}});
           if(!prResponse.ok)throw new Error("FIX_PR_LOOKUP_FAILED");
           const pr=await prResponse.json();
           if(!pr.merged){
@@ -104,8 +104,17 @@ jobs:
                   createdAt:candidate.createdAt||null,ownerUid:candidate.ownerUid||candidate.createdByUid||candidate.createdBy||null,
                   senderUid:candidate.senderUid||null,ownerEmail:candidate.ownerEmail||candidate.senderEmail||null};
                 const id=encodeURIComponent(candidateId);
-                const recovery=await call("recovery-envelope-list","/api/recovery/envelopes?limit=100&offset=0&diagnostic=1");
-                out.recoveryQueueCandidateFound=(recovery.body?.items||[]).some(e=>String(e.envelopeId||e.id||"")===candidateId);
+                let recoveryOffset=0,recoveryTotal=0,recoveryPages=0,recoveryItems=[];
+                do {
+                  const recovery=await call(`recovery-envelope-list-page-${recoveryPages+1}`,`/api/recovery/envelopes?limit=100&offset=${recoveryOffset}&diagnostic=1`);
+                  recoveryItems.push(...(recovery.body?.items||[]));
+                  recoveryTotal=Number(recovery.body?.total||0);
+                  recoveryOffset+=100;
+                  recoveryPages+=1;
+                } while(recoveryOffset<recoveryTotal&&recoveryPages<50);
+                out.recoveryQueueCandidateFound=recoveryItems.some(e=>String(e.envelopeId||e.id||"")===candidateId);
+                out.recoveryQueueTotal=recoveryTotal;
+                out.recoveryQueuePages=recoveryPages;
                 await call("court-evidence","/api/recovery/envelopes/"+id+"/evidence?diagnostic=1");
                 await call("emergency-retrieval","/api/recovery/envelopes/"+id+"/emergency-retrieval","POST");
                 await call("completed-copy","/api/recovery/envelopes/"+id+"/completed-copy.pdf");
