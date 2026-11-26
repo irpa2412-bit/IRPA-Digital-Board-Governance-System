@@ -149,6 +149,7 @@ jobs:
               status:{stringValue:"Active"},accountActivated:{booleanValue:true},
               registrationStatus:{stringValue:"Activated"},testAccount:{booleanValue:true},
               isTestAccount:{booleanValue:true},testAccountType:{stringValue:"PRODUCTION_ACCESS_VERIFICATION"},
+              invitationId:{stringValue:"PRODUCTION_ACCESS_VERIFICATION"},
               createdAt:{timestampValue:new Date().toISOString()}
             };
             const url=base+"/members/"+uid+"?currentDocument.exists=false";
@@ -266,7 +267,7 @@ jobs:
               }
             }catch(e){console.error("TEST PROFILE CLEANUP FAILED: "+e.message);add("Test profile final cleanup","signed-in token UID; delete only if testAccount=true",e.message,false,true);}
 
-            const testTable=["| test | expected | actual | pass/fail |","|---|---|---|---|",...rows.map(x=>`| ${x.t} | ${x.e} | ${x.a.replace(/\\|/g,"/")} | ${x.p?"PASS":"FAIL"} |`)].join("\n");
+            const testTable=["| test | expected | actual | pass/fail |","|---|---|---|---|",...rows.map(x=>`| ${x.t} | ${x.e} | ${x.a.replaceAll("|","/")} | ${x.p?"PASS":"FAIL"} |`)].join("\n");
             const remaining=productionWrites.some(x=>x.action==="PRESERVED")?"One or more records were preserved; inspect rows above":"NONE";
             const writeTable=["| production record | action | detail |","|---|---|---|",...productionWrites.map(x=>`| ${x.record} | ${x.action} | ${x.detail} |`),`| Production remainder | ${remaining==="NONE"?"NONE":"REVIEW"} | ${remaining} |`].join("\n");
             console.log(testTable);
