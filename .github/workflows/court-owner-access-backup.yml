@@ -92,7 +92,21 @@ jobs:
             }
             exported[name] = { count, pages, rows };
           };
-          for (const name of collections) await scan(name);
+          await scan("signatureProfiles");
+          const authUsers = [];
+          let pageToken;
+          do {
+            const page = await getAuth().listUsers(1000,pageToken);
+            for (const u of page.users) {
+              const email = String(u.email || "").trim().toLowerCase();
+              if (email && knownEmails.has(email)) {
+                authUsers.push({ uid:u.uid,email:u.email||null,emailVerified:u.emailVerified,disabled:u.disabled,creationTime:u.metadata?.creationTime||null,lastSignInTime:u.metadata?.lastSignInTime||null,providerIds:(u.providerData||[]).map(p=>p.providerId) });
+                knownUids.add(u.uid);
+              }
+            }
+            pageToken = page.pageToken;
+          } while (pageToken);
+          for (const name of collections.filter(name=>name!=="signatureProfiles")) await scan(name);
 
           const envelopeRows = [...matched.values()].filter(row => ["envelopes","signatureEnvelopes"].includes(row.path.split("/")[0]));
           const ownerUids = new Set(knownUids);
@@ -113,19 +127,6 @@ jobs:
               for(const key of ["email","primaryEmail","secondaryEmail","alternateEmail","personalEmail","workEmail","contactEmail"]){const v=String(d[key]||"").trim().toLowerCase();if(v)emails.add(v);}
             }
           }
-          const authUsers = [];
-          let pageToken;
-          do {
-            const page = await getAuth().listUsers(1000,pageToken);
-            for (const u of page.users) {
-              const email = String(u.email || "").trim().toLowerCase();
-              if (ownerUids.has(u.uid) || (email && emails.has(email))) {
-                authUsers.push({ uid:u.uid,email:u.email||null,emailVerified:u.emailVerified,disabled:u.disabled,creationTime:u.metadata?.creationTime||null,lastSignInTime:u.metadata?.lastSignInTime||null,providerIds:(u.providerData||[]).map(p=>p.providerId) });
-              }
-            }
-            pageToken = page.pageToken;
-          } while (pageToken);
-
           const identityRecords = [...matched.values()].filter(row=>["envelopes","signatureEnvelopes"].includes(row.path.split("/")[0])).map(row=>{
             const d=row.data||{},signers=Array.isArray(d.signers)?d.signers:[],fields=Array.isArray(d.fields)?d.fields:[];
             const doc=exported.documents.rows.find(x=>x.id===d.documentId)?.data||{};
