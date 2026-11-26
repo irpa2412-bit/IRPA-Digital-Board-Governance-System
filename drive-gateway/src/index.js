@@ -782,6 +782,10 @@ export default {
       console.error("Drive gateway error", error);
 
       const message = error?.message || "Drive gateway request failed.";
+      if (["TOKEN_INVALID","PROFILE_LOOKUP_FAILED","NOT_ACTIVATED"].includes(error?.code)) {
+        const status = Number(error.status) || (error.code === "NOT_ACTIVATED" ? 403 : error.code === "PROFILE_LOOKUP_FAILED" ? 503 : 401);
+        return json({ok:false,code:error.code,requestId:error.requestId||crypto.randomUUID()},status,corsHeaders(request));
+      }
       if (message === "Google Drive has not yet been authorized.") {
         return json({ok:false,code:"GOOGLE_DRIVE_NOT_AUTHORIZED",error:"Google Drive has not yet been authorized. An active IRPA administrator must complete Google Drive authorization in Settings before retrying this operation."},503,corsHeaders(request));
       }
@@ -3590,6 +3594,7 @@ async function authenticateFirebaseRequest(request, env, options = {}) {
     const error = new Error("Firebase authentication is required.");
     error.status = 401;
     error.code = "TOKEN_INVALID";
+    error.requestId = crypto.randomUUID();
     throw error;
   }
 
@@ -3609,6 +3614,7 @@ async function authenticateFirebaseRequest(request, env, options = {}) {
     const error = new Error("Firebase ID token is invalid, expired, or not issued for this production project.");
     error.status = 401;
     error.code = "TOKEN_INVALID";
+    error.requestId = crypto.randomUUID();
     error.cause = cause;
     throw error;
   }
@@ -3681,6 +3687,7 @@ async function assertActivatedPortalUser(claims, env) {
     const error = new Error("IRPA_INVITATION_FAILURE:PORTAL_ACTIVATION_REQUIRED");
     error.status = 403;
     error.code = "NOT_ACTIVATED";
+    error.requestId = crypto.randomUUID();
     throw error;
   }
   } catch (cause) {
@@ -3688,6 +3695,7 @@ async function assertActivatedPortalUser(claims, env) {
     const error = new Error("Portal activation profile lookup failed.");
     error.status = 503;
     error.code = "PROFILE_LOOKUP_FAILED";
+    error.requestId = crypto.randomUUID();
     error.cause = cause;
     throw error;
   }
