@@ -168,7 +168,8 @@ jobs:
                     signedCount:safeSigners.filter(s=>s.status==="SIGNED"||s.signedAt).length,
                     pendingCount:safeSigners.filter(s=>!s.signedAt&&s.status!=="SIGNED").length,
                     totalFields:fields.length,
-                    fieldsCompleted:safeSigners.every(s=>s.fieldsCompleted===null)?null:safeSigners.reduce((n,s)=>n+(s.fieldsCompleted||0),0),\n                    fieldMappingStatus:safeSigners.every(s=>s.fieldsAssigned===null)?"UNRESOLVED":"PARTIAL_OR_COMPLETE",
+                    fieldsCompleted:safeSigners.every(s=>s.fieldsCompleted===null)?null:safeSigners.reduce((n,s)=>n+(s.fieldsCompleted||0),0),
+                    fieldMappingStatus:safeSigners.every(s=>s.fieldsAssigned===null)?"UNRESOLVED":"PARTIAL_OR_COMPLETE",
                     signers:safeSigners,
                     tokenValuesReadOrReturned:false
                   };
