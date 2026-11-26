@@ -74,5 +74,5 @@ test("isolated recovery router uses the shared bounded GET evidence matcher", as
   const recovery = await readFile(new URL("../src/signatureRecovery.mjs", import.meta.url), "utf8");
   assert.match(recovery, /import \{ matchRecoveryEvidenceRoute \} from "\.\/esignPathPolicy\.mjs"/);
   assert.match(recovery, /matchRecoveryEvidenceRoute\(request\.method,pathname\)/);
-  assert.match(recovery, /assessRecoveryEvidence\(ctx,user,decodeURIComponent\(evidence\[1\]\)\)/);
+  assert.match(recovery, /assessRecoveryEvidence\(ctx,user,decodeURIComponent\(evidence\[1\]\),\{recordAccess:false\}\)/);
 });
