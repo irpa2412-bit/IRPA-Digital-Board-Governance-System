@@ -8,9 +8,10 @@ const end = source.indexOf("async function getSignatureWorkflowViewRoute", start
 const route = source.slice(start, end);
 
 test("workflow listing uses server-side owner, sender and participant queries", () => {
-  assert.match(route, /queryField\("signatureEnvelopes","ownerUid","EQUAL"/);
-  assert.match(route, /queryField\("signatureEnvelopes","senderUid","EQUAL"/);
-  assert.match(route, /queryField\("signatureEnvelopes","participantUids","ARRAY_CONTAINS"/);
+  assert.match(route, /queryField\(collectionId,"ownerUid","EQUAL"/);
+  assert.match(route, /queryField\(collectionId,"senderUid","EQUAL"/);
+  assert.match(route, /queryField\(collectionId,"participantUids","ARRAY_CONTAINS"/);
+  assert.match(route, /\["envelopes","signatureEnvelopes"\]/);
 });
 
 test("workflow listing uses cursor pagination and bounded pages", () => {
