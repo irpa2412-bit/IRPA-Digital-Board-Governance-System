@@ -522,7 +522,7 @@ export function createSignatureRecoveryRouter({authenticateFirebaseRequest,getFi
     } catch(error) {
       const status=Number(error?.status)||500;
       const message=String(error?.message||"EMERGENCY_RETRIEVAL_REQUEST_FAILED");
-      const code=status===403?"NOT_OWNER":String(error?.code||"RECOVERY_REQUEST_FAILED");
+      const code=status===403?"NOT_OWNER":status===404?"ENVELOPE_NOT_FOUND":status===409?(pathname.endsWith("/completed-copy.pdf")?"COMPLETED_COPY_NOT_AVAILABLE":"RECOVERY_NOT_ELIGIBLE"):String(error?.code||"RECOVERY_REQUEST_FAILED");
       return json({ok:false,code,requestId,stages:[{stageCode:"REQUEST",status:"fail",error:message}]},status,corsHeaders(request));
     }
   };
