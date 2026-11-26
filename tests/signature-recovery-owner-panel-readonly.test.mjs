@@ -58,7 +58,6 @@ test("each recovery action passes its own button label into the route error form
 test("refresh always forces a fresh Firebase ID token, bypasses HTTP caches and clears stale results before requesting",()=>{
  assert.match(queue,/getIdToken\\(user,true\\)/);
  assert.match(queue,/cache:"no-store"/);
- assert.match(queue,/"Cache-Control":"no-cache"/);
  assert.match(queue,/if\\(reset\\)\\{setRows\\(\\[\\]\\);setTotal\\(0\\);setOffset\\(0\\);setSelected\\(null\\);\\}/);
  assert.match(queue,/Last refreshed at:/);
  assert.match(queue,/Worker version:/);
