@@ -1,4 +1,5 @@
 name: Court envelope owner-access forensic backup (read only)
+# Push-triggered owner-identity scan; report commits are metadata-only.
 
 on:
   push:
