@@ -582,3 +582,32 @@ test("recovery assessment distinguishes production Worker runtime from a verifie
  assert.equal(result.environmentDiagnostics.gatewayExpected,"TRIAL");
  assert.equal(result.environmentDiagnostics.allMatch,true);
 });
+
+test("recovery queue and evidence resolve signatureEnvelopes when legacy lookup throws 404",async()=>{
+  const f=await fixture();
+  const envelopeId="IRPA-ENV-2026-54530056";
+  const source=await f.ctx.storage.get((await f.ctx.meta.get("documents","DOC-REC-1")).primaryStorageId);
+  const sourceHash=await sha256Hex(source);
+  await f.ctx.meta.create("documents","DOC-REC-SIGNATURE",{id:"DOC-REC-SIGNATURE",fileId:(await f.ctx.meta.get("documents","DOC-REC-1")).primaryStorageId,sha256:sourceHash});
+  await f.ctx.meta.create("signatureEnvelopes",envelopeId,{
+    id:envelopeId,documentId:"DOC-REC-SIGNATURE",title:"Modern recovery lookup test",status:"InProgress",
+    ownerUid:f.user.uid,senderUid:f.user.uid,recordOrigin:"TRIAL",sha256:sourceHash,events:[],
+    fields:[{fieldId:"SIG-MODERN-1",type:"Signature",page:1,signerUid:"email-link-1"}],
+    recipients:[{uid:"email-link-1",email:"signer@example.test",name:"Test Signer"}],
+    signers:[{signerId:"S1",name:"Test Signer",email:"signer@example.test",status:"Signed",signedAt:"2026-11-22T10:00:00.000Z"}]
+  });
+  const originalGet=f.ctx.meta.get.bind(f.ctx.meta);
+  f.ctx.meta.get=async(collection,id)=>{
+    if(collection==="envelopes"&&id===envelopeId)throw Object.assign(new Error("Document not found"),{status:404});
+    return originalGet(collection,id);
+  };
+  const queue=await getRecoveryQueue(f.ctx,f.user,{recordAccess:false});
+  assert.ok(queue.items.some(item=>item.envelopeId===envelopeId&&item.collection==="signatureEnvelopes"));
+  const evidence=await assessRecoveryEvidence(f.ctx,f.user,envelopeId,{recordAccess:false});
+  assert.equal(evidence.envelopeId,envelopeId);
+  assert.equal(evidence.auditChain.status,"NOT_HASH_CHAINED");
+  assert.equal(evidence.sourceHashStatus,"VERIFIED");
+  assert.equal(evidence.summary.unverifiable,1);
+  assert.equal(evidence.signerSummary.length,1);
+  assert.equal((await f.ctx.meta.list("recoveryAccessEvents")).length,0);
+});
