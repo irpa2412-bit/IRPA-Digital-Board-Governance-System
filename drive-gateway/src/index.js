@@ -1371,32 +1371,58 @@ async function systemDiagnosticsRoute(request, env) {
 }
 
 async function getSignatureWorkflowListRoute(request, env) {
-  const claims = await authenticateFirebaseRequest(request, env);
-  const actorUid = String(claims.user_id || "").trim();
-  if (!actorUid) return json({ok:false,error:"Authenticated identity is required."},401,corsHeaders(request));
-  const token = await getFirestoreAdminAccessToken(env);
-  const adminProfile = await getFirestoreDocument(env, "adminProfiles/" + actorUid, token);
-  const isAdmin = String(claims.email || "").trim().toLowerCase() === "irpa2412@gmail.com" || Boolean(adminProfile?.fields?.active?.booleanValue === true && adminProfile?.fields?.role?.stringValue === "Administrator");
-  const query = async (fieldPath, op) => {
-    const response = await fetch("https://firestore.googleapis.com/v1/projects/" + getFirebaseProjectId(env) + "/databases/(default)/documents:runQuery", {
-      method:"POST", headers:{Authorization:"Bearer " + token,"Content-Type":"application/json"},
-      body:JSON.stringify({structuredQuery:{from:[{collectionId:"signatureEnvelopes"}],where:{fieldFilter:{field:{fieldPath},op,value:{stringValue:actorUid}}},limit:100}})
-    });
-    if (!response.ok) throw new Error("Unable to retrieve signing envelopes.");
-    return (await response.json()).filter(row=>row.document).map(row=>row.document);
-  };
-  const rows = isAdmin
-    ? await (async()=>{const response=await fetch("https://firestore.googleapis.com/v1/projects/"+getFirebaseProjectId(env)+"/databases/(default)/documents/signatureEnvelopes?pageSize=100",{headers:{Authorization:"Bearer "+token}});if(!response.ok)throw new Error("Unable to retrieve signing envelopes.");return (await response.json()).documents||[];})()
-    : (await Promise.all([query("participantUids","ARRAY_CONTAINS"),query("ownerUid","EQUAL"),query("senderUid","EQUAL")])).flat();
-  const unique = new Map(rows.map(row=>[String(row.name||"").split("/").pop(),row]));
-  const envelopes = [];
-  for (const [id,row] of unique) {
-    const envelope = {id,...(firestoreDocumentToPlain(row)||{})};
-    const filtered = filterSignatureEnvelopeForCaller(envelope,{authenticatedUid:actorUid,isAdmin});
-    if (filtered.allowed && !["Cancelled","Declined"].includes(String(envelope.status||""))) envelopes.push(filtered.view);
+  const requestId = crypto.randomUUID();
+  let claims;
+  try { claims = await authenticateFirebaseRequest(request, env); }
+  catch (error) {
+    const code = ["TOKEN_INVALID","PROFILE_LOOKUP_FAILED","NOT_ACTIVATED"].includes(error?.code) ? error.code : "TOKEN_INVALID";
+    const status = code === "PROFILE_LOOKUP_FAILED" ? 503 : code === "NOT_ACTIVATED" ? 403 : 401;
+    return json({ok:false,code,requestId},status,corsHeaders(request));
   }
-  envelopes.sort((a,b)=>String(b.updatedAt||b.createdAt||"").localeCompare(String(a.updatedAt||a.createdAt||"")));
-  return json({ok:true,envelopes},200,{...corsHeaders(request),"Cache-Control":"no-store"});
+  const actorUid = String(claims.user_id || "").trim();
+  if (!actorUid) return json({ok:false,code:"TOKEN_INVALID",requestId},401,corsHeaders(request));
+  try {
+    const token = await getFirestoreAdminAccessToken(env);
+    const adminProfile = await getFirestoreDocument(env, "adminProfiles/" + actorUid, token);
+    const isAdmin = String(claims.email || "").trim().toLowerCase() === "irpa2412@gmail.com" || Boolean(adminProfile?.fields?.active?.booleanValue === true && adminProfile?.fields?.role?.stringValue === "Administrator");
+    const listCollection = async collectionId => {
+      const rows = [];
+      let pageToken = "";
+      let pages = 0;
+      do {
+        const url = new URL("https://firestore.googleapis.com/v1/projects/" + getFirebaseProjectId(env) + "/databases/(default)/documents/" + collectionId);
+        url.searchParams.set("pageSize","1000");
+        if (pageToken) url.searchParams.set("pageToken",pageToken);
+        const response = await fetch(url.toString(),{headers:{Authorization:"Bearer " + token}});
+        if (!response.ok) throw new Error("Unable to retrieve " + collectionId + " records.");
+        const payload = await response.json();
+        rows.push(...(payload.documents || []));
+        pageToken = payload.nextPageToken || "";
+        pages += 1;
+        if (pages > 500) throw new Error("Collection pagination safety limit exceeded.");
+      } while (pageToken);
+      return rows;
+    };
+    const [signatureRows, legacyRows] = await Promise.all([
+      listCollection("signatureEnvelopes"),
+      listCollection("envelopes")
+    ]);
+    const unique = new Map();
+    for (const row of [...signatureRows,...legacyRows]) {
+      const id = String(row.name || "").split("/").pop();
+      if (id) unique.set(id,row);
+    }
+    const envelopes = [];
+    for (const [id,row] of unique) {
+      const envelope = {id,...(firestoreDocumentToPlain(row)||{})};
+      const filtered = filterSignatureEnvelopeForCaller(envelope,{authenticatedUid:actorUid,isAdmin});
+      if (filtered.allowed && !["Cancelled","Declined"].includes(String(envelope.status||""))) envelopes.push(filtered.view);
+    }
+    envelopes.sort((a,b)=>String(b.updatedAt||b.createdAt||"").localeCompare(String(a.updatedAt||a.createdAt||"")));
+    return json({ok:true,requestId,totalScanned:signatureRows.length+legacyRows.length,envelopes},200,{...corsHeaders(request),"Cache-Control":"no-store"});
+  } catch (error) {
+    return json({ok:false,code:"PROFILE_LOOKUP_FAILED",requestId},503,corsHeaders(request));
+  }
 }
 
 async function getSignatureWorkflowViewRoute(request, env) {
@@ -3598,13 +3624,10 @@ async function assertActivatedPortalUser(claims, env) {
   // email-fallback profile used by upload authorization so activated
   // invitees are not rejected before the storage layer.
   const { memberRecord, employeeRecord } = await getInstitutionalProfileForUser(env, claims, adminToken);
-  let personal = null;
-  if (!memberRecord && !employeeRecord) {
-    personal = await getFirestoreDocument(env, `signatureProfiles/${claims.user_id}`, adminToken);
-    if (!personal && claims.email) {
-      const matches = await getFirestoreDocumentsByEmail(env, "signatureProfiles", claims.email, adminToken);
-      personal = matches[0] || null;
-    }
+  let personal = await getFirestoreDocument(env, `signatureProfiles/${claims.user_id}`, adminToken);
+  if (!personal && claims.email) {
+    const matches = await getFirestoreDocumentsByEmail(env, "signatureProfiles", claims.email, adminToken);
+    personal = matches[0] || null;
   }
   const memberActivated = memberRecord && (
     memberRecord.fields?.registrationStatus?.stringValue === "Activated" ||
