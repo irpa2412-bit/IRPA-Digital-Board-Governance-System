@@ -207,7 +207,10 @@ test("session-state returns 401 when Firebase authentication is missing", async(
     FIREBASE_SERVICE_ACCOUNT_JSON:JSON.stringify(serviceAccount)
   });
   assert.equal(response.status,401);
-  assert.deepEqual(await response.json(),{ok:false,error:"Firebase authentication is required."});
+  const body=await response.json();
+  assert.equal(body.ok,false);
+  assert.equal(body.code,"TOKEN_INVALID");
+  assert.match(body.requestId,/^[0-9a-f-]{36}$/i);
 });
 
 
@@ -494,7 +497,10 @@ test("portal activation gate rejects a valid Firebase ID token whose member reco
   try{
     const response=await handler.fetch(new Request("https://gw.test/api/esign/cleanup",{method:"POST",headers:{Authorization:"Bearer "+idToken,"Content-Type":"application/json"},body:"{}"}),{FIREBASE_PROJECT_ID:"irpa-digital-board-governance",FIREBASE_SERVICE_ACCOUNT_JSON:JSON.stringify(serviceAccount),ESIGN_MODULE_ENABLED:"true"});
     assert.equal(response.status,403);
-    assert.deepEqual(await response.json(),{ok:false,error:"IRPA_INVITATION_FAILURE:PORTAL_ACTIVATION_REQUIRED"});
+    const body=await response.json();
+    assert.equal(body.ok,false);
+    assert.equal(body.code,"NOT_ACTIVATED");
+    assert.match(body.requestId,/^[0-9a-f-]{36}$/i);
   } finally { global.fetch=originalFetch; }
 });
 
@@ -860,7 +866,10 @@ test("inactive canonical institutional records remain blocked by portal activati
     });
 
     assert.equal(response.status,403);
-    assert.deepEqual(await response.json(),{ok:false,error:"IRPA_INVITATION_FAILURE:PORTAL_ACTIVATION_REQUIRED"});
+    const body=await response.json();
+    assert.equal(body.ok,false);
+    assert.equal(body.code,"NOT_ACTIVATED");
+    assert.match(body.requestId,/^[0-9a-f-]{36}$/i);
   } finally {
     global.fetch=originalFetch;
   }
