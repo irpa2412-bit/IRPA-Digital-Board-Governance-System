@@ -71,8 +71,12 @@ test("PWA worker activates immediately, claims clients, versions its cache and b
  assert.match(sw,/self\\.clients\\.claim\\(\\)/);
  assert.match(sw,/p\\.startsWith\\("\/api\/"\\)/);
  assert.match(sw,/CACHE_PREFIX\\+BUILD_KEY/);
- assert.match(main,/\/sw\\.js\\?v=/);
- assert.doesNotMatch(install,/serviceWorker\\.register/);
+ assert.match(sw,/BUILD_KEY="20261126-refresh-pwa-1"/);
+ assert.match(sw,/CACHE_PREFIX\\+BUILD_KEY/);
+ assert.match(main,/serviceWorker\\.register/);
+ assert.match(install,/serviceWorker\\.register/);
+ assert.match(main,/updateViaCache: "none"/);
+ assert.match(install,/updateViaCache:"none"/);
 });
 test("authentication diagnostics preserve the four required stable error codes and request IDs",()=>{
  const route="/api/recovery/envelopes/ENV-0000000000000000/evidence";
