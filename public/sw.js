@@ -1,6 +1,6 @@
 /* Build-keyed shell cache. API/auth/signing traffic is never cached. */
 const CACHE_PREFIX="irpa-dbgs-shell-";
-const BUILD_KEY=new URL(self.location.href).searchParams.get("v")||"unversioned";
+const BUILD_KEY="20261126-refresh-pwa-1";
 const CACHE_NAME=CACHE_PREFIX+BUILD_KEY;
 const OFFLINE_URL="/offline.html";
 const APP_SHELL=["/","/index.html","/manifest.webmanifest",OFFLINE_URL,"/icons/irpa-192.svg","/icons/irpa-512.svg","/icons/irpa-maskable.svg","/install.js"];
