@@ -6,7 +6,7 @@ import { sha256Hex } from "../src/util.mjs";
 async function fixture(){
  const bytes=new TextEncoder().encode("%PDF-1.7\nexisting-preserved-final-pdf\n%%EOF");
  const hash=await sha256Hex(bytes);
- const envelope={id:"IRPA-ENV-2026-11501354",createdBy:"court-owner",status:"CompletionFailed",dataEnvironment:"trial",completion:{finalHash:hash,archivePending:{storageId:"pending-pdf",finalHash:hash,fileName:"court-copy.pdf",createdAt:"2026-11-23T06:00:00.000Z",environment:"trial"}}};
+ const envelope={id:"IRPA-ENV-2026-54530056",createdBy:"court-owner",status:"CompletionFailed",dataEnvironment:"trial",completion:{finalHash:hash,archivePending:{storageId:"pending-pdf",finalHash:hash,fileName:"court-copy.pdf",createdAt:"2026-11-23T06:00:00.000Z",environment:"trial"}}};
  let writes=0,reads=0;
  const ctx={env:{IRPA_ENVIRONMENT:"trial"},meta:{async get(){return envelope;},async update(){writes++;throw Error("write forbidden");},async create(){writes++;throw Error("write forbidden");}},storage:{async get(id){reads++;assert.equal(id,"pending-pdf");return new Uint8Array(bytes);},async put(){writes++;throw Error("write forbidden");},async delete(){writes++;throw Error("write forbidden");}},now:()=>new Date("2026-11-23T06:00:00.000Z")};
  return{ctx,envelope,bytes,getWrites:()=>writes,getReads:()=>reads,hash};
@@ -60,5 +60,21 @@ test("download rejects bytes that do not match the preserved final hash",async()
  const f=await fixture();
  f.ctx.storage.get=async()=>new TextEncoder().encode("%PDF-1.7\nwrong bytes\n%%EOF");
  await assert.rejects(()=>buildUnarchivedCompletedCopy(f.ctx,{uid:"court-owner"},f.envelope.id),e=>e.code==="HASH_MISMATCH");
+ assert.equal(f.getWrites(),0);
+});
+
+test("completed-copy lookup falls back to signatureEnvelopes after legacy 404",async()=>{
+ const f=await fixture(),calls=[];
+ f.ctx.meta.get=async(collection,id)=>{
+  calls.push(collection);
+  if(collection==="envelopes")throw Object.assign(new Error("Document not found"),{status:404});
+  if(collection==="signatureEnvelopes")return f.envelope;
+  return null;
+ };
+ const result=await buildUnarchivedCompletedCopy(f.ctx,{uid:"court-owner"},f.envelope.id);
+ assert.deepEqual(result.bytes,f.bytes);
+ assert.equal(result.hash,f.hash);
+ assert.deepEqual(calls,["envelopes","signatureEnvelopes"]);
+ assert.equal(f.getReads(),1);
  assert.equal(f.getWrites(),0);
 });
