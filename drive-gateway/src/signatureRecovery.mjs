@@ -354,14 +354,15 @@ export async function buildEmergencyRetrieval(ctx,user,id,{extractText=extractPd
     if(envelope.status!=="CompletionFailed")throw Object.assign(new Error("Only failed-completion envelopes are eligible for emergency retrieval."),{status:409});
     let document;
     try{document=await ctx.meta.get("documents",envelope.documentId);}catch(error){return fail("SOURCE_READ",error);}
-    if(!document?.primaryStorageId)return fail("SOURCE_READ",new Error("SOURCE_REFERENCE_MISSING"));
+    const sourceStorageId=document?.primaryStorageId||document?.storageId||document?.driveFileId||document?.fileId||envelope.primaryStorageId||envelope.sourcePdfStorageId||null;
+    if(!sourceStorageId)return fail("SOURCE_READ",new Error("SOURCE_REFERENCE_MISSING"));
     let source;
-    try{source=await ctx.storage.get(document.primaryStorageId);}catch(error){return fail("SOURCE_READ",error);}
+    try{source=await ctx.storage.get(sourceStorageId);}catch(error){return fail("SOURCE_READ",error);}
     if(!(source instanceof Uint8Array)||!source.length)return fail("SOURCE_READ",new Error("SOURCE_FILE_MISSING"));
     stage("SOURCE_READ","PASS");
     let sourceHash;
     try{sourceHash=await sha256Hex(source);}catch(error){return fail("HASH",error);}
-    const references=[document.sha256,document.hash,envelope.documentHash,envelope.originalHash].filter(value=>typeof value==="string"&&value.trim()).map(value=>value.trim().toLowerCase());
+    const references=[document.sha256,document.hash,envelope.sha256,envelope.documentHash,envelope.originalHash,envelope.gatewayOriginalHash].filter(value=>typeof value==="string"&&value.trim()).map(value=>value.trim().toLowerCase());
     if(!references.length||references.some(value=>value!==sourceHash))return fail("HASH",new Error("SOURCE_HASH_MISMATCH_OR_REFERENCE_MISSING"));
     stage("SOURCE_HASH","PASS");
     let chainValid;
