@@ -138,26 +138,24 @@ export async function assessRecoveryEvidence(ctx,user,id,{recordAccess=true}={})
   const runtimeMarkers = [
     ctx.env?.IRPA_ENVIRONMENT,
     ctx.env?.IRPA_WORKER_ENVIRONMENT
-  ].filter(value => String(value || "").trim());
-  const runtimeValues = runtimeMarkers.map(value => {
-    const normalized = String(value).trim().toUpperCase();
-    if (normalized === "STAGING" || normalized === "TRIAL") return "TRIAL";
-    if (normalized === "PRODUCTION" || normalized === "ACTUAL") return "ACTUAL";
-    return "UNKNOWN";
-  });
-  const runtimeDistinct = [...new Set(runtimeValues)];
-  const runtimeEnvironment = runtimeDistinct.length === 1 && runtimeDistinct[0] !== "UNKNOWN"
-    ? runtimeDistinct[0]
-    : "UNKNOWN";
+  ].map(value=>String(value||"").trim().toLowerCase()).filter(Boolean);
+  const runtimeDistinct=[...new Set(runtimeMarkers)];
+  const runtimeEnvironment=runtimeDistinct.length===1?runtimeDistinct[0]:"unknown";
+  const runtimeAllowsEnvironment=runtimeEnvironment==="production"
+    ? ["TRIAL","ACTUAL"].includes(envelopeEnvironment)
+    : runtimeEnvironment==="staging"||runtimeEnvironment==="trial"
+      ? envelopeEnvironment==="TRIAL"
+      : runtimeEnvironment==="actual"
+        ? envelopeEnvironment==="ACTUAL"
+        : false;
   const environmentDiagnostics = {
     envelope: envelopeEnvironment,
     preservedCopy: pendingEnvironment,
     gatewayRuntime: runtimeEnvironment,
     gatewayExpected: envelopeEnvironment,
-    allMatch: runtimeEnvironment !== "UNKNOWN" &&
+    allMatch: runtimeAllowsEnvironment &&
       envelopeEnvironment !== "UNKNOWN" &&
       pendingEnvironment !== "UNKNOWN" &&
-      runtimeEnvironment === envelopeEnvironment &&
       envelopeEnvironment === pendingEnvironment
   };
   let artifactIntegrityStatus="NOT_CHECKED";
