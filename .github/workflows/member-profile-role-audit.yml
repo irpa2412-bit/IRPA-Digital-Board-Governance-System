@@ -75,7 +75,7 @@ jobs:
             const report = {
               profiles_scanned: snapshot.size,
               profiles_with_role_entries: profilesWithRoleEntries,
-              profiles_with_role_entries_lacking_legitimate_grant: null
+              profiles_with_role_entries_lacking_legitimate_grant: profilesWithRoleEntries === 0 ? 0 : null
             };
             fs.mkdirSync("../reports", { recursive: true });
             fs.writeFileSync("../reports/member-profile-role-audit.json", JSON.stringify(report, null, 2) + "\n", { mode: 0o644 });
