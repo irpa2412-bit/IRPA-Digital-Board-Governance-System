@@ -119,7 +119,7 @@ jobs:
             "## Route results","| Route | HTTP | Error code | SHA-256 |","|---|---:|---|---|",
             ...out.routes.map(x=>`| ${x.route} | ${x.status} | ${x.code||""} | ${x.sha256||""} |`),"",
             "## PDF outputs",...(out.pdfs.length?out.pdfs.map(x=>`- ${x.file}: SHA-256 ${x.sha256} (${x.bytes} bytes)`):["- No PDF was returned by the read-only routes."])];
-          fs.writeFileSync("docs-results.md",lines.join("\\n")+"\\n");
+          fs.writeFileSync("docs-results.md",lines.join("\n")+"\n");
           console.log(JSON.stringify({status:out.status,candidate:out.candidate||null,routes:out.routes,pdfs:out.pdfs}));
           NODE
       - name: Append metadata-only results and comment on PR #982
@@ -132,7 +132,7 @@ jobs:
           set -euo pipefail
           mkdir -p docs/incident
           if [[ -f docs-results.md ]]; then
-            node --input-type=module -e 'import fs from "node:fs";const p="docs/incident/results-20261126.md";const next=fs.readFileSync("docs-results.md","utf8");if(fs.existsSync(p))fs.appendFileSync(p,"\\n---\\n\\n"+next);else fs.writeFileSync(p,next);'
+            node --input-type=module -e 'import fs from "node:fs";const p="docs/incident/results-20261126.md";const next=fs.readFileSync("docs-results.md","utf8");if(fs.existsSync(p))fs.appendFileSync(p,"\n---\n\n"+next);else fs.writeFileSync(p,next);'
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
