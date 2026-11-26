@@ -27,3 +27,5 @@ jobs:
       - run: npm ci
       - run: node --test tests/court-auth-isolation.test.mjs
       - run: npm test
+
+# The full Gateway suite is required in addition to the focused auth-boundary tests.
