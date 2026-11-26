@@ -3537,6 +3537,7 @@ async function authenticateFirebaseRequest(request, env, options = {}) {
   if (!match) {
     const error = new Error("Firebase authentication is required.");
     error.status = 401;
+    error.code = "TOKEN_INVALID";
     throw error;
   }
 
@@ -3555,6 +3556,7 @@ async function authenticateFirebaseRequest(request, env, options = {}) {
   } catch (cause) {
     const error = new Error("Firebase ID token is invalid, expired, or not issued for this production project.");
     error.status = 401;
+    error.code = "TOKEN_INVALID";
     error.cause = cause;
     throw error;
   }
@@ -3563,6 +3565,7 @@ async function authenticateFirebaseRequest(request, env, options = {}) {
   if (!uid || uid !== String(payload.sub || "").trim()) {
     const error = new Error("Firebase ID token subject is invalid.");
     error.status = 401;
+    error.code = "TOKEN_INVALID";
     throw error;
   }
   const claims = {
@@ -3582,9 +3585,11 @@ async function authenticateFirebaseRequest(request, env, options = {}) {
 }
 
 async function assertActivatedPortalUser(claims, env) {
-  const adminToken = await getFirestoreAdminAccessToken(env);
-  const admin = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, adminToken);
-  if (admin?.fields?.active?.booleanValue === true) return;
+  let adminToken;
+  try {
+    adminToken = await getFirestoreAdminAccessToken(env);
+    const admin = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, adminToken);
+    if (admin?.fields?.active?.booleanValue === true) return;
 
   // Invitation activation preserves the canonical institutional record ID
   // and attaches the authenticated Firebase UID to that record. Some older
@@ -3592,7 +3597,13 @@ async function assertActivatedPortalUser(claims, env) {
   // was always identical to the Firebase UID. Resolve the same UID-first,
   // email-fallback profile used by upload authorization so activated
   // invitees are not rejected before the storage layer.
-  const { memberRecord, employeeRecord } = await getInstitutionalProfileForUser(env, claims);
+  const { memberRecord, employeeRecord } = await getInstitutionalProfileForUser(env, claims, adminToken);
+  const personalDirect = await getFirestoreDocument(env, `signatureProfiles/${claims.user_id}`, adminToken);
+  let personal = personalDirect;
+  if (!personal && claims.email) {
+    const matches = await getFirestoreDocumentsByEmail(env, "signatureProfiles", claims.email, adminToken);
+    personal = matches[0] || null;
+  }
   const memberActivated = memberRecord && (
     memberRecord.fields?.registrationStatus?.stringValue === "Activated" ||
     memberRecord.fields?.status?.stringValue === "Activated" ||
@@ -3604,9 +3615,25 @@ async function assertActivatedPortalUser(claims, env) {
     employeeRecord.fields?.employmentStatus?.stringValue === "Active"
   ) && employeeRecord.fields?.accountActivated?.booleanValue !== false;
 
-  if (!memberActivated && !employeeActive) {
+  const activeStatus = value => ["active","activated"].includes(String(value || "").trim().toLowerCase());
+  const personalActive = personal && (
+    activeStatus(personal.fields?.status?.stringValue) ||
+    activeStatus(personal.fields?.registrationStatus?.stringValue) ||
+    personal.fields?.active?.booleanValue === true ||
+    personal.fields?.accountActivated?.booleanValue === true
+  ) && personal.fields?.accountActivated?.booleanValue !== false;
+  if (!memberActivated && !employeeActive && !personalActive) {
     const error = new Error("IRPA_INVITATION_FAILURE:PORTAL_ACTIVATION_REQUIRED");
     error.status = 403;
+    error.code = "NOT_ACTIVATED";
+    throw error;
+  }
+  } catch (cause) {
+    if (cause?.code === "NOT_ACTIVATED") throw cause;
+    const error = new Error("Portal activation profile lookup failed.");
+    error.status = 503;
+    error.code = "PROFILE_LOOKUP_FAILED";
+    error.cause = cause;
     throw error;
   }
 }
