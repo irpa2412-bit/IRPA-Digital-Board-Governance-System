@@ -29,3 +29,10 @@ test("every fetched record is checked through the visibility policy", () => {
   assert.match(route, /filterSignatureEnvelopeForCaller\(envelope/);
   assert.match(route, /if\(filtered\.allowed\) envelopes\.push/);
 });
+
+test("workflow listing normalizes PRODUCTION to ACTUAL and labels missing metadata UNKNOWN", () => {
+  assert.match(route, /normalizeSignatureEnvironment\(envelope\)/);
+  assert.match(route, /normalizeSignatureEnvironment\(\{recordOrigin:rawEnvironment\}\)/);
+  assert.match(route, /normalizedEnvironment:normalizedEnvironment\.environment/);
+  assert.match(route, /INVALID_ENVIRONMENT_FILTER/);
+});
