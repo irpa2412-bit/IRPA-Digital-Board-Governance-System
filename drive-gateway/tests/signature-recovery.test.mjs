@@ -581,3 +581,22 @@ test("recovery assessment distinguishes production Worker runtime from a verifie
  assert.equal(result.environmentDiagnostics.gatewayExpected,"TRIAL");
  assert.equal(result.environmentDiagnostics.allMatch,true);
 });
+
+
+test("InProgress emergency retrieval creates only a labelled partial evidence PDF and never finalises",async()=>{
+  const f=await fixture({stampCount:12});
+  const before=await f.ctx.meta.get("envelopes","ENV-REC-1");
+  before.status="InProgress";
+  await f.ctx.meta.update("envelopes","ENV-REC-1",before);
+  const result=await buildEmergencyRetrieval(f.ctx,f.user,"ENV-REC-1");
+  assert.equal(result.ok,true);
+  assert.equal(result.envelopeStatus,"InProgress");
+  assert.equal(result.isCompleted,false);
+  assert.match(result.label,/PARTIAL SIGNED-EVIDENCE COPY/);
+  assert.match(result.outputHash,/^[a-f0-9]{64}$/);
+  const after=await f.ctx.meta.get("envelopes","ENV-REC-1");
+  assert.equal(after.status,"InProgress");
+  assert.deepEqual(after.signers,before.signers);
+  assert.deepEqual(after.fields,before.fields);
+  assert.deepEqual(after.events,before.events);
+});
