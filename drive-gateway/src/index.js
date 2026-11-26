@@ -3598,11 +3598,13 @@ async function assertActivatedPortalUser(claims, env) {
   // email-fallback profile used by upload authorization so activated
   // invitees are not rejected before the storage layer.
   const { memberRecord, employeeRecord } = await getInstitutionalProfileForUser(env, claims, adminToken);
-  const personalDirect = await getFirestoreDocument(env, `signatureProfiles/${claims.user_id}`, adminToken);
-  let personal = personalDirect;
-  if (!personal && claims.email) {
-    const matches = await getFirestoreDocumentsByEmail(env, "signatureProfiles", claims.email, adminToken);
-    personal = matches[0] || null;
+  let personal = null;
+  if (!memberRecord && !employeeRecord) {
+    personal = await getFirestoreDocument(env, `signatureProfiles/${claims.user_id}`, adminToken);
+    if (!personal && claims.email) {
+      const matches = await getFirestoreDocumentsByEmail(env, "signatureProfiles", claims.email, adminToken);
+      personal = matches[0] || null;
+    }
   }
   const memberActivated = memberRecord && (
     memberRecord.fields?.registrationStatus?.stringValue === "Activated" ||
