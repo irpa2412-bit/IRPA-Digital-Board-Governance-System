@@ -234,7 +234,7 @@ jobs:
             `- Personal Auth accounts: ${loginAccounts.map(x=>x.uid+" / "+(x.email||"no-email")+" / "+(x.creationTime||"unknown-created")).join("; ")||"NONE"}`,
             `- UID overlap: ${owners.some(x=>logins.includes(x))?"MATCH":"NO MATCH"}`,
             `- Duplicate email groups: ${(p.identityComparison?.duplicateEmails||[]).map(x=>x.email+" ("+x.uids.join(",")+")").join("; ")||"NONE"}`,""
-          ].join("\\n");
+          ].join("\n");
           fs.writeFileSync("docs/incident/results-20261126.md",report+"\n");
           fs.writeFileSync("/tmp/pr-comment.md",report+"\n");
           NODE
