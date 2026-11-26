@@ -69,13 +69,15 @@ async function loadOwnedFailedEnvelope(ctx,user,id){
 export async function assessRecoveryEvidence(ctx,user,id,{recordAccess=true}={}){
   const envelope=await loadOwnedIncompleteEnvelope(ctx,user,id);
   const events=Array.isArray(envelope.events)?envelope.events:[];
-  const auditChainStatus=events.length===0?"NO_EVENTS":(await validChain(events)?"VERIFIED":"FAILED");
+  const modernEnvelope=envelope.__collection==="signatureEnvelopes";
+  const auditChainStatus=modernEnvelope&&events.length===0?"NOT_HASH_CHAINED":events.length===0?"NO_EVENTS":(await validChain(events)?"VERIFIED":"FAILED");
   const document=await ctx.meta.get("documents",envelope.documentId);
-  const expectedHashes=[...new Set([document?.sha256,document?.hash,envelope.documentHash,envelope.originalHash].filter(value=>typeof value==="string"&&value.trim()).map(value=>value.trim().toLowerCase()))];
+  const sourceStorageId=document?.primaryStorageId||document?.storageId||document?.driveFileId||document?.fileId||envelope.primaryStorageId||envelope.sourcePdfStorageId||null;
+  const expectedHashes=[...new Set([document?.sha256,document?.hash,envelope.sha256,envelope.documentHash,envelope.originalHash,envelope.gatewayOriginalHash].filter(value=>typeof value==="string"&&value.trim()).map(value=>value.trim().toLowerCase()))];
   let sourceHash=null,sourceHashStatus="NO_STORED_HASH",sourceHashCode="SOURCE_HASH_MISSING",sourceHashReason="No stored source hash is available.";
-  if(document?.primaryStorageId){
+  if(sourceStorageId){
     try{
-      const original=await ctx.storage.get(document.primaryStorageId);
+      const original=await ctx.storage.get(sourceStorageId);
       if(original){
         sourceHash=await sha256Hex(original);
         if(!expectedHashes.length){sourceHashStatus="NO_STORED_HASH";sourceHashCode="SOURCE_HASH_MISSING";sourceHashReason="The source file exists, but no stored reference hash is available.";}
@@ -87,8 +89,22 @@ export async function assessRecoveryEvidence(ctx,user,id,{recordAccess=true}={})
   const rows=[];
   for(const field of envelope.fields||[]){
     if(!["Signature","Initials"].includes(field.type))continue;
-    const signer=(envelope.signers||[]).find(s=>field.signerId?s.id===field.signerId:Boolean(s.uid&&s.uid===field.signerUid));
     const page=Number(field.page||0)||null;
+    if(modernEnvelope){
+      const recipient=(envelope.recipients||[]).find(item=>String(item.uid||"")===String(field.signerUid||""));
+      const email=String(recipient?.email||field.signerEmail||"").trim().toLowerCase();
+      const normalizeName=value=>String(value||"").normalize("NFKC").replace(/[^a-z0-9]+/gi," ").trim().toLowerCase();
+      let candidates=(envelope.signers||[]).filter(item=>email&&String(item.email||"").trim().toLowerCase()===email);
+      const recipientName=normalizeName(recipient?.name);
+      if(recipientName){const exact=candidates.filter(item=>normalizeName(item.name)===recipientName);if(exact.length)candidates=exact;}
+      const signed=candidates.filter(item=>item.status==="Signed"&&item.signedAt);
+      if(!candidates.length){rows.push({fieldId:field.fieldId,page,signerId:null,status:"MISSING",code:"STAMP_SIGNER_MISSING",reason:"No signer status record matches the assigned recipient."});continue;}
+      if(signed.length===candidates.length){rows.push({fieldId:field.fieldId,page,signerId:candidates.length===1?candidates[0].signerId||candidates[0].id:null,status:"UNVERIFIABLE",code:"STAMP_SIGNER_STATUS_ONLY",reason:"The signer is marked Signed, but no retained field value or hash-chained signer event is available."});continue;}
+      if(signed.length===0){rows.push({fieldId:field.fieldId,page,signerId:candidates.length===1?candidates[0].signerId||candidates[0].id:null,status:"MISSING",code:"STAMP_SIGNER_PENDING",reason:"The assigned signer has not completed this signature slot."});continue;}
+      rows.push({fieldId:field.fieldId,page,signerId:null,status:"UNVERIFIABLE",code:"STAMP_SIGNER_IDENTITY_AMBIGUOUS",reason:"Multiple signer assignments share this email and their statuses cannot be mapped unambiguously to this field."});
+      continue;
+    }
+    const signer=(envelope.signers||[]).find(s=>field.signerId?s.id===field.signerId:Boolean(s.uid&&s.uid===field.signerUid));
     if(auditChainStatus==="FAILED"){rows.push({fieldId:field.fieldId,page,signerId:field.signerId||null,status:"UNVERIFIABLE",code:"STAMP_AUDIT_CHAIN_FAILED",reason:"The signing audit chain failed verification."});continue;}
     if(!signer){rows.push({fieldId:field.fieldId,page,signerId:field.signerId||null,status:"MISSING",code:"STAMP_SIGNER_MISSING",reason:"Assigned signer record is unavailable."});continue;}
     const event=signedEvent(envelope,signer.id);
@@ -138,7 +154,7 @@ export async function assessRecoveryEvidence(ctx,user,id,{recordAccess=true}={})
     return "UNRECOGNIZED";
   };
   const runtimeEnvironment=String(ctx.env?.IRPA_ENVIRONMENT||"").trim().toLowerCase()||"unknown";
-  const envelopeEnvironment=environmentClass(envelope.dataEnvironment);
+  const envelopeEnvironment=environmentClass(envelope.dataEnvironment||envelope.environment||envelope.recordOrigin);
   const pendingEnvironment=environmentClass(pendingRecord?.environment);
   let runtimeCompatible=false;
   try{
@@ -161,7 +177,7 @@ export async function assessRecoveryEvidence(ctx,user,id,{recordAccess=true}={})
   else if(pendingRecord)artifactIntegrityStatus="STORAGE_REFERENCE_MISSING";
   const archivePending={metadataPresent:Boolean(pendingRecord),storageReferencePresent:Boolean(pendingRecord?.storageId),recordedHashPresent:/^[a-f0-9]{64}$/.test(pendingHash),recordedHash:/^[a-f0-9]{64}$/.test(pendingHash)?pendingHash:null,fileName:pendingFileName,createdAt:typeof pendingRecord?.createdAt==="string"?pendingRecord.createdAt:null,environment:pendingRecord?.environment?String(pendingRecord.environment).toUpperCase():null,artifactBytesVerified:artifactIntegrityStatus==="MATCH",artifactIntegrityStatus};
   if(recordAccess&&auditChainStatus==="VERIFIED"){try{await appendRecoveryAccessEvent(ctx,user,id,"recovery.evidence.assessed",{verifiedStampCount:rows.filter(x=>x.status==="VERIFIED_EXISTING").length,nonVerifiedStampCount:rows.filter(x=>x.status!=="PASS").length});}catch{}}
-  return {ok:true,envelopeId:id,title:envelope.title||"",status:envelope.status,auditChain:{status:auditChainStatus,code:auditChainStatus==="VERIFIED"?"AUDIT_CHAIN_VERIFIED":auditChainStatus==="FAILED"?"AUDIT_CHAIN_FAILED":"AUDIT_CHAIN_NO_EVENTS"},auditChainValid:auditChainStatus==="VERIFIED",signerSummary:(envelope.signers||[]).filter(signer=>events.some(event=>event.type==="signer.signed"&&event.signerId===signer.id)).map(signer=>({name:String(signer.name||"Signer").slice(0,100),maskedAddress:maskRecoveryEmail(signer.email),signedAt:formatRecoveryTimestampEAT(signer.signedAt)})),sourceHash,sourceHashStatus,sourceHashCode,sourceHashReason,finalisationStage,finalisationStageCode:rawStage||"FINALISATION_STAGE_NOT_RECORDED",completionFailure:{stage:envelope.completionFailure?.stage||null,failedAt:envelope.completionFailure?.failedAt||null},finalisationRecord:{latestStage,firstFailedStage,updatedAt:typeof storedFinalisationRecord.updatedAt==="string"?storedFinalisationRecord.updatedAt:null,stages:finalisationStages},stageRecordIntegrity,environmentDiagnostics,archivePending,stampSlots:rows,summary:{verified:rows.filter(x=>x.resultStatus==="PASS"||x.status==="VERIFIED_EXISTING").length,missing:rows.filter(x=>x.status==="MISSING").length,failed:rows.filter(x=>x.status==="INVALID").length,unverifiable:rows.filter(x=>x.status==="UNVERIFIABLE").length}};
+  return {ok:true,envelopeId:id,title:envelope.title||"",status:envelope.status,auditChain:{status:auditChainStatus,code:auditChainStatus==="VERIFIED"?"AUDIT_CHAIN_VERIFIED":auditChainStatus==="FAILED"?"AUDIT_CHAIN_FAILED":auditChainStatus==="NOT_HASH_CHAINED"?"AUDIT_CHAIN_NOT_HASH_CHAINED":"AUDIT_CHAIN_NO_EVENTS"},auditChainValid:auditChainStatus==="VERIFIED",signerSummary:(envelope.signers||[]).filter(signer=>modernEnvelope?signer.status==="Signed"&&signer.signedAt:events.some(event=>event.type==="signer.signed"&&event.signerId===signer.id)).map(signer=>({name:String(signer.name||"Signer").slice(0,100),maskedAddress:maskRecoveryEmail(signer.email),signedAt:formatRecoveryTimestampEAT(signer.signedAt)})),sourceHash,sourceHashStatus,sourceHashCode,sourceHashReason,finalisationStage,finalisationStageCode:rawStage||"FINALISATION_STAGE_NOT_RECORDED",completionFailure:{stage:envelope.completionFailure?.stage||null,failedAt:envelope.completionFailure?.failedAt||null},finalisationRecord:{latestStage,firstFailedStage,updatedAt:typeof storedFinalisationRecord.updatedAt==="string"?storedFinalisationRecord.updatedAt:null,stages:finalisationStages},stageRecordIntegrity,environmentDiagnostics,archivePending,stampSlots:rows,summary:{verified:rows.filter(x=>x.resultStatus==="PASS"||x.status==="VERIFIED_EXISTING").length,missing:rows.filter(x=>x.status==="MISSING").length,failed:rows.filter(x=>x.status==="INVALID").length,unverifiable:rows.filter(x=>x.status==="UNVERIFIABLE").length}};
 }
 export async function reassignRecoveryStampSlots(ctx,user,id,{signerId,fieldIds,email,name,reason}={}){
   const envelope=await loadOwnedFailedEnvelope(ctx,user,id);
