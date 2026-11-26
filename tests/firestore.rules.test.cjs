@@ -64,7 +64,7 @@ beforeEach(async () => {
 });
 
 
-test("member with invitationId can update displayName and reproduce role-array self-assignment", async () => {
+test("member self-profile allowlist preserves displayName and denies role-array self-assignment", async () => {
   const withInvitationUid = "profile-editor-with-invitation";
   const withoutInvitationUid = "profile-editor-without-invitation";
 
@@ -92,10 +92,10 @@ test("member with invitationId can update displayName and reproduce role-array s
     displayName: "Updated self-service display name"
   }));
 
-  // Security reproduction: the self-update branch preserves the scalar role,
-  // status and invitationId, but currently has no affectedKeys allowlist.
+  // Only the documented self-service field remains writable. Role-bearing
+  // arrays must be provisioned through the administrator-controlled register.
   for (const field of ["roles", "assignedRoles", "selectedRoles"]) {
-    await assertSucceeds(permittedDb.doc("members/" + withInvitationUid).update({
+    await assertFails(permittedDb.doc("members/" + withInvitationUid).update({
       [field]: ["Executive Director"]
     }));
   }
