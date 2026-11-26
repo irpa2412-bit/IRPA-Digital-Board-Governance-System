@@ -64,6 +64,45 @@ beforeEach(async () => {
 });
 
 
+test("member self-profile displayName update requires an existing invitationId precondition", async () => {
+  const withInvitationUid = "profile-editor-with-invitation";
+  const withoutInvitationUid = "profile-editor-without-invitation";
+
+  await testEnv.withSecurityRulesDisabled(async context => {
+    const db = context.firestore();
+    await db.doc("members/" + withInvitationUid).set({
+      uid: withInvitationUid,
+      email: "profile-editor-with-invitation@example.test",
+      status: "Active",
+      role: "Member",
+      invitationId: "PRODUCTION_ACCESS_VERIFICATION_TEST_ONLY"
+    });
+    await db.doc("members/" + withoutInvitationUid).set({
+      uid: withoutInvitationUid,
+      email: "profile-editor-without-invitation@example.test",
+      status: "Active",
+      role: "Member"
+    });
+  });
+
+  const permittedDb = testEnv.authenticatedContext(withInvitationUid, {
+    email: "profile-editor-with-invitation@example.test"
+  }).firestore();
+  await assertSucceeds(permittedDb.doc("members/" + withInvitationUid).update({
+    displayName: "Updated self-service display name"
+  }));
+  await assertFails(permittedDb.doc("members/" + withInvitationUid).update({
+    role: "Executive Director"
+  }));
+  const missingInvitationDb = testEnv.authenticatedContext(withoutInvitationUid, {
+    email: "profile-editor-without-invitation@example.test"
+  }).firestore();
+  await assertFails(missingInvitationDb.doc("members/" + withoutInvitationUid).update({
+    displayName: "This update has no immutable invitationId precondition"
+  }));
+});
+
+
 function lifecycleDocument(overrides = {}) {
   return {
     documentId: "LIFE-test-1",

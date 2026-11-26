@@ -139,12 +139,15 @@ jobs:
               if((fields.uid?.stringValue||uid)!==uid)throw Error("Existing member profile UID mismatch.");
               if((fields.email?.stringValue||"").toLowerCase()!==member.email)throw Error("Existing member profile email does not match the authenticated test account.");
               if(!["Active","Activated"].includes(fields.status?.stringValue||fields.registrationStatus?.stringValue||"") && fields.registrationStatus?.stringValue!=="Activated")throw Error("Existing member profile is not active; refusing to activate or rewrite an existing institutional record.");
-              return "EXISTS: active member profile already stored at members/"+uid+"; no profile fields changed";
+              if(typeof fields.invitationId?.stringValue!=="string"||!fields.invitationId.stringValue)throw Error("Existing member profile lacks the immutable invitationId required by the self-profile update rule; refusing to rewrite institutional metadata.");
+              return "EXISTS: active member profile with immutable invitationId already stored at members/"+uid+"; no profile fields changed";
             }
             const token=await serviceAccountToken();
             const fields={
               uid:{stringValue:uid},email:{stringValue:member.email},
               name:{stringValue:"IRPA Production Verification Test Member"},
+              displayName:{stringValue:"IRPA Production Verification Test Member"},
+              invitationId:{stringValue:"PRODUCTION_ACCESS_VERIFICATION_TEST_ONLY"},
               role:{stringValue:"Member"},memberType:{stringValue:"Governance Member"},
               status:{stringValue:"Active"},accountActivated:{booleanValue:true},
               registrationStatus:{stringValue:"Activated"},testAccount:{booleanValue:true},
@@ -182,14 +185,15 @@ jobs:
                 const d=await get("members/"+member.uid,member.token);
                 if(!d)throw Error("Member profile missing after setup.");
                 probePath="members/"+member.uid;
-                probeField="productionProbe_"+crypto.randomUUID().replace(/-/g,"");
+                probeField="displayName";
                 probeExisted=Object.hasOwn(d.fields||{},probeField);
                 probeOriginal=d.fields?.[probeField];
-                const r=await req(base+"/"+probePath+"?updateMask.fieldPaths="+encodeURIComponent(probeField),member.token,"PATCH",{fields:{[probeField]:{stringValue:"temporary-verification"}}});
+                console.log("Member self-profile write target: "+probePath+"."+probeField);
+                const r=await req(base+"/"+probePath+"?updateMask.fieldPaths="+encodeURIComponent(probeField),member.token,"PATCH",{fields:{[probeField]:{stringValue:"IRPA Production Verification temporary self-profile update"}}});
                 probeWritten=r.ok;
-                if(probeWritten)productionWrites.push({record:probePath+"."+probeField,action:"CREATED",detail:"unique temporary allowed-write probe field"});
-                add("Member allowed Firestore write","2xx","HTTP "+r.status,r.ok,true);
-              }catch(e){add("Member allowed Firestore write","2xx",e.message,false,true);}
+                if(probeWritten)productionWrites.push({record:probePath+"."+probeField,action:"TEMPORARILY UPDATED",detail:"own-profile displayName updated for the access probe and restored in finally cleanup"});
+                add("Member allowed Firestore self-profile update","2xx","HTTP "+r.status,r.ok,true);
+              }catch(e){add("Member allowed Firestore self-profile update","2xx",e.message,false,true);}
               try {
                 const id="production-probe-"+crypto.randomUUID(), path="systemResetPlans/"+id;
                 const r=await req(base+"/"+path,member.token,"PATCH",{fields:{probe:{booleanValue:true},testAccount:{booleanValue:true},testPurpose:{stringValue:"PRODUCTION_ACCESS_VERIFICATION"}}});
@@ -211,7 +215,7 @@ jobs:
                 add("Member denied Firestore write","403","HTTP "+r.status+"; cleanup: "+cleanupStatus,passed,true);
               }catch(e){console.error("RULES ARE TOO PERMISSIVE");add("Member denied Firestore write","403",e.message,false,true);}
             } else {
-              for(const [t,e] of [["Test member profile","active role=Member; testAccount=true"],["Member attendance Worker call","2xx"],["Member actual-data write gate","403"],["Member allowed Firestore write","2xx"],["Member denied Firestore write","403"]])add(t,e,"NOT RUN: member sign-in failed",false,true);
+              for(const [t,e] of [["Test member profile","active role=Member; testAccount=true"],["Member attendance Worker call","2xx"],["Member actual-data write gate","403"],["Member allowed Firestore self-profile update","2xx"],["Member denied Firestore write","403"]])add(t,e,"NOT RUN: member sign-in failed",false,true);
             }
 
             if(!process.env.ADMIN_EMAIL||!process.env.ADMIN_PASSWORD){
@@ -266,7 +270,7 @@ jobs:
               }
             }catch(e){console.error("TEST PROFILE CLEANUP FAILED: "+e.message);add("Test profile final cleanup","signed-in token UID; delete only if testAccount=true",e.message,false,true);}
 
-            const testTable=["| test | expected | actual | pass/fail |","|---|---|---|---|",...rows.map(x=>`| ${x.t} | ${x.e} | ${x.a.replace(/\\|/g,"/")} | ${x.p?"PASS":"FAIL"} |`)].join("\n");
+            const testTable=["| test | expected | actual | pass/fail |","|---|---|---|---|",...rows.map(x=>`| ${x.t} | ${x.e} | ${x.a.replace(/\|/g,"/")} | ${x.p?"PASS":"FAIL"} |`)].join("\n");
             const remaining=productionWrites.some(x=>x.action==="PRESERVED")?"One or more records were preserved; inspect rows above":"NONE";
             const writeTable=["| production record | action | detail |","|---|---|---|",...productionWrites.map(x=>`| ${x.record} | ${x.action} | ${x.detail} |`),`| Production remainder | ${remaining==="NONE"?"NONE":"REVIEW"} | ${remaining} |`].join("\n");
             console.log(testTable);
