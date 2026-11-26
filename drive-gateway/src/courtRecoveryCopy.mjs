@@ -16,8 +16,12 @@ function recoveryError(code,message){
  * current Worker deployment or a request-time environment switch.
  */
 export async function buildUnarchivedCompletedCopy(ctx,user,envelopeId) {
-  let envelope=await ctx.meta.get("envelopes",envelopeId);
-  if(!envelope) envelope=await ctx.meta.get("signatureEnvelopes",envelopeId);
+  const isNotFound=error=>Number(error?.status||error?.statusCode||error?.response?.status)===404||error?.code==="NOT_FOUND"||/not found|does not exist/i.test(String(error?.message||""));
+  let envelope=null;
+  try{envelope=await ctx.meta.get("envelopes",envelopeId);}catch(error){if(!isNotFound(error))throw error;}
+  if(!envelope){
+    try{envelope=await ctx.meta.get("signatureEnvelopes",envelopeId);}catch(error){if(!isNotFound(error))throw error;}
+  }
   if(!envelope) throw new HttpError(404,"Envelope not found.");
   if(!owns(envelope,user)) throw new HttpError(403,"Not authorized.");
   if(!["CompletionFailed","Completing"].includes(envelope.status))
