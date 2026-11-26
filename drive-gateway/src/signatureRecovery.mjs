@@ -421,7 +421,7 @@ export function createSignatureRecoveryRouter({authenticateFirebaseRequest,getFi
     catch(error) {
       const code=["TOKEN_INVALID","PROFILE_LOOKUP_FAILED","NOT_ACTIVATED"].includes(error?.code)?error.code:"TOKEN_INVALID";
       const status=code==="PROFILE_LOOKUP_FAILED"?503:code==="NOT_ACTIVATED"?403:401;
-      return json({ok:false,code,requestId},status,corsHeaders(request));
+      return json({ok:false,code,requestId,error:"A valid IRPA sign-in is required."},status,corsHeaders(request));
     }
     const uid=String(claims?.user_id||"").trim();
     if(!uid)return json({ok:false,error:"A valid IRPA sign-in is required."},401,corsHeaders(request));
