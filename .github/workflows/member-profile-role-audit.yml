@@ -1,11 +1,7 @@
 name: Read-only member profile role audit
 
 on:
-  push:
-    branches:
-      - security/member-role-array-emulator-proof
-    paths:
-      - .github/workflows/member-profile-role-audit.yml
+  workflow_dispatch:
 
 permissions:
   contents: write
