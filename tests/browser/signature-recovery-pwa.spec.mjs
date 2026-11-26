@@ -83,7 +83,7 @@ test("installed-PWA worker activates the deployed build and removes the previous
     return {
       activeScript: current?.active?.scriptURL || "",
       oldCachePresent: (await caches.keys()).includes(oldCache),
-      newCachePresent: (await caches.keys()).includes("irpa-dbgs-shell-new-deploy-fixture")
+      newCachePresent: (await caches.keys()).includes("irpa-dbgs-shell-20261126-refresh-pwa-1")
     };
   });
   expect(result.activeScript).toContain("new-deploy-fixture");
