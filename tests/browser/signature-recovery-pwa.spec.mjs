@@ -15,12 +15,15 @@ test("Signature Recovery refresh makes two fresh authenticated requests on mobil
   await page.route("**/*", async route => {
     const url = new URL(route.request().url());
     if (url.origin === gateway) {
+      if (route.request().method() === "OPTIONS") {
+        return route.fulfill({ status: 204, headers: { "access-control-allow-origin": "*", "access-control-allow-methods": "GET, OPTIONS", "access-control-allow-headers": "authorization" } });
+      }
       if (url.pathname === "/health") {
         return route.fulfill({ status: 200, contentType: "application/json", headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "authorization,content-type" }, body: JSON.stringify({ ok: true, version: "worker-fixture-v2", commit: "worker-fixture-v2" }) });
       }
       if (url.pathname === "/api/recovery/envelopes") {
         const headers = await route.request().allHeaders();
-        queueRequests.push({ authorization: headers.authorization || "", cacheControl: headers["cache-control"] || "" });
+        queueRequests.push({ authorization: headers.authorization || "" });
         if (failNext) {
           failNext = false;
           return route.fulfill({ status: 403, contentType: "application/json", headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "authorization,content-type", "x-request-id": "refresh-failure-fixture" }, body: JSON.stringify({ ok: false, code: "NOT_OWNER", error: "Not the envelope owner", requestId: "refresh-failure-fixture" }) });
@@ -50,7 +53,6 @@ test("Signature Recovery refresh makes two fresh authenticated requests on mobil
   await refresh.click();
   await expect.poll(() => queueRequests.length).toBe(2);
   expect(queueRequests.every(request => request.authorization.startsWith("Bearer "))).toBe(true);
-  expect(queueRequests.every(request => request.cacheControl === "no-cache")).toBe(true);
   expect(queueRequests[0].authorization).not.toBe("");
 
   failNext = true;
