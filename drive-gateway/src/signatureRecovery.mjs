@@ -139,8 +139,15 @@ export async function assessRecoveryEvidence(ctx,user,id,{recordAccess=true}={})
     ctx.env?.IRPA_ENVIRONMENT,
     ctx.env?.IRPA_WORKER_ENVIRONMENT
   ].filter(value => String(value || "").trim());
-  const runtimeEnvironment = runtimeMarkers.length
-    ? normalizeSignatureEnvironment({ dataEnvironment: runtimeMarkers[0] }).environment
+  const runtimeValues = runtimeMarkers.map(value => {
+    const normalized = String(value).trim().toUpperCase();
+    if (normalized === "STAGING" || normalized === "TRIAL") return "TRIAL";
+    if (normalized === "PRODUCTION" || normalized === "ACTUAL") return "ACTUAL";
+    return "UNKNOWN";
+  });
+  const runtimeDistinct = [...new Set(runtimeValues)];
+  const runtimeEnvironment = runtimeDistinct.length === 1 && runtimeDistinct[0] !== "UNKNOWN"
+    ? runtimeDistinct[0]
     : "UNKNOWN";
   const environmentDiagnostics = {
     envelope: envelopeEnvironment,
