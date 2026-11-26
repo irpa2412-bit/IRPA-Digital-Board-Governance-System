@@ -1,0 +1,224 @@
+name: Court envelope read-only snapshot
+
+on:
+  push:
+    branches:
+      - fix/court-listing-recovery-20261126
+    paths:
+      - .github/workflows/court-envelope-readonly-snapshot.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: court-envelope-readonly-snapshot-54530056
+  cancel-in-progress: false
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install read-only evidence dependencies
+        run: npm install --no-save firebase-admin@^13 googleapis@^150
+      - name: Read exact Court envelope and compute safe evidence summary
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
+          GITHUB_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$FIREBASE_SERVICE_ACCOUNT"
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          import crypto from "node:crypto";
+          import { initializeApp, cert } from "firebase-admin/app";
+          import { getFirestore } from "firebase-admin/firestore";
+          import { google } from "googleapis";
+
+          const project="irpa-digital-board-governance";
+          const envelopeId="IRPA-ENV-2026-54530056";
+          const documentId="bYcgwszYnuOieHiwbg7O";
+          const ownerUid="UQxfLOXCl7bEQ7KNM6Tt4eKoJlg1";
+          const sa=JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+          if(sa.project_id!==project||!sa.client_email||!sa.private_key)throw new Error("Production service-account metadata validation failed.");
+          initializeApp({credential:cert(sa),projectId:project});
+          const db=getFirestore();
+          const get=(obj,...keys)=>{for(const key of keys){const v=obj?.[key];if(v!==undefined&&v!==null&&v!=="")return v;}return null;};
+          const iso=v=>v?.toDate?v.toDate().toISOString():v instanceof Date?v.toISOString():typeof v==="string"?v:null;
+          const masked=email=>{
+            const value=String(email||"").trim();
+            const at=value.lastIndexOf("@");
+            if(at<1)return "Not recorded";
+            const local=value.slice(0,at);
+            return (local.length<3?local[0]+"*":local.slice(0,2)+"***")+"@"+value.slice(at+1);
+          };
+          const sha=bytes=>crypto.createHash("sha256").update(bytes).digest("hex");
+          const canonical=value=>{
+            if(Array.isArray(value))return "["+value.map(canonical).join(",")+"]";
+            if(value&&typeof value==="object")return "{"+Object.keys(value).sort().map(k=>JSON.stringify(k)+":"+canonical(value[k])).join(",")+"}";
+            return JSON.stringify(value);
+          };
+          const snap=await db.collection("signatureEnvelopes").doc(envelopeId).get();
+          const collection=snap.exists?"signatureEnvelopes":"envelopes";
+          const envelopeSnap=snap.exists?snap:await db.collection("envelopes").doc(envelopeId).get();
+          if(!envelopeSnap.exists)throw new Error("TARGET_ENVELOPE_NOT_FOUND");
+          const envelope=envelopeSnap.data()||{};
+          if(String(envelope.documentId||"")!==documentId||String(envelope.ownerUid||envelope.senderUid||"")!==ownerUid)throw new Error("TARGET_ENVELOPE_IDENTITY_MISMATCH");
+          const docSnap=await db.collection("documents").doc(documentId).get();
+          const document=docSnap.exists?(docSnap.data()||{}):{};
+          const [signatureSnap,eventSnap]=await Promise.all([
+            db.collection("signatures").where("envelopeId","==",envelopeId).get(),
+            db.collection("signatureEvents").where("envelopeId","==",envelopeId).get()
+          ]);
+          const signatures=signatureSnap.docs.map(d=>({id:d.id,...d.data()}));
+          const queriedEvents=eventSnap.docs.map(d=>({id:d.id,...d.data()}));
+          const envelopeEvents=Array.isArray(envelope.events)?envelope.events:[];
+          let auditChainValid=envelopeEvents.length>0,previous="GENESIS";
+          for(const event of envelopeEvents){
+            if(!event||typeof event.hash!=="string"){auditChainValid=false;break;}
+            const {hash,...body}=event;
+            const expected=sha(Buffer.from(canonical(body)));
+            if(body.prevHash!==previous||expected!==hash){auditChainValid=false;break;}
+            previous=hash;
+          }
+          const signers=(Array.isArray(envelope.signers)?envelope.signers:[])
+            .map((signer,index)=>{
+              const signerId=String(signer.id||signer.signerId||"");
+              const signerUid=String(signer.uid||signer.signerUid||"");
+              const signerEmail=String(signer.email||"");
+              const signedEvent=envelopeEvents.filter(e=>e?.type==="signer.signed"&&(String(e.signerId||"")===signerId||(signerUid&&String(e.signerUid||e.uid||"")===signerUid))).at(-1);
+              const signed=String(signer.status||"").toLowerCase()==="signed"||Boolean(signer.signedAt)||Boolean(signedEvent);
+              const tokenValue=get(signer,"signingToken","linkToken","invitationToken","token","tokenHash","tokenId");
+              const expiry=get(signer,"tokenExpiresAt","linkExpiresAt","expiresAt","invitationExpiresAt");
+              const expiryMs=expiry?.toDate?expiry.toDate().getTime():Date.parse(String(expiry||""));
+              const linkExists=Boolean(tokenValue||get(signer,"signingUrl","invitationUrl","linkUrl"));
+              const used=Boolean(signed||get(signer,"tokenUsedAt","usedAt","linkUsedAt","consumedAt"));
+              const boundEnvelope=String(get(signer,"envelopeId","envelopeReference")||envelopeId)===envelopeId;
+              const boundDocument=String(get(signer,"documentId")||documentId)===documentId;
+              const boundSigner=String(get(signer,"signerId","id")||signerId)===signerId;
+              const linkStatus={
+                exists:linkExists,
+                unexpired:linkExists&&Number.isFinite(expiryMs)?expiryMs>Date.now():null,
+                boundToDocumentAndSigner:linkExists?Boolean(boundEnvelope&&boundDocument&&boundSigner):null,
+                used:linkExists?used:null
+              };
+              const fields=(Array.isArray(envelope.fields)?envelope.fields:[]).filter(f=>String(f.signerId||"")===signerId||(signerUid&&String(f.signerUid||"")===signerUid));
+              const fieldResults=fields.map(field=>{
+                const fieldId=String(field.fieldId||field.id||"");
+                const signatureRecord=signatures.find(record=>String(record.signerId||record.signerUid||"")===signerId&&String(record.fieldId||"")===fieldId);
+                const eventEvidence=envelopeEvents.some(event=>String(event.signerId||"")===signerId&&(event.signatureFieldHashes||[]).some(item=>String(item.fieldId||"")===fieldId&&/^[a-f0-9]{64}$/i.test(String(item.hash||""))));
+                const signerValue=signer.fieldValues&&fieldId?signer.fieldValues[fieldId]:null;
+                const completed=Boolean(signatureRecord||eventEvidence||((signed)&&typeof signerValue==="string"&&signerValue.length));
+                return {fieldId,completed};
+              });
+              return {
+                role:String(signer.role||signer.designation||"Signer"),
+                order:Number(signer.order||signer.signingOrder||index+1),
+                status:signed?"SIGNED":"PENDING",
+                signedAt:iso(signer.signedAt||signedEvent?.at),
+                email:masked(signerEmail),
+                linkStatus,
+                fieldsTotal:fields.length,
+                fieldsCompleted:fieldResults.filter(x=>x.completed).length
+              };
+            }).sort((a,b)=>a.order-b.order);
+          const sourceId=get(document,"primaryStorageId","storageId","driveFileId","googleDriveFileId","fileId","sourceFileId");
+          const pendingCopy=envelope.completion?.archivePending||{};
+          const partialId=get(pendingCopy,"storageId")||get(envelope,"latestPartialPdfStorageId","partialPdfStorageId","partialStorageId");
+          const pdfs=[];
+          const addPdf=async(label,fileId)=>{
+            if(!fileId){pdfs.push({label,status:"NO_REFERENCE",sha256:null,byteLength:null,driveLink:null});return;}
+            try{
+              const auth=new google.auth.GoogleAuth({credentials:sa,scopes:["https://www.googleapis.com/auth/drive"]});
+              const drive=google.drive({version:"v3",auth});
+              const response=await drive.files.get({fileId,alt:"media"},{responseType:"arraybuffer"});
+              const bytes=Buffer.from(response.data);
+              pdfs.push({label,status:"READ",sha256:sha(bytes),byteLength:bytes.length,driveLink:null,bytes});
+            }catch(error){
+              pdfs.push({label,status:"READ_FAILED",sha256:null,byteLength:null,driveLink:null,errorClass:String(error?.name||"Error")});
+            }
+          };
+          await addPdf("source",sourceId);
+          await addPdf("latest-partial",partialId);
+          let driveCopy={status:"NOT_ATTEMPTED",folderUrl:null,retrievalVaultUrl:null,files:[]};
+          const readable=pdfs.filter(p=>p.status==="READ");
+          if(readable.length){
+            try{
+              const auth=new google.auth.GoogleAuth({credentials:sa,scopes:["https://www.googleapis.com/auth/drive"]});
+              const drive=google.drive({version:"v3",auth});
+              const root=await drive.files.list({q:"name = 'IRPA Governance System' and mimeType = 'application/vnd.google-apps.folder' and trashed = false",pageSize:5,fields:"files(id,name)"});
+              const rootId=root.data.files?.[0]?.id;
+              if(!rootId)throw new Error("AUTHORIZED_IRPA_DRIVE_ROOT_NOT_FOUND");
+              const folder=await drive.files.create({requestBody:{name:"IRPA COURT SNAPSHOT 54530056 2026-11-26",mimeType:"application/vnd.google-apps.folder",parents:[rootId]},fields:"id,name,webViewLink"});
+              const vault=await drive.files.create({requestBody:{name:"Retrieval Vault",mimeType:"application/vnd.google-apps.folder",parents:[folder.data.id]},fields:"id,name,webViewLink"});
+              for(const item of readable){
+                const name=item.label==="source"?"COURT-SOURCE.pdf":"COURT-LATEST-PARTIAL.pdf";
+                const metadata={name,mimeType:"application/pdf",parents:[folder.data.id],description:"Read-only incident snapshot; SHA-256 "+item.sha256+"; bytes "+item.byteLength};
+                const saved=await drive.files.create({requestBody:metadata,media:{mimeType:"application/pdf",body:item.bytes},fields:"id,name,webViewLink"});
+                const vaultSaved=await drive.files.create({requestBody:{...metadata,parents:[vault.data.id]},media:{mimeType:"application/pdf",body:item.bytes},fields:"id,name,webViewLink"});
+                driveCopy.files.push({label:item.label,folderFileUrl:saved.data.webViewLink||"https://drive.google.com/file/d/"+saved.data.id+"/view",vaultFileUrl:vaultSaved.data.webViewLink||"https://drive.google.com/file/d/"+vaultSaved.data.id+"/view",sha256:item.sha256,byteLength:item.byteLength});
+              }
+              driveCopy={...driveCopy,status:"COPIED",folderUrl:folder.data.webViewLink||"https://drive.google.com/drive/folders/"+folder.data.id,retrievalVaultUrl:vault.data.webViewLink||"https://drive.google.com/drive/folders/"+vault.data.id,files:driveCopy.files};
+            }catch(error){driveCopy={status:"COPY_FAILED",folderUrl:null,retrievalVaultUrl:null,files:[],errorClass:String(error?.name||"Error")};}
+          }
+          const safePdfs=pdfs.map(({bytes,...safe})=>safe);
+          const signedCount=signers.filter(s=>s.status==="SIGNED").length;
+          const pendingCount=signers.length-signedCount;
+          const fieldsTotal=signers.reduce((n,s)=>n+s.fieldsTotal,0);
+          const fieldsCompleted=signers.reduce((n,s)=>n+s.fieldsCompleted,0);
+          const pendingSigner=signers.find(s=>s.status==="PENDING")||null;
+          const result={
+            generatedAt:new Date().toISOString(),envelopeId,documentId,collection,
+            status:String(envelope.status||"UNKNOWN"),environment:String(envelope.recordOrigin||envelope.dataEnvironment||"UNKNOWN"),
+            signers,signersSigned:signedCount,signersPending:pendingCount,pendingSigner,
+            fieldsTotal,fieldsCompleted,auditChainValid,auditEvents:envelopeEvents.length,queriedSignatureEvents:queriedEvents.length,signatureRecords:signatures.length,
+            pdfs:safePdfs,driveCopy
+          };
+          fs.mkdirSync("forensic-court-snapshot",{recursive:true});
+          fs.writeFileSync("forensic-court-snapshot/result.json",JSON.stringify(result,null,2));
+          const report=[
+            "# Live Court envelope snapshot — 2026-11-26","",
+            `- Envelope: ${envelopeId}`,
+            `- Document: ${documentId}`,
+            `- Collection: ${collection}`,
+            `- Status / environment: ${result.status} / ${result.environment}`,
+            `- Signers: ${signedCount} signed; ${pendingCount} pending; total ${signers.length}`,
+            `- Fields: ${fieldsCompleted} completed / ${fieldsTotal} total`,
+            `- Audit chain: ${auditChainValid?"VALID":"NOT VERIFIED"} (${envelopeEvents.length} chained events)`,"",
+            "| Order | Role | Status | Signed at | Masked email | Link exists | Unexpired | Bound to document+signer | Used | Fields completed / total |",
+            "|---:|---|---|---|---|---|---|---|---|---:|",
+            ...signers.map(s=>`| ${s.order} | ${s.role} | ${s.status} | ${s.signedAt||"—"} | ${s.email} | ${s.linkStatus.exists} | ${s.linkStatus.unexpired??"UNKNOWN"} | ${s.linkStatus.boundToDocumentAndSigner??"UNKNOWN"} | ${s.linkStatus.used??"UNKNOWN"} | ${s.fieldsCompleted}/${s.fieldsTotal} |`),"",
+            "## PDF hashes and copies","",
+            "| PDF | Read status | SHA-256 | Byte length |","|---|---|---|---:|",
+            ...safePdfs.map(p=>`| ${p.label} | ${p.status} | ${p.sha256||"—"} | ${p.byteLength??"—"} |`),"",
+            `- Drive snapshot copy: ${driveCopy.status}`,
+            `- Snapshot folder: ${driveCopy.folderUrl||"NOT AVAILABLE"}`,
+            `- Retrieval Vault: ${driveCopy.retrievalVaultUrl||"NOT AVAILABLE"}`,"",
+            `- Pending signer: ${pendingSigner?pendingSigner.order+" / "+pendingSigner.role+" / "+pendingSigner.email:"NONE"}`,
+            "- Signing-link token values: NOT OUTPUT."
+          ].join("\n");
+          fs.writeFileSync("forensic-court-snapshot/report.md",report+"\n");
+          console.log(report);
+          NODE
+      - name: Append report and comment on PR #982
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p docs/incident
+          cat forensic-court-snapshot/report.md >> docs/incident/results-20261126.md
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/incident/results-20261126.md
+          git commit -m "Record live Court envelope read-only snapshot"
+          git push origin "HEAD:fix/court-listing-recovery-20261126"
+          gh pr comment 982 --repo "${{ github.repository }}" --body-file forensic-court-snapshot/report.md
