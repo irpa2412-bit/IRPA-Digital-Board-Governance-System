@@ -3532,7 +3532,8 @@ async function driveFetch(env, accessToken, path, options = {}) {
 }
 
 async function authenticateFirebaseRequest(request, env, options = {}) {
-  const requestId = crypto.randomUUID();\n  const header = request.headers.get("Authorization") || "";
+  const requestId = crypto.randomUUID();
+  const header = request.headers.get("Authorization") || "";
   const match = header.match(/^Bearer\s+([^\s]+)$/i);
   if (!match) {
     const error = new Error("Firebase authentication is required.");
