@@ -484,6 +484,7 @@ test("portal activation gate rejects a valid Firebase ID token whose member reco
     if(target.includes("/documents/adminProfiles/pending-portal-uid")) return new Response("",{status:404});
     if(target.includes("/documents/members/pending-portal-uid")) return new Response(JSON.stringify({fields:{status:{stringValue:"Pending"},accountActivated:{booleanValue:false}}}),{status:200});
     if(target.includes("/documents/employees/pending-portal-uid")) return new Response("",{status:404});
+    if(target.includes("/documents/signatureProfiles/pending-portal-uid")) return new Response("",{status:404});
     throw new Error("Unexpected external request: "+target);
   };
   try{
@@ -772,7 +773,7 @@ test("activated canonical Board Member record authorizes portal access when its 
           }
         }]),{status:200});
       }
-      if(collection==="employees") return new Response(JSON.stringify([]),{status:200});
+      if(collection==="employees" || collection==="signatureProfiles") return new Response(JSON.stringify([]),{status:200});
     }
 
     throw new Error("Unexpected external request: "+target);
