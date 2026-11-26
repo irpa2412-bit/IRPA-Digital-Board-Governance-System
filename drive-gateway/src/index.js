@@ -221,7 +221,7 @@ const signatureRecoveryRouter = createSignatureRecoveryRouter({
       async get(collection,id) {
         if (!allowedCollections.has(collection)) throw new Error("Recovery Firestore collection is not permitted.");
         const raw = await getFirestoreDocument(env, collection + "/" + id, adminToken);
-        return raw ? { id, ...(firestoreDocumentToPlain(raw) || {}) } : null;
+        return raw ? { ...(firestoreDocumentToPlain(raw) || {}), id } : null;
       },
       async list(collection) {
         if (!allowedCollections.has(collection)) throw new Error("Recovery Firestore collection is not permitted.");
@@ -4026,7 +4026,7 @@ async function listFirestoreCollectionDocuments(env, collectionName, firebaseTok
     const payload = await response.json();
     for (const document of payload.documents || []) {
       const id = String(document.name || "").split("/").pop();
-      if (id) rows.push({ id, ...(firestoreDocumentToPlain(document) || {}) });
+      if (id) rows.push({ ...(firestoreDocumentToPlain(document) || {}), id });
     }
     pageToken = payload.nextPageToken || "";
     pages += 1;
