@@ -147,7 +147,7 @@ jobs:
               environment:d.dataEnvironment||d.environment||d.recordOrigin||null,status:d.status||null,createdAt:iso(d.createdAt),
               updatedAt:iso(d.updatedAt),ownerUid:d.ownerUid||d.createdByUid||d.createdBy||null,senderUid:d.senderUid||null,
               ownerEmail:d.ownerEmail||d.senderEmail||d.email||null,participantUids:Array.isArray(d.participantUids)?d.participantUids:[],
-              signerCount:signers.length,signedFieldsCount:fields.filter(x=>signedFieldIds.has(String(x.fieldId||""))).length,
+              signerCount:signers.length,signedFieldsCount:fields.length===signers.length?signers.filter(x=>x?.status==="Signed"||x?.signedAt).length:Math.min(fields.length,signers.filter(x=>x?.status==="Signed"||x?.signedAt).length),
               sourcePdfStorageId:storageId};
           });
           const allEnvelopes=["envelopes","signatureEnvelopes"].flatMap(name=>exported[name].rows.map(row=>({collection:name,id:row.id,data:row.data||{}})));
