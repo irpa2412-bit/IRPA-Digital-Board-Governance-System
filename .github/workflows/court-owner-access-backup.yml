@@ -157,7 +157,7 @@ jobs:
           fs.writeFileSync("forensic-backup/court-owner-access-backup.json",raw,{flag:"wx"});
           const sha = crypto.createHash("sha256").update(raw).digest("hex");
           fs.writeFileSync("forensic-backup/SHA256SUMS.txt",sha+"  court-owner-access-backup.json\n",{flag:"wx"});
-          fs.writeFileSync("forensic-backup/manifest.json",JSON.stringify({projectId:project,generatedAt:payload.generatedAt,readOnly:true,exportFile:"court-owner-access-backup.json",byteLength:raw.length,sha256:sha,collectionCounts:payload.collectionCounts,artifactName,retentionDays:90,identityComparison},null,2),{flag:"wx"});
+          fs.writeFileSync("forensic-backup/manifest.json",JSON.stringify({projectId:project,generatedAt:payload.generatedAt,readOnly:true,exportFile:"court-owner-access-backup.json",byteLength:raw.length,sha256:sha,collectionCounts:payload.collectionCounts,artifactName,retentionDays:90},null,2),{flag:"wx"});
           console.log("READ_ONLY_BACKUP_CREATED");
           console.log(JSON.stringify({projectId:project,readOnly:true,byteLength:raw.length,sha256:sha,collectionCounts:payload.collectionCounts,artifactName,retentionDays:90,matchingAuthAccountCount:authUsers.length,matchedRecordCount:matched.size}));
           NODE
