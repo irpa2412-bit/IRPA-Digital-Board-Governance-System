@@ -54,3 +54,30 @@ test("each recovery action passes its own button label into the route error form
  assert.match(source,/button:"Generate watermarked preview"/);
  assert.match(queue,/formatRecoveryRouteError/);
 });
+
+test("refresh always forces a fresh Firebase ID token, bypasses HTTP caches and clears stale results before requesting",()=>{
+ assert.match(queue,/getIdToken\\(user,true\\)/);
+ assert.match(queue,/cache:"no-store"/);
+ assert.match(queue,/"Cache-Control":"no-cache"/);
+ assert.match(queue,/if\\(reset\\)\\{setRows\\(\\[\\]\\);setTotal\\(0\\);setOffset\\(0\\);setSelected\\(null\\);\\}/);
+ assert.match(queue,/Last refreshed at:/);
+ assert.match(queue,/Worker version:/);
+ assert.match(queue,/VITE_BUILD_COMMIT/);
+});
+test("PWA worker activates immediately, claims clients, versions its cache and bypasses API routes",()=>{
+ const sw=fs.readFileSync(new URL("../public/sw.js",import.meta.url),"utf8");
+ const main=fs.readFileSync(new URL("../src/main.jsx",import.meta.url),"utf8");
+ const install=fs.readFileSync(new URL("../public/install.js",import.meta.url),"utf8");
+ assert.match(sw,/self\\.skipWaiting\\(\\)/);
+ assert.match(sw,/self\\.clients\\.claim\\(\\)/);
+ assert.match(sw,/p\\.startsWith\\("\/api\/"\\)/);
+ assert.match(sw,/CACHE_PREFIX\\+BUILD_KEY/);
+ assert.match(main,/\/sw\\.js\\?v=/);
+ assert.doesNotMatch(install,/serviceWorker\\.register/);
+});
+test("authentication diagnostics preserve the four required stable error codes and request IDs",()=>{
+ for(const code of ["TOKEN_INVALID","PROFILE_LOOKUP_FAILED","NOT_ACTIVATED","NOT_OWNER"]){
+  assert.match(formatRecoveryRouteError({status:403,body:{code,error:"Access denied",requestId:"req-fixture"},button:"Refresh recovery queue",route}),new RegExp(code));
+  assert.match(formatRecoveryRouteError({status:403,body:{code,error:"Access denied",requestId:"req-fixture"},button:"Refresh recovery queue",route}),/Request ID: req-fixture/);
+ }
+});
