@@ -103,6 +103,34 @@ test("member self-profile displayName update requires an existing invitationId p
 });
 
 
+test("SECURITY REPRODUCTION (pre-fix): member with invitationId can self-add institutional role arrays", async () => {
+  const uid = "self-escalating-member";
+  await testEnv.withSecurityRulesDisabled(async context => {
+    await context.firestore().doc("members/" + uid).set({
+      uid,
+      email: "self-escalating-member@example.test",
+      status: "Active",
+      role: "Member",
+      invitationId: "EXISTING_INVITATION_FOR_TEST",
+      roles: [],
+      assignedRoles: [],
+      selectedRoles: []
+    });
+  });
+
+  const memberDb = testEnv.authenticatedContext(uid, {
+    email: "self-escalating-member@example.test"
+  }).firestore();
+  const profile = memberDb.doc("members/" + uid);
+
+  // Each write keeps uid, role, status and invitationId unchanged, so it
+  // exercises the overly broad self(id) update alternative on its own.
+  await assertSucceeds(profile.update({ roles: ["Executive Director"] }));
+  await assertSucceeds(profile.update({ assignedRoles: ["Executive Director"] }));
+  await assertSucceeds(profile.update({ selectedRoles: ["Executive Director"] }));
+});
+
+
 function lifecycleDocument(overrides = {}) {
   return {
     documentId: "LIFE-test-1",
