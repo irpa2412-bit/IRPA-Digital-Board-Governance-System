@@ -162,20 +162,20 @@ jobs:
           const pendingCopy=envelope.completion?.archivePending||{};
           const partialId=get(pendingCopy,"storageId")||get(envelope,"latestPartialPdfStorageId","partialPdfStorageId","partialStorageId");
           const pdfs=[];
-          const addPdf=async(label,fileId)=>{
-            if(!fileId){pdfs.push({label,status:"NO_REFERENCE",sha256:null,byteLength:null,driveLink:null});return;}
+          const addPdf=async(label,fileId,expectedHash=null,expectedLength=null)=>{
+            if(!fileId){pdfs.push({label,status:"NO_REFERENCE",sha256:null,expectedSha256:expectedHash,byteLength:expectedLength,driveLink:null});return;}
             try{
               const auth=new google.auth.GoogleAuth({credentials:sa,scopes:["https://www.googleapis.com/auth/drive"]});
               const drive=google.drive({version:"v3",auth});
               const response=await drive.files.get({fileId,alt:"media"},{responseType:"arraybuffer"});
               const bytes=Buffer.from(response.data);
-              pdfs.push({label,status:"READ",sha256:sha(bytes),byteLength:bytes.length,driveLink:null,bytes});
+              pdfs.push({label,status:"READ",sha256:sha(bytes),expectedSha256:expectedHash,byteLength:bytes.length,driveLink:null,bytes});
             }catch(error){
-              pdfs.push({label,status:"READ_FAILED",sha256:null,byteLength:null,driveLink:null,errorClass:String(error?.name||"Error")});
+              pdfs.push({label,status:"READ_FAILED",sha256:null,expectedSha256:expectedHash,byteLength:expectedLength,driveLink:null,errorClass:String(error?.name||"Error")});
             }
           };
-          await addPdf("source",sourceId);
-          await addPdf("latest-partial",partialId);
+          await addPdf("source",sourceId,String(envelope.sha256||document.sha256||"")||null,Number(envelope.byteLength||document.fileSize||0)||null);
+          await addPdf("latest-partial",partialId,null,null);
           let driveCopy={status:"NOT_ATTEMPTED",folderUrl:null,retrievalVaultUrl:null,files:[]};
           const readable=pdfs.filter(p=>p.status==="READ");
           if(readable.length){
@@ -229,7 +229,7 @@ jobs:
             ...signers.map(s=>`| ${s.order} | ${s.role} | ${s.status} | ${s.signedAt||"—"} | ${s.email} | ${s.linkStatus.exists} | ${s.linkStatus.unexpired??"UNKNOWN"} | ${s.linkStatus.boundToDocumentAndSigner??"UNKNOWN"} | ${s.linkStatus.opened??"UNKNOWN"} | ${s.linkStatus.used??"UNKNOWN"} | ${s.linkStatus.sourceStatus} | ${s.fieldsCompleted}/${s.fieldsTotal} |`),"",
             "## PDF hashes and copies","",
             "| PDF | Read status | SHA-256 | Byte length |","|---|---|---|---:|",
-            ...safePdfs.map(p=>`| ${p.label} | ${p.status} | ${p.sha256||"—"} | ${p.byteLength??"—"} |`),"",
+            ...safePdfs.map(p=>`| ${p.label} | ${p.status} | ${p.sha256||p.expectedSha256||"—"}${p.sha256?" (computed)":p.expectedSha256?" (stored metadata; unverified)":""} | ${p.byteLength??"—"} |`),"",
             `- Drive snapshot copy: ${driveCopy.status}`,
             `- Snapshot folder: ${driveCopy.folderUrl||"NOT AVAILABLE"}`,
             `- Retrieval Vault: ${driveCopy.retrievalVaultUrl||"NOT AVAILABLE"}`,"",
@@ -239,6 +239,12 @@ jobs:
           fs.writeFileSync("forensic-court-snapshot/report.md",report+"\n");
           console.log(report);
           NODE
+      - name: Preserve safe snapshot artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: court-envelope-readonly-snapshot
+          path: forensic-court-snapshot/
+          retention-days: 90
       - name: Append report and comment on PR #982
         env:
           GH_TOKEN: ${{ github.token }}
