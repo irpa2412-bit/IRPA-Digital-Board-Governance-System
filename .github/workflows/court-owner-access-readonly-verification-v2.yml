@@ -45,7 +45,7 @@ jobs:
           const excluded=new Set(["IRPA-ENV-2026-11501354","ENV-4b06e60941f8eb1d"]);
           const out={status:"PENDING",ownerUid:uid,candidateId,routes:[],pdfs:[]};
           const callRaw=(path,options={})=>fetch(base+path,options);
-          const prResponse=await fetch(`https://api.github.com/repos/${repo}/pulls/983`,{headers:{Authorization:"Bearer "+process.env.GH_TOKEN,Accept:"application/vnd.github+json"}});
+          const prResponse=await fetch(`https://api.github.com/repos/${repo}/pulls/985`,{headers:{Authorization:"Bearer "+process.env.GH_TOKEN,Accept:"application/vnd.github+json"}});
           if(!prResponse.ok)throw new Error("FIX_PR_LOOKUP_FAILED");
           const pr=await prResponse.json();
           if(!pr.merged){
@@ -90,7 +90,7 @@ jobs:
                 const body=await r.json().catch(()=>({}));
                 const item={route:label,status:r.status,code:body.code||body.errorCode||null,requestId:body.requestId||null,
                   auditChainStatus:body.auditChain?.status||null,auditChainCode:body.auditChain?.code||null,
-                  sourceHashStatus:body.sourceHashStatus||null,sourceHashCode:body.sourceHashCode||null,
+                  sourceHashStatus:body.sourceHashStatus||null,sourceHashCode:body.sourceHashCode||null,sourceHash:body.sourceHash||null,
                   summary:body.summary||null,total:body.total??null};
                 out.routes.push(item);return {item,body};
               };
@@ -99,12 +99,13 @@ jobs:
               const candidate=items.find(e=>String(e.id||e.envelopeId||"")===candidateId);
               out.listResult={returned:items.length,candidateFound:Boolean(candidate)};
               if(candidate){
-                out.candidate={envelopeId:candidate.id||candidate.envelopeId,documentId:candidate.documentId||null,title:candidate.title||candidate.documentTitle||null,
+                out.candidate={collection:candidate.collection||null,envelopeId:candidate.id||candidate.envelopeId,documentId:candidate.documentId||null,title:candidate.title||candidate.documentTitle||null,
                   environment:candidate.dataEnvironment||candidate.environment||candidate.recordOrigin||null,status:candidate.status||null,
                   createdAt:candidate.createdAt||null,ownerUid:candidate.ownerUid||candidate.createdByUid||candidate.createdBy||null,
                   senderUid:candidate.senderUid||null,ownerEmail:candidate.ownerEmail||candidate.senderEmail||null};
                 const id=encodeURIComponent(candidateId);
-                await call("recovery-envelope-list","/api/recovery/envelopes?limit=100&offset=0&diagnostic=1");
+                const recovery=await call("recovery-envelope-list","/api/recovery/envelopes?limit=100&offset=0&diagnostic=1");
+                out.recoveryQueueCandidateFound=(recovery.body?.items||[]).some(e=>String(e.envelopeId||e.id||"")===candidateId);
                 await call("court-evidence","/api/recovery/envelopes/"+id+"/evidence?diagnostic=1");
                 await call("emergency-retrieval","/api/recovery/envelopes/"+id+"/emergency-retrieval","POST");
                 await call("completed-copy","/api/recovery/envelopes/"+id+"/completed-copy.pdf");
@@ -121,7 +122,7 @@ jobs:
             `- Worker commit: ${out.workerBefore?.commit||"NOT_VERIFIED"}`,`- Candidate found in personal list: ${out.listResult?.candidateFound?"YES":"NO"}`,
             `- Stored owner UID: ${out.candidate?.ownerUid||"NOT_RETURNED"}`,`- Stored owner email: ${out.candidate?.ownerEmail||"NOT_RETURNED"}`,"",
             "## Route results","| Route | HTTP | Error code | Request ID | Evidence / source hash | SHA-256 |","|---|---:|---|---|---|---|",
-            ...out.routes.map(x=>`| ${x.route} | ${x.status} | ${x.code||""} | ${x.requestId||""} | ${x.auditChainStatus||x.sourceHashStatus||x.total||""} ${x.auditChainCode||x.sourceHashCode||""} | ${x.sha256||""} |`),"",
+            ...out.routes.map(x=>`| ${x.route} | ${x.status} | ${x.code||""} | ${x.requestId||""} | ${x.auditChainStatus||x.sourceHashStatus||x.total||""} ${x.auditChainCode||x.sourceHashCode||""} | ${x.sha256||x.sourceHash||""} |`),"",
             "## PDF outputs",...(out.pdfs.length?out.pdfs.map(x=>`- ${x.file}: SHA-256 ${x.sha256} (${x.bytes} bytes)`):["- No PDF was returned by the read-only routes."])];
           fs.writeFileSync("docs-results.md",lines.join("\n")+"\n");
           console.log(JSON.stringify({status:out.status,candidate:out.candidate||null,routes:out.routes,pdfs:out.pdfs}));
