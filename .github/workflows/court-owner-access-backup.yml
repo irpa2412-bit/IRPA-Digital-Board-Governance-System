@@ -130,22 +130,28 @@ jobs:
             const d=row.data||{},signers=Array.isArray(d.signers)?d.signers:[],fields=Array.isArray(d.fields)?d.fields:[];
             const doc=exported.documents.rows.find(x=>x.id===d.documentId)?.data||{};
             const iso=v=>v?.toDate?v.toDate().toISOString():v||null;
+            const signedFieldIds=new Set(signers.filter(x=>x?.status==="Signed"||x?.signedAt).flatMap(x=>Object.keys(x?.fieldValues||{})));
+            const storageId=doc.primaryStorageId||doc.storageId||doc.driveFileId||doc.googleDriveFileId||doc.fileId||doc.sourceFileId||
+              d.primaryStorageId||d.storageId||d.sourcePdfStorageId||d.driveFileId||null;
             return {collection:row.path.split("/")[0],envelopeId:row.id,documentId:d.documentId||null,title:d.title||doc.title||null,
               environment:d.dataEnvironment||d.environment||d.recordOrigin||null,status:d.status||null,createdAt:iso(d.createdAt),
               updatedAt:iso(d.updatedAt),ownerUid:d.ownerUid||d.createdByUid||d.createdBy||null,senderUid:d.senderUid||null,
               ownerEmail:d.ownerEmail||d.senderEmail||d.email||null,participantUids:Array.isArray(d.participantUids)?d.participantUids:[],
-              signerCount:signers.length,signedFieldsCount:fields.filter(x=>x?.signedAt||x?.signatureData||x?.value||x?.status==="Signed").length,
-              sourcePdfStorageId:doc.primaryStorageId||d.primaryStorageId||d.sourcePdfStorageId||null};
+              signerCount:signers.length,signedFieldsCount:fields.filter(x=>signedFieldIds.has(String(x.fieldId||""))).length,
+              sourcePdfStorageId:storageId};
           });
           const allEnvelopes=["envelopes","signatureEnvelopes"].flatMap(name=>exported[name].rows.map(row=>({collection:name,id:row.id,data:row.data||{}})));
-          const mostRecentFive=allEnvelopes.sort((a,b)=>String(b.data.createdAt||"").localeCompare(String(a.data.createdAt||""))).slice(0,5).map(x=>({collection:x.collection,envelopeId:x.id,documentId:x.data.documentId||null,title:x.data.title||null,environment:x.data.dataEnvironment||x.data.environment||x.data.recordOrigin||null,status:x.data.status||null,createdAt:x.data.createdAt?.toDate?.().toISOString?.()||x.data.createdAt||null}));
+          const dateMs=v=>{if(v?.toDate)return v.toDate().getTime();const n=Date.parse(String(v||""));return Number.isFinite(n)?n:0;};
+          const mostRecentFive=allEnvelopes.sort((a,b)=>dateMs(b.data.createdAt)-dateMs(a.data.createdAt)).slice(0,5).map(x=>({collection:x.collection,envelopeId:x.id,documentId:x.data.documentId||null,title:x.data.title||null,environment:x.data.dataEnvironment||x.data.environment||x.data.recordOrigin||null,status:x.data.status||null,createdAt:x.data.createdAt?.toDate?.().toISOString?.()||x.data.createdAt||null}));
+          const ownerAuthUsers=authUsers.filter(u=>u.uid===identity.uid||(u.email&&emails.has(String(u.email).trim().toLowerCase())));
           const emailGroups = new Map();
-          for (const u of authUsers) { const e=String(u.email||"").toLowerCase(); if(e) emailGroups.set(e,[...(emailGroups.get(e)||[]),u]); }
+          for (const u of ownerAuthUsers) { const e=String(u.email||"").toLowerCase(); if(e) emailGroups.set(e,[...(emailGroups.get(e)||[]),u]); }
           const duplicateEmails = [...emailGroups.entries()].filter(([,users])=>users.length>1).map(([email,users])=>({email,uids:users.map(u=>u.uid),created:users.map(u=>u.creationTime)}));
-          const identityComparison = { records: identityRecords, authAccounts: authUsers, duplicateEmails,
+          const storedOwnerUids=[...new Set(identityRecords.flatMap(x=>[x.ownerUid,x.senderUid].filter(Boolean)))].sort();
+          const identityComparison = { records: identityRecords, storedOwnerUids, authAccounts: ownerAuthUsers, duplicateEmails,
             possibleRecreatedAccounts: duplicateEmails.map(x=>({email:x.email,accounts:x.uids.length,created:x.created})) };
           console.log("COURT_ENVELOPE_IDENTITY_COMPARISON");
-          console.log(JSON.stringify({courtCandidates:identityRecords,mostRecentFiveOverall:mostRecentFive,authAccounts:authUsers.map(x=>({uid:x.uid,email:x.email,creationTime:x.creationTime,providerIds:x.providerIds})),duplicateEmails}));
+          console.log(JSON.stringify({courtCandidates:identityRecords,mostRecentFiveOverall:mostRecentFive,storedOwnerUids,authAccounts:ownerAuthUsers.map(x=>({uid:x.uid,email:x.email,creationTime:x.creationTime,providerIds:x.providerIds})),duplicateEmails}));
           const artifactName = "court-owner-access-backup-" + process.env.GITHUB_SHA;
           const payload = {
             generatedAt: new Date().toISOString(),
@@ -156,9 +162,9 @@ jobs:
             courtCandidates:identityRecords,
             mostRecentFiveOverall:mostRecentFive,
             collectionCounts: Object.fromEntries(Object.entries(exported).map(([k,v])=>[k,{count:v.count,pages:v.pages}])),
-            ownerUidCandidates: [...ownerUids],
+            ownerUidCandidates: identityComparison.storedOwnerUids,
             ownerEmailCandidates: [...emails],
-            matchingAuthAccounts: authUsers,
+            matchingAuthAccounts: ownerAuthUsers,
             identityComparison,
             matchedRecords: [...matched.values()],
             collections: exported
@@ -194,9 +200,10 @@ jobs:
           const p=JSON.parse(fs.readFileSync("forensic-backup/court-owner-access-backup.json","utf8"));
           const records=p.identityComparison?.records||[];
           const auth=p.identityComparison?.authAccounts||[];
-          const owners=[...new Set(records.flatMap(x=>[x.ownerUid,x.senderUid,...(x.participantUids||[])].filter(Boolean)))].sort();
-          const logins=[...new Set(auth.map(x=>x.uid).filter(Boolean))].sort();
-          const counts=Object.entries(m.collectionCounts||{}).map(([k,v])=>`| ${k} | ${v.count} |`).join("\\n");
+          const owners=p.identityComparison?.storedOwnerUids||[];
+          const loginAccounts=p.identityComparison?.authAccounts||[];
+          const logins=[...new Set(loginAccounts.map(x=>x.uid).filter(Boolean))].sort();
+          const counts=Object.entries(m.collectionCounts||{}).map(([k,v])=>`| ${k} | ${v.count} |`).join("\n");
           const report=[
             "# Court owner-access incident results — 2026-11-26","",
             "| Backup field | Value |","|---|---|",
@@ -204,20 +211,22 @@ jobs:
             `| Export byte length | ${m.byteLength} |`,
             `| Export SHA-256 | ${m.sha256} |`,
             `| Artifact | ${m.artifactName} (90 days) |`,
-            `| Matched record count | ${records.length} |`,
+            `| Matched envelope/profile records | ${records.length} |`,
+            `| Owner Firebase Auth accounts | ${loginAccounts.length} |`,
             `| Duplicate login email groups | ${(p.identityComparison?.duplicateEmails||[]).length} |`,"",
             "## Collection counts","","| Collection | Count |","|---|---:|",counts,"",
             "## Court envelope candidates","","| Collection | Envelope ID | Document ID | Title | Environment | Status | Created | Owner UID | Owner email | Signers | Signed fields | Source PDF storage ID |","|---|---|---|---|---|---|---|---|---|---:|---:|---|",
             ...records.map(x=>`| ${x.collection} | ${x.envelopeId} | ${x.documentId||""} | ${x.title||""} | ${x.environment||""} | ${x.status||""} | ${x.createdAt||""} | ${x.ownerUid||""} | ${x.ownerEmail||""} | ${x.signerCount} | ${x.signedFieldsCount} | ${x.sourcePdfStorageId||""} |`),"",
             "## Five most recent envelopes overall","","| Collection | Envelope ID | Document ID | Title | Environment | Status | Created |","|---|---|---|---|---|---|---|",
             ...(p.mostRecentFiveOverall||[]).map(x=>`| ${x.collection} | ${x.envelopeId} | ${x.documentId||""} | ${x.title||""} | ${x.environment||""} | ${x.status||""} | ${x.createdAt||""} |`),"",
-            "## Stored owner IDs vs matching Firebase Auth IDs","",
-            `- Stored owner/sender/participant UIDs: ${owners.join(", ")||"NONE"}`,
-            `- Matching Firebase Auth UIDs: ${logins.join(", ")||"NONE"}`,
-            `- UID overlap: ${owners.some(x=>logins.includes(x))?"MATCH":"NO MATCH"}`,""
+            "## Stored owner IDs vs personal Firebase Auth login IDs","",
+            `- Stored owner/sender UIDs: ${owners.join(", ")||"NONE"}`,
+            `- Personal Auth accounts: ${loginAccounts.map(x=>x.uid+" / "+(x.email||"no-email")+" / "+(x.creationTime||"unknown-created")).join("; ")||"NONE"}`,
+            `- UID overlap: ${owners.some(x=>logins.includes(x))?"MATCH":"NO MATCH"}`,
+            `- Duplicate email groups: ${(p.identityComparison?.duplicateEmails||[]).map(x=>x.email+" ("+x.uids.join(",")+")").join("; ")||"NONE"}`,""
           ].join("\\n");
-          fs.writeFileSync("docs/incident/results-20261126.md",report+"\\n");
-          fs.writeFileSync("/tmp/pr-comment.md",report+"\\n");
+          fs.writeFileSync("docs/incident/results-20261126.md",report+"\n");
+          fs.writeFileSync("/tmp/pr-comment.md",report+"\n");
           NODE
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
