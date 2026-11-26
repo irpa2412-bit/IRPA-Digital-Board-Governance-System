@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: court-owner-access-forensic-backup
@@ -123,6 +123,22 @@ jobs:
             pageToken = page.pageToken;
           } while (pageToken);
 
+          const identityRecords = [...matched.values()].map(row => {
+            const d = row.data || {};
+            return { path: row.path, id: row.id, ownerUid:d.ownerUid||d.createdByUid||d.createdBy||null,
+              senderUid:d.senderUid||null, participantUids:Array.isArray(d.participantUids)?d.participantUids:[],
+              ownerEmail:d.ownerEmail||d.senderEmail||d.email||null,
+              senderEmail:d.senderEmail||null, email:d.email||null,
+              documentId:d.documentId||d.documentRef||null, status:d.status||null };
+          });
+          const emailGroups = new Map();
+          for (const u of authUsers) { const e=String(u.email||"").toLowerCase(); if(e) emailGroups.set(e,[...(emailGroups.get(e)||[]),u]); }
+          const duplicateEmails = [...emailGroups.entries()].filter(([,users])=>users.length>1).map(([email,users])=>({email,uids:users.map(u=>u.uid),created:users.map(u=>u.creationTime)}));
+          const identityComparison = { records: identityRecords, authAccounts: authUsers, duplicateEmails,
+            possibleRecreatedAccounts: duplicateEmails.map(x=>({email:x.email,accounts:x.uids.length,created:x.created})) };
+          console.log("COURT_ENVELOPE_IDENTITY_COMPARISON");
+          console.log(JSON.stringify(identityComparison));
+          const artifactName = "court-owner-access-backup-" + process.env.GITHUB_SHA;
           const payload = {
             generatedAt: new Date().toISOString(),
             projectId: project,
@@ -132,6 +148,7 @@ jobs:
             ownerUidCandidates: [...ownerUids],
             ownerEmailCandidates: [...emails],
             matchingAuthAccounts: authUsers,
+            identityComparison,
             matchedRecords: [...matched.values()],
             collections: exported
           };
@@ -140,9 +157,9 @@ jobs:
           fs.writeFileSync("forensic-backup/court-owner-access-backup.json",raw,{flag:"wx"});
           const sha = crypto.createHash("sha256").update(raw).digest("hex");
           fs.writeFileSync("forensic-backup/SHA256SUMS.txt",sha+"  court-owner-access-backup.json\n",{flag:"wx"});
-          fs.writeFileSync("forensic-backup/manifest.json",JSON.stringify({projectId:project,generatedAt:payload.generatedAt,readOnly:true,bytes:raw.length,sha256:sha,collectionCounts:payload.collectionCounts,matchingAuthAccountCount:authUsers.length,matchedRecordCount:matched.size},null,2),{flag:"wx"});
+          fs.writeFileSync("forensic-backup/manifest.json",JSON.stringify({projectId:project,generatedAt:payload.generatedAt,readOnly:true,exportFile:"court-owner-access-backup.json",byteLength:raw.length,sha256:sha,collectionCounts:payload.collectionCounts,artifactName,retentionDays:90,identityComparison},null,2),{flag:"wx"});
           console.log("READ_ONLY_BACKUP_CREATED");
-          console.log(JSON.stringify({projectId:project,readOnly:true,bytes:raw.length,sha256:sha,collectionCounts:payload.collectionCounts,matchingAuthAccountCount:authUsers.length,matchedRecordCount:matched.size}));
+          console.log(JSON.stringify({projectId:project,readOnly:true,byteLength:raw.length,sha256:sha,collectionCounts:payload.collectionCounts,artifactName,retentionDays:90,matchingAuthAccountCount:authUsers.length,matchedRecordCount:matched.size}));
           NODE
       - name: Upload immutable forensic backup artifact
         uses: actions/upload-artifact@v4
@@ -150,4 +167,18 @@ jobs:
           name: court-owner-access-backup-${{ github.sha }}
           path: forensic-backup/
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 90
+
+      - name: Commit manifest only (never export data)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p docs/signature-recovery
+          cp forensic-backup/manifest.json docs/signature-recovery/owner-access-backup-manifest.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/signature-recovery/owner-access-backup-manifest.json
+          git commit -m "Record Court owner-access backup manifest"
+          git push origin "HEAD:incident/owner-access-20261126"
