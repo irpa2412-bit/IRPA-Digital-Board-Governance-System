@@ -138,6 +138,8 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add docs/incident/results-20261126.md
           git commit -m "Append Court owner-access Gateway verification" || true
+          git fetch origin incident/owner-access-20261126
+          git rebase origin/incident/owner-access-20261126
           git push origin "HEAD:incident/owner-access-20261126"
           gh pr comment 982 --repo "$GITHUB_REPOSITORY" --body-file docs-results.md
       - name: Publish verified PDF outputs
