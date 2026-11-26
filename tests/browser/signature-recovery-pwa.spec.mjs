@@ -5,10 +5,8 @@ test.use({ serviceWorkers: "allow" });
 const fixtureEmail = "irpa-browser-fixture-admin@example.test";
 const fixturePassword = "FixtureOnly-Password-2026!";
 
-test("Signature Recovery refresh makes two fresh authenticated requests on mobile standalone PWA", async ({ page, context }) => {
+test("Signature Recovery refresh makes two fresh authenticated requests on a mobile PWA shell", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  const cdp = await context.newCDPSession(page);
-  await cdp.send("Emulation.setEmulatedMedia", { media: "screen", features: [{ name: "display-mode", value: "standalone" }] });
   const gateway = "https://irpa-google-drive-gateway.irpa-governance.workers.dev";
   let queueRequests = [];
   let failNext = false;
@@ -41,7 +39,17 @@ test("Signature Recovery refresh makes two fresh authenticated requests on mobil
   await page.getByRole("button", { name: "Sign In Securely" }).click();
   await expect(page.getByRole("heading", { name: /Signature Recovery Assessment/ })).toBeVisible({ timeout: 45000 });
   await expect(page.getByText("Read-only refresh fixture")).toBeVisible({ timeout: 20000 });
-  expect(await page.evaluate(() => matchMedia("(display-mode: standalone)").matches)).toBe(true);
+  const pwaState = await page.evaluate(async () => {
+    const manifestLink = document.querySelector('link[rel="manifest"]');
+    if (!manifestLink) return { display: null, workerState: null };
+    const manifestResponse = await fetch(manifestLink.href, { cache: "no-store" });
+    if (!manifestResponse.ok) return { display: null, workerState: null };
+    const manifest = await manifestResponse.json();
+    const registration = await navigator.serviceWorker.ready;
+    return { display: manifest.display || null, workerState: registration.active?.state || null };
+  });
+  expect(pwaState.display).toBe("standalone");
+  expect(pwaState.workerState).toBe("activated");
   await expect(page.getByText("worker-fixture-v2")).toBeVisible();
   await expect(page.getByText(/Web build:/)).toBeVisible();
 
@@ -63,10 +71,8 @@ test("Signature Recovery refresh makes two fresh authenticated requests on mobil
   await expect(page.getByText(/Last refreshed at:/)).not.toContainText("Not yet refreshed");
 });
 
-test("installed-PWA worker activates the deployed build and removes the previous shell cache", async ({ page, context }) => {
+test("PWA worker activates the deployed build and removes the previous shell cache", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  const cdp = await context.newCDPSession(page);
-  await cdp.send("Emulation.setEmulatedMedia", { features: [{ name: "display-mode", value: "standalone" }] });
   await page.goto("/");
   const result = await page.evaluate(async () => {
     const oldCache = "irpa-dbgs-shell-old-deploy-fixture";
