@@ -207,13 +207,29 @@ const smtpSelfcheckRoute = async (request, env) => {
 const signatureRecoveryRouter = createSignatureRecoveryRouter({
   authenticateFirebaseRequest,
   getFirestoreDocument,
-  buildContext: (env,claims,user) => buildEsignContext({
-    env,
-    verifyUser: async () => user,
-    sendInvitation: async () => { throw new Error("Read-only recovery routes do not send invitations."); },
-    logger: console,
-    driveHelpers: { getDriveAccessToken, driveFetch }
-  }),
+  buildContext: async (env,claims,user) => {
+    const ctx = buildEsignContext({
+      env,
+      verifyUser: async () => user,
+      sendInvitation: async () => { throw new Error("Read-only recovery routes do not send invitations."); },
+      logger: console,
+      driveHelpers: { getDriveAccessToken, driveFetch }
+    });
+    const adminToken = await getFirestoreAdminAccessToken(env);
+    const allowedCollections = new Set(["envelopes","signatureEnvelopes","documents"]);
+    ctx.firestore = {
+      async get(collection,id) {
+        if (!allowedCollections.has(collection)) throw new Error("Recovery Firestore collection is not permitted.");
+        const raw = await getFirestoreDocument(env, collection + "/" + id, adminToken);
+        return raw ? { ...(firestoreDocumentToPlain(raw) || {}), id } : null;
+      },
+      async list(collection) {
+        if (!allowedCollections.has(collection)) throw new Error("Recovery Firestore collection is not permitted.");
+        return listFirestoreCollectionDocuments(env, collection, adminToken);
+      }
+    };
+    return ctx;
+  },
   json,
   corsHeaders
 });
@@ -3990,6 +4006,33 @@ async function getFirestoreDocument(env, path, firebaseToken) {
     throw new Error(`Firestore GET ${path} failed: HTTP ${response.status} ${googleStatus} ${googleMessage}`);
   }
   return response.json();
+}
+
+async function listFirestoreCollectionDocuments(env, collectionName, firebaseToken) {
+  const rows = [];
+  let pageToken = "";
+  let pages = 0;
+  do {
+    const url = new URL(`https://firestore.googleapis.com/v1/projects/${getFirebaseProjectId(env)}/databases/(default)/documents/${encodeURIComponent(collectionName)}`);
+    url.searchParams.set("pageSize", "1000");
+    if (pageToken) url.searchParams.set("pageToken", pageToken);
+    const response = await fetch(url.toString(), { headers: { Authorization: `Bearer ${firebaseToken}` } });
+    if (!response.ok) {
+      const error = new Error(`Unable to retrieve Firestore collection ${collectionName}.`);
+      error.status = response.status;
+      error.code = "FIRESTORE_COLLECTION_LIST_FAILED";
+      throw error;
+    }
+    const payload = await response.json();
+    for (const document of payload.documents || []) {
+      const id = String(document.name || "").split("/").pop();
+      if (id) rows.push({ ...(firestoreDocumentToPlain(document) || {}), id });
+    }
+    pageToken = payload.nextPageToken || "";
+    pages += 1;
+    if (pages > 500) throw new Error("Firestore collection pagination safety limit exceeded.");
+  } while (pageToken);
+  return rows;
 }
 
 function firestoreMapArray(field) {

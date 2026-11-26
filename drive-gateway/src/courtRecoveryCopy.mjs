@@ -19,6 +19,8 @@ export async function buildUnarchivedCompletedCopy(ctx,user,envelopeId) {
   const isNotFound=error=>Number(error?.status||error?.statusCode||error?.response?.status)===404||error?.code==="NOT_FOUND"||/not found|does not exist/i.test(String(error?.message||""));
   let envelope=null;
   try{envelope=await ctx.meta.get("envelopes",envelopeId);}catch(error){if(!isNotFound(error))throw error;}
+  if(!envelope&&ctx.firestore?.get)envelope=await ctx.firestore.get("envelopes",envelopeId);
+  if(!envelope&&ctx.firestore?.get)envelope=await ctx.firestore.get("signatureEnvelopes",envelopeId);
   if(!envelope){
     try{envelope=await ctx.meta.get("signatureEnvelopes",envelopeId);}catch(error){if(!isNotFound(error))throw error;}
   }

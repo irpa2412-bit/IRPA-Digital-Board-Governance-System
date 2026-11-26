@@ -78,3 +78,22 @@ test("completed-copy lookup falls back to signatureEnvelopes after legacy 404",a
  assert.equal(f.getReads(),1);
  assert.equal(f.getWrites(),0);
 });
+
+test("completed-copy lookup reads Firestore signatureEnvelopes through Gateway context",async()=>{
+ const f=await fixture(),calls=[];
+ f.ctx.meta.get=async(collection,id)=>{
+  calls.push("meta:"+collection);
+  if(collection==="envelopes")throw Object.assign(new Error("Document not found"),{status:404});
+  return null;
+ };
+ f.ctx.firestore={get:async(collection,id)=>{
+  calls.push("firestore:"+collection);
+  return collection==="signatureEnvelopes"&&id===f.envelope.id?f.envelope:null;
+ }};
+ const result=await buildUnarchivedCompletedCopy(f.ctx,{uid:"court-owner"},f.envelope.id);
+ assert.deepEqual(result.bytes,f.bytes);
+ assert.equal(result.hash,f.hash);
+ assert.deepEqual(calls,["meta:envelopes","firestore:envelopes","firestore:signatureEnvelopes"]);
+ assert.equal(f.getReads(),1);
+ assert.equal(f.getWrites(),0);
+});

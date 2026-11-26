@@ -26,10 +26,16 @@ export async function getRecoveryQueue(ctx,user,{limit=25,offset=0,recordAccess=
   if(!user?.uid)throw new HttpError(401,"Authentication required.");
   const safeLimit=Math.max(1,Math.min(50,limit==null?25:(Number.isInteger(Number(limit))?Number(limit):25)));
   const safeOffset=Math.max(0,Math.min(10000,Number.isInteger(Number(offset))?Number(offset):0));
-  const [legacyRows,signatureRows]=await Promise.all([ctx.meta.list("envelopes"),ctx.meta.list("signatureEnvelopes")]);
+  const [legacyRows,signatureRows,firestoreLegacyRows,firestoreSignatureRows]=await Promise.all([
+    ctx.meta.list("envelopes"),ctx.meta.list("signatureEnvelopes"),
+    ctx.firestore?.list?ctx.firestore.list("envelopes"):Promise.resolve([]),
+    ctx.firestore?.list?ctx.firestore.list("signatureEnvelopes"):Promise.resolve([])
+  ]);
   const byId=new Map();
-  for(const row of legacyRows||[])byId.set(row.id,{...row,__collection:"envelopes"});
-  for(const row of signatureRows||[])byId.set(row.id,{...row,__collection:"signatureEnvelopes"});
+  for(const row of legacyRows||[])byId.set("envelopes/"+row.id,{...row,__collection:"envelopes",__source:"durable-object"});
+  for(const row of signatureRows||[])byId.set("signatureEnvelopes/"+row.id,{...row,__collection:"signatureEnvelopes",__source:"durable-object"});
+  for(const row of firestoreLegacyRows||[])byId.set("envelopes/"+row.id,{...row,__collection:"envelopes",__source:"firestore"});
+  for(const row of firestoreSignatureRows||[])byId.set("signatureEnvelopes/"+row.id,{...row,__collection:"signatureEnvelopes",__source:"firestore"});
   const eligible=[...byId.values()].filter(row=>row.status!=="Completed"&&isOwner(row,user))
     .sort((a,b)=>String(b.updatedAt||b.createdAt||"").localeCompare(String(a.updatedAt||a.createdAt||"")));
   const page=eligible.slice(safeOffset,safeOffset+safeLimit);if(recordAccess)for(const envelope of page)await appendRecoveryAccessEvent(ctx,user,envelope.id,"recovery.queue.viewed", {collection:envelope.__collection});return {ok:true,total:eligible.length,limit:safeLimit,offset:safeOffset,items:page.map(e=>({
@@ -40,12 +46,15 @@ export async function getRecoveryQueue(ctx,user,{limit=25,offset=0,recordAccess=
 }
 const isRecoveryNotFound=error=>Number(error?.status||error?.statusCode||error?.response?.status)===404||error?.code==="NOT_FOUND"||/not found|does not exist/i.test(String(error?.message||""));
 async function getRecoveryEnvelope(ctx,id){
-  let legacy=null;
+  let legacy=null,legacySource="durable-object";
   try{legacy=await ctx.meta.get("envelopes",id);}catch(error){if(!isRecoveryNotFound(error))throw error;}
-  if(legacy)return {...legacy,__collection:"envelopes"};
+  if(!legacy&&ctx.firestore?.get){legacy=await ctx.firestore.get("envelopes",id);legacySource="firestore";}
+  if(legacy)return {...legacy,__collection:"envelopes",__source:legacySource};
   let signature=null;
+  if(ctx.firestore?.get)signature=await ctx.firestore.get("signatureEnvelopes",id);
+  if(signature)return {...signature,__collection:"signatureEnvelopes",__source:"firestore"};
   try{signature=await ctx.meta.get("signatureEnvelopes",id);}catch(error){if(!isRecoveryNotFound(error))throw error;}
-  if(signature)return {...signature,__collection:"signatureEnvelopes"};
+  if(signature)return {...signature,__collection:"signatureEnvelopes",__source:"durable-object"};
   return null;
 }
 async function appendRecoveryAccessEvent(ctx,user,id,type,details={}){
@@ -74,7 +83,7 @@ export async function assessRecoveryEvidence(ctx,user,id,{recordAccess=true}={})
   const events=Array.isArray(envelope.events)?envelope.events:[];
   const modernEnvelope=envelope.__collection==="signatureEnvelopes";
   const auditChainStatus=modernEnvelope&&events.length===0?"NOT_HASH_CHAINED":events.length===0?"NO_EVENTS":(await validChain(events)?"VERIFIED":"FAILED");
-  const document=await ctx.meta.get("documents",envelope.documentId);
+  const document=envelope.__source==="firestore"&&ctx.firestore?.get?await ctx.firestore.get("documents",envelope.documentId):await ctx.meta.get("documents",envelope.documentId);
   const sourceStorageId=document?.primaryStorageId||document?.storageId||document?.driveFileId||document?.fileId||envelope.primaryStorageId||envelope.sourcePdfStorageId||null;
   const expectedHashes=[...new Set([document?.sha256,document?.hash,envelope.sha256,envelope.documentHash,envelope.originalHash,envelope.gatewayOriginalHash].filter(value=>typeof value==="string"&&value.trim()).map(value=>value.trim().toLowerCase()))];
   let sourceHash=null,sourceHashStatus="NO_STORED_HASH",sourceHashCode="SOURCE_HASH_MISSING",sourceHashReason="No stored source hash is available.";
@@ -231,7 +240,7 @@ export async function buildRecoveryPreview(ctx,user,id){
   const assessment=await assessRecoveryEvidence(ctx,user,id);
   if(assessment.auditChain.status!=="VERIFIED")throw new HttpError(409,"Preview unavailable because the signing audit chain is not verified.");
   if(assessment.sourceHashStatus!=="VERIFIED")throw new HttpError(409,"Preview unavailable because the original source hash is not verified.");
-  const document=await ctx.meta.get("documents",envelope.documentId);
+  const document=envelope.__source==="firestore"&&ctx.firestore?.get?await ctx.firestore.get("documents",envelope.documentId):await ctx.meta.get("documents",envelope.documentId);
   const original=await ctx.storage.get(document.primaryStorageId);
   const verifiedIds=new Set(assessment.stampSlots.filter(x=>x.status==="VERIFIED_EXISTING").map(x=>x.fieldId));
   const safeFields=(envelope.fields||[]).filter(field=>verifiedIds.has(field.fieldId));
@@ -356,7 +365,7 @@ export async function buildEmergencyRetrieval(ctx,user,id,{extractText=extractPd
     if(!emergencyOwner(envelope,user))throw Object.assign(new Error("This envelope belongs to another owner."),{status:403});
     if(envelope.status!=="CompletionFailed")throw Object.assign(new Error("Only failed-completion envelopes are eligible for emergency retrieval."),{status:409});
     let document;
-    try{document=await ctx.meta.get("documents",envelope.documentId);}catch(error){return fail("SOURCE_READ",error);}
+    try{document=envelope.__source==="firestore"&&ctx.firestore?.get?await ctx.firestore.get("documents",envelope.documentId):await ctx.meta.get("documents",envelope.documentId);}catch(error){return fail("SOURCE_READ",error);}
     const sourceStorageId=document?.primaryStorageId||document?.storageId||document?.driveFileId||document?.fileId||envelope.primaryStorageId||envelope.sourcePdfStorageId||null;
     if(!sourceStorageId)return fail("SOURCE_READ",new Error("SOURCE_REFERENCE_MISSING"));
     let source;
@@ -458,8 +467,8 @@ export function createSignatureRecoveryRouter({authenticateFirebaseRequest,getFi
     const profile=await getFirestoreDocument(env,"adminProfiles/"+uid,claims.token).catch(()=>null);
     const isAdmin=claims.admin===true||String(claims.email||"").trim().toLowerCase()==="irpa2412@gmail.com"||profile?.fields?.active?.booleanValue===true;
     const user={uid,isAdmin};
-    const ctx=buildContext(env,claims,user);
     try {
+      const ctx=await buildContext(env,claims,user);
       if(emergencyPath){
         const result=await buildEmergencyRetrieval(ctx,user,decodeURIComponent(emergencyPath[1]));
         if(!result.ok){const denied=result.status===403;const code=denied?"NOT_OWNER":"EMERGENCY_RETRIEVAL_FAILED:"+String(result.failureCode||"UNKNOWN");const explanation=EMERGENCY_FAILURE_EXPLANATIONS[result.failureCode||"UNKNOWN"];return json({ok:false,code,requestId,stages:result.stages,error:denied?"This envelope belongs to another owner.":explanation[0]+" / "+explanation[1]},result.status||500,corsHeaders(request));}

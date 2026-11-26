@@ -611,3 +611,37 @@ test("recovery queue and evidence resolve signatureEnvelopes when legacy lookup 
   assert.equal(evidence.signerSummary.length,1);
   assert.equal((await f.ctx.meta.list("recoveryAccessEvents")).length,0);
 });
+
+test("recovery queue reads Firestore signatureEnvelopes and filters non-admin owners",async()=>{
+  const f=await fixture();
+  const envelopeId="IRPA-ENV-2026-54530056";
+  const sourceDoc=await f.ctx.meta.get("documents","DOC-REC-1");
+  const source=await f.ctx.storage.get(sourceDoc.primaryStorageId);
+  const sourceHash=await sha256Hex(source);
+  const document={id:"DOC-REC-FIRESTORE",fileId:sourceDoc.primaryStorageId,sha256:sourceHash};
+  const candidate={
+    id:envelopeId,documentId:document.id,title:"Firestore recovery candidate",status:"InProgress",
+    ownerUid:f.user.uid,senderUid:f.user.uid,recordOrigin:"TRIAL",sha256:sourceHash,events:[],
+    fields:[{fieldId:"SIG-FS-1",type:"Signature",page:1,signerUid:"email-link-1"}],
+    recipients:[{uid:"email-link-1",email:"signer@example.test",name:"Test Signer"}],
+    signers:[{signerId:"S1",name:"Test Signer",email:"signer@example.test",status:"Signed",signedAt:"2026-11-22T10:00:00.000Z"}]
+  };
+  const other={...candidate,id:"IRPA-ENV-OTHER",ownerUid:"another-owner",senderUid:"another-owner"};
+  f.ctx.meta.list=async collection=>collection==="recoveryAccessEvents"?[]:[];
+  f.ctx.meta.get=async(collection,id)=>{
+    if(collection==="envelopes")return null;
+    if(collection==="documents"&&id==="DOC-REC-1")return sourceDoc;
+    return null;
+  };
+  f.ctx.firestore={
+    list:async collection=>collection==="signatureEnvelopes"?[candidate,other]:[],
+    get:async(collection,id)=>collection==="signatureEnvelopes"&&id===envelopeId?candidate:collection==="documents"&&id===document.id?document:null
+  };
+  const queue=await getRecoveryQueue(f.ctx,{uid:f.user.uid},{recordAccess:false});
+  assert.deepEqual(queue.items.map(item=>item.envelopeId),[envelopeId]);
+  const evidence=await assessRecoveryEvidence(f.ctx,{uid:f.user.uid},envelopeId,{recordAccess:false});
+  assert.equal(evidence.envelopeId,envelopeId);
+  assert.equal(evidence.sourceHashStatus,"VERIFIED");
+  assert.equal(evidence.auditChain.status,"NOT_HASH_CHAINED");
+  assert.equal(evidence.summary.unverifiable,1);
+});
