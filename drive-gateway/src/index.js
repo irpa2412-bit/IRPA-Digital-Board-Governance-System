@@ -3532,7 +3532,7 @@ async function driveFetch(env, accessToken, path, options = {}) {
 }
 
 async function authenticateFirebaseRequest(request, env, options = {}) {
-  const header = request.headers.get("Authorization") || "";
+  const requestId = crypto.randomUUID();\n  const header = request.headers.get("Authorization") || "";
   const match = header.match(/^Bearer\s+([^\s]+)$/i);
   if (!match) {
     const error = new Error("Firebase authentication is required.");
@@ -3577,36 +3577,61 @@ async function authenticateFirebaseRequest(request, env, options = {}) {
       emailDeliveryService: payload.irpaEmailDeliveryService === true
     }
   };
-  if (options.skipActivation !== true) await assertActivatedPortalUser(claims, env);
+  if (options.skipActivation !== true) await assertActivatedPortalUser(claims, env, requestId);
   return claims;
 }
 
-async function assertActivatedPortalUser(claims, env) {
-  const adminToken = await getFirestoreAdminAccessToken(env);
-  const admin = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, adminToken);
-  if (admin?.fields?.active?.booleanValue === true) return;
+async function assertActivatedPortalUser(claims, env, requestId = crypto.randomUUID()) {
+  try {
+    const adminToken = await getFirestoreAdminAccessToken(env);
+    const admin = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, adminToken);
+    if (admin?.fields?.active?.booleanValue === true) return;
 
-  // Invitation activation preserves the canonical institutional record ID
-  // and attaches the authenticated Firebase UID to that record. Some older
-  // authorization paths incorrectly assumed the institutional document ID
-  // was always identical to the Firebase UID. Resolve the same UID-first,
-  // email-fallback profile used by upload authorization so activated
-  // invitees are not rejected before the storage layer.
-  const { memberRecord, employeeRecord } = await getInstitutionalProfileForUser(env, claims);
-  const memberActivated = memberRecord && (
-    memberRecord.fields?.registrationStatus?.stringValue === "Activated" ||
-    memberRecord.fields?.status?.stringValue === "Activated" ||
-    memberRecord.fields?.accountActivated?.booleanValue === true
-  );
-  const employeeActive = employeeRecord && (
-    employeeRecord.fields?.registrationStatus?.stringValue === "Activated" ||
-    employeeRecord.fields?.status?.stringValue === "Active" ||
-    employeeRecord.fields?.employmentStatus?.stringValue === "Active"
-  ) && employeeRecord.fields?.accountActivated?.booleanValue !== false;
+    // Resolve the authenticated user's institutional profile using the
+    // privileged Firestore token. The Firebase ID token is not a Firestore
+    // administrator credential.
+    const { memberRecord, employeeRecord } = await getInstitutionalProfileForUser(env, claims, adminToken);
+    const memberActivated = memberRecord && (
+      memberRecord.fields?.registrationStatus?.stringValue === "Activated" ||
+      memberRecord.fields?.status?.stringValue === "Activated" ||
+      memberRecord.fields?.accountActivated?.booleanValue === true
+    );
+    const employeeActive = employeeRecord && (
+      employeeRecord.fields?.registrationStatus?.stringValue === "Activated" ||
+      employeeRecord.fields?.status?.stringValue === "Active" ||
+      employeeRecord.fields?.employmentStatus?.stringValue === "Active"
+    ) && employeeRecord.fields?.accountActivated?.booleanValue !== false;
 
-  if (!memberActivated && !employeeActive) {
-    const error = new Error("IRPA_INVITATION_FAILURE:PORTAL_ACTIVATION_REQUIRED");
-    error.status = 403;
+    let personalActive = false;
+    if (!memberActivated && !employeeActive) {
+      let personal = await getFirestoreDocument(env, `signatureProfiles/${claims.user_id}`, adminToken);
+      if (!personal && claims.email) {
+        const matches = await getFirestoreDocumentsByEmail(env, "signatureProfiles", claims.email, adminToken);
+        personal = matches[0] || null;
+      }
+      const activeStatus = value => ["active", "activated"].includes(String(value || "").trim().toLowerCase());
+      personalActive = Boolean(personal && (
+        activeStatus(personal.fields?.status?.stringValue) ||
+        activeStatus(personal.fields?.registrationStatus?.stringValue) ||
+        personal.fields?.active?.booleanValue === true ||
+        personal.fields?.accountActivated?.booleanValue === true
+      ) && personal.fields?.accountActivated?.booleanValue !== false);
+    }
+
+    if (!memberActivated && !employeeActive && !personalActive) {
+      const error = new Error("IRPA_INVITATION_FAILURE:PORTAL_ACTIVATION_REQUIRED");
+      error.status = 403;
+      error.code = "NOT_ACTIVATED";
+      error.requestId = requestId;
+      throw error;
+    }
+  } catch (cause) {
+    if (cause?.code === "NOT_ACTIVATED") throw cause;
+    const error = new Error("Portal activation profile lookup failed.");
+    error.status = 503;
+    error.code = "PROFILE_LOOKUP_FAILED";
+    error.requestId = requestId;
+    error.cause = cause;
     throw error;
   }
 }
