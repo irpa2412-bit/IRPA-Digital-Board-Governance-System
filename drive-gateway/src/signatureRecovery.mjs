@@ -7,7 +7,7 @@ import { buildUnarchivedCompletedCopy } from "./courtRecoveryCopy.mjs";
 import { buildSignedPdf, MAX_PDF_BYTES } from "./pdf.mjs";
 import { verifyCertificateInput, verifyCertificatePageText, extractPdfText } from "./recoveryCertificateVerifier.mjs";
 
-const isOwner=(envelope,user)=>Boolean(user?.uid)&&(envelope.createdBy===user.uid||envelope.createdByUid===user.uid||envelope.ownerUid===user.uid||envelope.senderUid===user.uid);
+const isOwner=(envelope,user)=>Boolean(user?.uid)&&(envelope.createdBy===user.uid||envelope.createdByUid===user.uid||envelope.ownerUid===user.uid||envelope.senderUid===user.uid||user.isAdmin===true);
 async function validChain(events){
   if(!Array.isArray(events))return false;
   let previous="GENESIS";
@@ -273,7 +273,7 @@ export async function buildRecoveryPreview(ctx,user,id){
 
 const EMERGENCY_COPY_LABEL="EMERGENCY-RETRIEVAL-COPY, NOT ARCHIVED";
 const EMERGENCY_COPY_DISCLAIMER="Cryptographic PDF seal: NOT APPLIED. Emergency retrieval copy, not archived.";
-const emergencyOwner=(envelope,user)=>Boolean(user?.uid)&&(envelope.createdBy===user.uid||envelope.createdByUid===user.uid||envelope.ownerUid===user.uid||envelope.senderUid===user.uid);
+const emergencyOwner=(envelope,user)=>Boolean(user?.uid)&&(envelope.createdBy===user.uid||envelope.createdByUid===user.uid||envelope.ownerUid===user.uid||envelope.senderUid===user.uid||user.isAdmin===true);
 async function appendEmergencyCertificatePage(bytes,events,signers,completedAt){
   const pdf=await PDFDocument.load(bytes);
   let page=pdf.addPage([612,792]);
@@ -464,7 +464,9 @@ export function createSignatureRecoveryRouter({authenticateFirebaseRequest,getFi
     }
     const uid=String(claims?.user_id||"").trim();
     if(!uid)return json({ok:false,error:"A valid IRPA sign-in is required."},401,corsHeaders(request));
-    const user={uid};
+    const profile=await getFirestoreDocument(env,"adminProfiles/"+uid,claims.token).catch(()=>null);
+    const isAdmin=claims.admin===true||String(claims.email||"").trim().toLowerCase()==="irpa2412@gmail.com"||profile?.fields?.active?.booleanValue===true;
+    const user={uid,isAdmin};
     try {
       const ctx=await buildContext(env,claims,user);
       if(emergencyPath){
