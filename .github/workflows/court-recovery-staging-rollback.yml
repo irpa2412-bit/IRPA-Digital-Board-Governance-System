@@ -1,0 +1,112 @@
+name: Court recovery staging rollback verification
+
+on:
+  push:
+    branches:
+      - fix/court-listing-recovery-20261126
+    paths:
+      - drive-gateway/**
+      - .github/workflows/court-recovery-staging-rollback.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: court-recovery-staging-rollback
+  cancel-in-progress: false
+
+jobs:
+  verify-staging-rollback:
+    runs-on: ubuntu-24.04
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: drive-gateway/package-lock.json
+      - name: Install and test Gateway
+        working-directory: drive-gateway
+        run: |
+          set -euo pipefail
+          npm ci
+          npm test
+      - name: Capture and validate previous staging Worker version
+        id: previous
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.STAGING_CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.STAGING_CLOUDFLARE_ACCOUNT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          url="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/irpa-google-drive-gateway-staging/deployments"
+          curl --fail --silent --show-error -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "$url" >/tmp/staging-deployments.json
+          code="$(curl --silent --show-error --max-time 10 --output /tmp/staging-health.json --write-out '%{http_code}' https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev/health)"
+          test "$code" = "200"
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          const data=JSON.parse(fs.readFileSync("/tmp/staging-deployments.json","utf8"));
+          const health=JSON.parse(fs.readFileSync("/tmp/staging-health.json","utf8"));
+          const versions=data.result?.deployments?.[0]?.versions||[];
+          const previous=versions.slice().sort((a,b)=>Number(b.percentage||0)-Number(a.percentage||0))[0];
+          if(!data.success||!previous?.version_id||!/^[A-Za-z0-9_-]{8,128}$/.test(previous.version_id)||!health.ok||health.environment!=="staging"||!/^([a-f0-9]{40})$/.test(health.commit||"")) throw new Error("STAGING_PREVIOUS_VERSION_NOT_VERIFIED");
+          fs.appendFileSync(process.env.GITHUB_OUTPUT,`version_id=${previous.version_id}\ncommit=${health.commit}\n`);
+          console.log(JSON.stringify({previousVersionId:previous.version_id,previousCommit:health.commit,environment:health.environment}));
+          NODE
+      - name: Deploy candidate to staging for rollback test
+        id: deploy
+        env:
+          GIT_SHA: ${{ github.sha }}
+        working-directory: drive-gateway
+        run: |
+          set -euo pipefail
+          npx wrangler deploy --config wrangler.toml --env staging --var "GIT_SHA:$GIT_SHA" 2>&1 | tee /tmp/staging-deploy.log
+      - name: Verify candidate staging health
+        id: health
+        env:
+          GIT_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          url="https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev/health"
+          deadline=$((SECONDS + 180))
+          while (( SECONDS < deadline )); do
+            status="$(curl --silent --show-error --max-time 10 --output /tmp/staging-candidate-health.json --write-out '%{http_code}' "$url" 2>/dev/null || true)"
+            if [[ "$status" == "200" ]] && node -e 'const h=require("/tmp/staging-candidate-health.json");if(h.ok&&h.environment==="staging"&&h.commit===process.env.GIT_SHA)process.exit(0);process.exit(1);'; then
+              echo "Candidate staging health confirmed exact commit $GIT_SHA."
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "Candidate staging health did not confirm exact commit."
+          exit 1
+      - name: Roll back staging and verify the exact previous version
+        if: always() && steps.previous.outputs.version_id != '' && steps.deploy.outcome != 'skipped'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.STAGING_CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.STAGING_CLOUDFLARE_ACCOUNT_ID }}
+          PREVIOUS_VERSION_ID: ${{ steps.previous.outputs.version_id }}
+          PREVIOUS_COMMIT: ${{ steps.previous.outputs.commit }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          url="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/irpa-google-drive-gateway-staging/deployments"
+          payload="$(node -e 'process.stdout.write(JSON.stringify({strategy:"percentage",versions:[{version_id:process.env.PREVIOUS_VERSION_ID,percentage:100}],annotations:{"workers/message":"Staging rollback verification for Court recovery repair"}}))')"
+          curl --fail --silent --show-error -X POST "$url" -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json" --data "$payload" >/tmp/staging-rollback.json
+          node -e 'const x=require("/tmp/staging-rollback.json");if(!x.success||x.result?.versions?.[0]?.version_id!==process.env.PREVIOUS_VERSION_ID)process.exit(1);console.log(JSON.stringify({restoredVersionId:process.env.PREVIOUS_VERSION_ID}));'
+          deadline=$((SECONDS + 180))
+          while (( SECONDS < deadline )); do
+            status="$(curl --silent --show-error --max-time 10 --output /tmp/staging-rollback-health.json --write-out '%{http_code}' https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev/health 2>/dev/null || true)"
+            if [[ "$status" == "200" ]] && node -e 'const h=require("/tmp/staging-rollback-health.json");if(h.ok&&h.environment==="staging"&&h.commit===process.env.PREVIOUS_COMMIT)process.exit(0);process.exit(1);'; then
+              echo "PASS: staging rollback restored previous commit $PREVIOUS_COMMIT."
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "FAIL: staging rollback did not restore previous health commit."
+          exit 1
