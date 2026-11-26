@@ -10,7 +10,7 @@ import { verifyCertificateInput, verifyCertificatePageText, extractPdfText } fro
 
 const isOwner=(envelope,user)=>Boolean(user?.uid)&&(envelope.createdBy===user.uid||envelope.createdByUid===user.uid||envelope.ownerUid===user.uid||user.isAdmin===true);
 async function getEnvelopeRecord(ctx,id){
-  const primary=await getEnvelopeRecord(ctx,id);
+  const primary=await ctx.meta.get("envelopes",id);
   if(primary)return primary;
   return await ctx.meta.get("signatureEnvelopes",id);
 }
