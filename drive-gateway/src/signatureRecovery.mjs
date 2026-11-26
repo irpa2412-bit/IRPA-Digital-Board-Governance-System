@@ -485,17 +485,13 @@ export function createSignatureRecoveryRouter({authenticateFirebaseRequest,getFi
         const limit=url.searchParams.get("limit");
         const offset=url.searchParams.get("offset");
         const diagnostic=url.searchParams.get("diagnostic")==="1";
-        const result=diagnostic
-          ? await getRecoveryQueue(ctx,user,{limit,offset,recordAccess:false})
-          : await getRecoveryQueue(ctx,user,{limit,offset});
+        const result=await getRecoveryQueue(ctx,user,{limit,offset,recordAccess:false});
         return json(result,200,corsHeaders(request));
       }
       const evidence=matchRecoveryEvidenceRoute(request.method,pathname);
       if(evidence) {
         const url=new URL(request.url);
-        const result=url.searchParams.get("diagnostic")==="1"
-          ? await assessRecoveryEvidence(ctx,user,decodeURIComponent(evidence[1]),{recordAccess:false})
-          : await assessRecoveryEvidence(ctx,user,decodeURIComponent(evidence[1]));
+        const result=await assessRecoveryEvidence(ctx,user,decodeURIComponent(evidence[1]),{recordAccess:false});
         return json(result,200,corsHeaders(request));
       }
       const completedCopy=pathname.match(/^\/api\/recovery\/envelopes\/([A-Za-z0-9_-]{3,64})\/completed-copy\.pdf$/);
