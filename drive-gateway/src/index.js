@@ -1371,32 +1371,117 @@ async function systemDiagnosticsRoute(request, env) {
 }
 
 async function getSignatureWorkflowListRoute(request, env) {
-  const claims = await authenticateFirebaseRequest(request, env);
-  const actorUid = String(claims.user_id || "").trim();
-  if (!actorUid) return json({ok:false,error:"Authenticated identity is required."},401,corsHeaders(request));
-  const token = await getFirestoreAdminAccessToken(env);
-  const adminProfile = await getFirestoreDocument(env, "adminProfiles/" + actorUid, token);
-  const isAdmin = String(claims.email || "").trim().toLowerCase() === "irpa2412@gmail.com" || Boolean(adminProfile?.fields?.active?.booleanValue === true && adminProfile?.fields?.role?.stringValue === "Administrator");
-  const query = async (fieldPath, op) => {
-    const response = await fetch("https://firestore.googleapis.com/v1/projects/" + getFirebaseProjectId(env) + "/databases/(default)/documents:runQuery", {
-      method:"POST", headers:{Authorization:"Bearer " + token,"Content-Type":"application/json"},
-      body:JSON.stringify({structuredQuery:{from:[{collectionId:"signatureEnvelopes"}],where:{fieldFilter:{field:{fieldPath},op,value:{stringValue:actorUid}}},limit:100}})
-    });
-    if (!response.ok) throw new Error("Unable to retrieve signing envelopes.");
-    return (await response.json()).filter(row=>row.document).map(row=>row.document);
-  };
-  const rows = isAdmin
-    ? await (async()=>{const response=await fetch("https://firestore.googleapis.com/v1/projects/"+getFirebaseProjectId(env)+"/databases/(default)/documents/signatureEnvelopes?pageSize=100",{headers:{Authorization:"Bearer "+token}});if(!response.ok)throw new Error("Unable to retrieve signing envelopes.");return (await response.json()).documents||[];})()
-    : (await Promise.all([query("participantUids","ARRAY_CONTAINS"),query("ownerUid","EQUAL"),query("senderUid","EQUAL")])).flat();
-  const unique = new Map(rows.map(row=>[String(row.name||"").split("/").pop(),row]));
-  const envelopes = [];
-  for (const [id,row] of unique) {
-    const envelope = {id,...(firestoreDocumentToPlain(row)||{})};
-    const filtered = filterSignatureEnvelopeForCaller(envelope,{authenticatedUid:actorUid,isAdmin});
-    if (filtered.allowed && !["Cancelled","Declined"].includes(String(envelope.status||""))) envelopes.push(filtered.view);
+  const requestId = crypto.randomUUID();
+  let claims;
+  try { claims = await authenticateFirebaseRequest(request, env); }
+  catch (error) {
+    const code = ["TOKEN_INVALID","PROFILE_LOOKUP_FAILED","NOT_ACTIVATED"].includes(error?.code) ? error.code : "TOKEN_INVALID";
+    const status = code === "PROFILE_LOOKUP_FAILED" ? 503 : code === "NOT_ACTIVATED" ? 403 : 401;
+    return json({ok:false,code,requestId},status,corsHeaders(request));
   }
-  envelopes.sort((a,b)=>String(b.updatedAt||b.createdAt||"").localeCompare(String(a.updatedAt||a.createdAt||"")));
-  return json({ok:true,envelopes},200,{...corsHeaders(request),"Cache-Control":"no-store"});
+  const actorUid = String(claims.user_id || "").trim();
+  if (!actorUid) return json({ok:false,code:"TOKEN_INVALID",requestId},401,corsHeaders(request));
+  try {
+    const token = await getFirestoreAdminAccessToken(env);
+    const adminProfile = await getFirestoreDocument(env, "adminProfiles/" + actorUid, token);
+    const institutional = await getInstitutionalProfileForUser(env, claims, token);
+    const toPlain = firestoreDocumentToPlain;
+    const active = record => {
+      const data = toPlain(record) || {};
+      const states = [data.status,data.registrationStatus,data.employmentStatus].map(v=>String(v||"").trim().toLowerCase());
+      return states.some(v=>v==="active"||v==="activated") && data.accountActivated !== false;
+    };
+    const rolesOf = record => {
+      const data = toPlain(record) || {};
+      return [data.role,data.designation,data.jobTitle,data.position,data.title,data.boardPosition,
+        ...(Array.isArray(data.roles)?data.roles:[]),
+        ...(Array.isArray(data.assignedRoles)?data.assignedRoles:[]),
+        ...(Array.isArray(data.selectedRoles)?data.selectedRoles:[]),
+        ...(Array.isArray(data.roleAssignments)?data.roleAssignments:[])]
+        .filter(Boolean).flatMap(v=>String(v).split(",").map(x=>x.trim().toLowerCase()).filter(Boolean));
+    };
+    const adminRole = adminProfile?.fields?.active?.booleanValue === true &&
+      String(adminProfile?.fields?.role?.stringValue||"").trim().toLowerCase()==="administrator";
+    const institutionalRoles = [institutional.memberRecord,institutional.employeeRecord]
+      .filter(Boolean).filter(active).flatMap(rolesOf);
+    const crossOwnerRoles = new Set(["administrator","executive director","director of internal oversight"]);
+    const canListAcrossOwners = adminRole || institutionalRoles.some(role=>crossOwnerRoles.has(role));
+    const personalProfile = await getFirestoreDocument(env,"signatureProfiles/"+actorUid,token)
+      .catch(()=>null);
+    const profileEmails = ["email","primaryEmail","secondaryEmail","alternateEmail","personalEmail","workEmail","contactEmail"]
+      .map(key=>String(personalProfile?.fields?.[key]?.stringValue||"").trim().toLowerCase()).filter(Boolean);
+    if (claims.firebaseClaims?.emailVerified && claims.email) profileEmails.push(String(claims.email).trim().toLowerCase());
+    const authenticatedEmails = [...new Set(profileEmails)];
+
+    const queryField = async (collectionId,fieldPath,op,value) => {
+      const rows=[];
+      let cursor=null;
+      let pages=0;
+      while(true) {
+        const structuredQuery={
+          from:[{collectionId}],
+          where:{fieldFilter:{field:{fieldPath},op,value:op==="ARRAY_CONTAINS"?{stringValue:value}:{stringValue:value}}},
+          orderBy:[{field:{fieldPath:"__name__"},direction:"ASCENDING"}],
+          limit:100
+        };
+        if(cursor) structuredQuery.startAt={values:[{referenceValue:cursor}],before:false};
+        const response=await fetch("https://firestore.googleapis.com/v1/projects/"+getFirebaseProjectId(env)+"/databases/(default)/documents:runQuery",{
+          method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},
+          body:JSON.stringify({structuredQuery})
+        });
+        if(!response.ok) throw new Error("Unable to query signing envelopes by "+fieldPath+".");
+        const result=await response.json();
+        const page=(Array.isArray(result)?result:[]).filter(row=>row.document).map(row=>row.document);
+        rows.push(...page);
+        if(page.length<100)break;
+        cursor=page[page.length-1].name;
+        pages+=1;
+        if(pages>1000)throw new Error("Signing-envelope cursor pagination safety limit exceeded.");
+      }
+      return rows;
+    };
+    const queryOwnerUids = new Set([actorUid]);
+    if(canListAcrossOwners) {
+      const readActiveOwners = async collectionId => {
+        const rows=[];
+        for(const fieldPath of ["status","registrationStatus","employmentStatus"]) {
+          for(const value of ["Active","Activated"]) {
+            try { rows.push(...await queryField(collectionId,fieldPath,"EQUAL",value)); }
+            catch(error) { if(!/Unable to query signing envelopes/.test(String(error?.message||""))) throw error; }
+          }
+        }
+        for(const row of rows) {
+          const data=toPlain(row)||{};
+          if(active(row)) queryOwnerUids.add(String(data.uid||row.name.split("/").pop()));
+        }
+      };
+      await Promise.all([readActiveOwners("members"),readActiveOwners("employees")]);
+    }
+    const rows=[];
+    for(const ownerUid of queryOwnerUids) {
+      const [byOwner,bySender,byParticipant]=await Promise.all([
+        queryField("signatureEnvelopes","ownerUid","EQUAL",ownerUid),
+        queryField("signatureEnvelopes","senderUid","EQUAL",ownerUid),
+        queryField("signatureEnvelopes","participantUids","ARRAY_CONTAINS",ownerUid)
+      ]);
+      rows.push(...byOwner,...bySender,...byParticipant);
+    }
+    const unique=new Map(rows.map(row=>[String(row.name||"").split("/").pop(),row]));
+    const envelopes=[];
+    for(const [id,row] of unique) {
+      const envelope={id,...(toPlain(row)||{})};
+      // Re-authorize every fetched record before serializing it.
+      const filtered=filterSignatureEnvelopeForCaller(envelope,{
+        authenticatedUid:actorUid,authenticatedEmails,isAdmin:canListAcrossOwners
+      });
+      if(filtered.allowed) envelopes.push(filtered.view);
+    }
+    envelopes.sort((a,b)=>String(b.updatedAt||b.createdAt||"").localeCompare(String(a.updatedAt||a.createdAt||"")));
+    return json({ok:true,requestId,totalScanned:unique.size,envelopes},200,{...corsHeaders(request),"Cache-Control":"no-store"});
+  } catch (error) {
+    console.error("Signature workflow list failed",{requestId,code:String(error?.code||"PROFILE_LOOKUP_FAILED")});
+    return json({ok:false,code:"PROFILE_LOOKUP_FAILED",requestId},503,corsHeaders(request));
+  }
 }
 
 async function getSignatureWorkflowViewRoute(request, env) {
