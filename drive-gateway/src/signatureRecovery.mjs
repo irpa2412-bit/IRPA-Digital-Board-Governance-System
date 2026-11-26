@@ -464,11 +464,9 @@ export function createSignatureRecoveryRouter({authenticateFirebaseRequest,getFi
     }
     const uid=String(claims?.user_id||"").trim();
     if(!uid)return json({ok:false,error:"A valid IRPA sign-in is required."},401,corsHeaders(request));
-    const profile=await getFirestoreDocument(env,"adminProfiles/"+uid,claims.token).catch(()=>null);
-    const isAdmin=claims.admin===true||String(claims.email||"").trim().toLowerCase()==="irpa2412@gmail.com"||profile?.fields?.active?.booleanValue===true;
-    const user={uid,isAdmin};
-    const ctx=buildContext(env,claims,user);
+    const user={uid};
     try {
+      const ctx=await buildContext(env,claims,user);
       if(emergencyPath){
         const result=await buildEmergencyRetrieval(ctx,user,decodeURIComponent(emergencyPath[1]));
         if(!result.ok){const denied=result.status===403;const code=denied?"NOT_OWNER":"EMERGENCY_RETRIEVAL_FAILED:"+String(result.failureCode||"UNKNOWN");const explanation=EMERGENCY_FAILURE_EXPLANATIONS[result.failureCode||"UNKNOWN"];return json({ok:false,code,requestId,stages:result.stages,error:denied?"This envelope belongs to another owner.":explanation[0]+" / "+explanation[1]},result.status||500,corsHeaders(request));}
