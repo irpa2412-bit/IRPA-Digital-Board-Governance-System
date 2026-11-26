@@ -3537,6 +3537,8 @@ async function authenticateFirebaseRequest(request, env, options = {}) {
   if (!match) {
     const error = new Error("Firebase authentication is required.");
     error.status = 401;
+    error.code = "TOKEN_INVALID";
+    error.requestId = requestId;
     throw error;
   }
 
@@ -3555,6 +3557,8 @@ async function authenticateFirebaseRequest(request, env, options = {}) {
   } catch (cause) {
     const error = new Error("Firebase ID token is invalid, expired, or not issued for this production project.");
     error.status = 401;
+    error.code = "TOKEN_INVALID";
+    error.requestId = requestId;
     error.cause = cause;
     throw error;
   }
