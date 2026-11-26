@@ -76,6 +76,7 @@ test("PWA worker activates immediately, claims clients, versions its cache and b
  assert.doesNotMatch(install,/serviceWorker\\.register/);
 });
 test("authentication diagnostics preserve the four required stable error codes and request IDs",()=>{
+ const route="/api/recovery/envelopes/ENV-0000000000000000/evidence";
  for(const code of ["TOKEN_INVALID","PROFILE_LOOKUP_FAILED","NOT_ACTIVATED","NOT_OWNER"]){
   assert.match(formatRecoveryRouteError({status:403,body:{code,error:"Access denied",requestId:"req-fixture"},button:"Refresh recovery queue",route}),new RegExp(code));
   assert.match(formatRecoveryRouteError({status:403,body:{code,error:"Access denied",requestId:"req-fixture"},button:"Refresh recovery queue",route}),/Request ID: req-fixture/);
