@@ -40,6 +40,7 @@ import { createDocumentLifecycleRouter } from "./documentLifecycle.mjs";
 import { canProvisionSignatureProfileFolder } from "./signatureProfileAuthorization.mjs";
 import { canReadSignatureAsset, canReadFirestoreSignatureAsset, canUploadSignedDocument } from "./signatureAssetAuthorization.mjs";
 import { filterSignatureEnvelopeForCaller } from "./signatureWorkflowVisibility.mjs";
+import { normalizeSignatureEnvironment } from "./signatureEnvironment.mjs";
 
 import { InvitationRedemptionError, redeemInvitationToken, confirmInvitationPasswordSetup, getInvitationSessionState } from "./invitationRedemption.mjs";
 import { buildGoogleDriveAuthorizationParams } from "./googleDriveOAuth.mjs";
@@ -1457,6 +1458,12 @@ async function getSignatureWorkflowListRoute(request, env) {
       };
       await Promise.all([readActiveOwners("members"),readActiveOwners("employees")]);
     }
+    const requestUrl=new URL(request.url);
+    const rawEnvironment=requestUrl.searchParams.get("environment");
+    const requestedEnvironment=rawEnvironment===null?null:normalizeSignatureEnvironment({recordOrigin:rawEnvironment}).environment;
+    if(rawEnvironment!==null&&requestedEnvironment==="UNKNOWN"&&String(rawEnvironment).trim().toUpperCase()!=="UNKNOWN"){
+      return json({ok:false,code:"INVALID_ENVIRONMENT_FILTER",requestId},400,corsHeaders(request));
+    }
     const rows=[];
     for(const ownerUid of queryOwnerUids) {
       const [byOwner,bySender,byParticipant]=await Promise.all([
@@ -1470,14 +1477,16 @@ async function getSignatureWorkflowListRoute(request, env) {
     const envelopes=[];
     for(const [id,row] of unique) {
       const envelope={id,...(toPlain(row)||{})};
+      const normalizedEnvironment=normalizeSignatureEnvironment(envelope);
+      if(requestedEnvironment&&normalizedEnvironment.environment!==requestedEnvironment)continue;
       // Re-authorize every fetched record before serializing it.
       const filtered=filterSignatureEnvelopeForCaller(envelope,{
         authenticatedUid:actorUid,authenticatedEmails,isAdmin:canListAcrossOwners
       });
-      if(filtered.allowed) envelopes.push(filtered.view);
+      if(filtered.allowed) envelopes.push({...filtered.view,normalizedEnvironment:normalizedEnvironment.environment,environmentSources:normalizedEnvironment.sources});
     }
     envelopes.sort((a,b)=>String(b.updatedAt||b.createdAt||"").localeCompare(String(a.updatedAt||a.createdAt||"")));
-    return json({ok:true,requestId,totalScanned:unique.size,envelopes},200,{...corsHeaders(request),"Cache-Control":"no-store"});
+    return json({ok:true,requestId,environmentFilter:requestedEnvironment||"ALL",totalScanned:unique.size,envelopes},200,{...corsHeaders(request),"Cache-Control":"no-store"});
   } catch (error) {
     console.error("Signature workflow list failed",{requestId,code:String(error?.code||"PROFILE_LOOKUP_FAILED")});
     return json({ok:false,code:"PROFILE_LOOKUP_FAILED",requestId},503,corsHeaders(request));
