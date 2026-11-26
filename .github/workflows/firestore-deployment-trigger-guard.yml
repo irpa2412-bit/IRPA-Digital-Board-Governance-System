@@ -22,3 +22,32 @@ jobs:
           node-version: 22
       - name: Reject automatic Firestore publication paths
         run: node scripts/check-firestore-deploy-triggers.mjs
+      - name: Check production access verification Node script syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          import subprocess
+          import tempfile
+          import textwrap
+
+          source = Path(".github/workflows/production-access-verification.yml").read_text(encoding="utf-8")
+          scripts = re.findall(r"(?ms)^[ \t]*node <<'NODE'[ \t]*\n(.*?)^[ \t]*NODE[ \t]*$", source)
+          if len(scripts) != 2:
+              raise SystemExit(f"Expected 2 inline Node scripts; found {len(scripts)}.")
+
+          for number, block in enumerate(scripts, 1):
+              with tempfile.NamedTemporaryFile(mode="w", suffix=".cjs", encoding="utf-8") as script:
+                  script.write(textwrap.dedent(block))
+                  script.flush()
+                  result = subprocess.run(["node", "--check", script.name], text=True, capture_output=True)
+                  if result.returncode:
+                      print(f"Inline Node script {number} failed node --check:")
+                      print(result.stdout)
+                      print(result.stderr)
+                      raise SystemExit(result.returncode)
+
+          print("PASS: Node 22 syntax check accepted both production access verification scripts.")
+          PY

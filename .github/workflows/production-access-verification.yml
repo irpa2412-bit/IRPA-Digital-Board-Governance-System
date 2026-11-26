@@ -18,13 +18,58 @@ jobs:
       ADMIN_EMAIL: ${{ secrets.PROD_TEST_ADMIN_EMAIL }}
       ADMIN_PASSWORD: ${{ secrets.PROD_TEST_ADMIN_PASSWORD }}
       SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
-      EXPECTED_MEMBER_UID: 35DB21ai9ERpshQ3FKa51ilOqxm1
       WORKER: https://irpa-google-drive-gateway.irpa-governance.workers.dev
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+      - name: Validate every inline Node heredoc syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          import tempfile
+          import textwrap
+
+          workflow = Path(".github/workflows/production-access-verification.yml")
+          lines = workflow.read_text(encoding="utf-8").splitlines()
+          scripts = []
+          index = 0
+          while index < len(lines):
+              if lines[index].strip() == "node <<'NODE'":
+                  indent = len(lines[index]) - len(lines[index].lstrip())
+                  body = []
+                  index += 1
+                  while index < len(lines):
+                      line = lines[index]
+                      if line.strip() == "NODE" and len(line) - len(line.lstrip()) == indent:
+                          break
+                      body.append(line)
+                      index += 1
+                  if index >= len(lines):
+                      raise SystemExit("Unterminated inline Node heredoc.")
+                  scripts.append(textwrap.dedent("\n".join(body)) + "\n")
+              index += 1
+
+          if len(scripts) != 2:
+              raise SystemExit(f"Expected 2 inline Node heredocs, found {len(scripts)}.")
+
+          for number, source in enumerate(scripts, 1):
+              with tempfile.NamedTemporaryFile(mode="w", suffix=".cjs", encoding="utf-8") as script:
+                  script.write(source)
+                  script.flush()
+                  result = subprocess.run(["node", "--check", script.name], text=True, capture_output=True)
+                  if result.returncode:
+                      print(f"Inline Node script {number} failed node --check:")
+                      print(result.stdout)
+                      print(result.stderr)
+                      raise SystemExit(result.returncode)
+
+          print(f"PASS: node --check accepted all {len(scripts)} inline Node heredoc scripts.")
+          PY
       - name: Validate required member secrets (never print values)
         shell: bash
         run: |
@@ -41,6 +86,7 @@ jobs:
         run: |
           set -euo pipefail
           node <<'NODE'
+          (async () => {
           const fs=require("node:fs"), crypto=require("node:crypto");
           const project=process.env.PROJECT;
           const base=`https://firestore.googleapis.com/v1/projects/${project}/databases/(default)/documents`;
@@ -54,7 +100,13 @@ jobs:
             const r=await fetch("https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key="+encodeURIComponent(process.env.API_KEY),{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({email,password,returnSecureToken:true})});
             const j=await r.json().catch(()=>({}));
             if(!r.ok||!j.idToken||!j.localId)throw Error("sign-in HTTP "+r.status);
-            return {token:j.idToken,uid:j.localId,email:String(j.email||email).toLowerCase()};
+            const parts=j.idToken.split(".");
+            if(parts.length!==3)throw Error("Firebase returned a malformed ID token.");
+            let claims;
+            try{claims=JSON.parse(Buffer.from(parts[1],"base64url").toString("utf8"));}catch{throw Error("Firebase ID token claims could not be decoded.");}
+            const uid=claims.sub;
+            if(!uid||uid!==j.localId||claims.aud!==project||claims.iss!=="https://securetoken.google.com/"+project||!Number.isFinite(claims.exp)||claims.exp<=Math.floor(Date.now()/1000))throw Error("Firebase ID token UID or project claims failed validation.");
+            return {token:j.idToken,uid,email:String(j.email||email).toLowerCase()};
           };
           const req=(url,token,method="GET",body)=>fetch(url,{method,headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},...(body===undefined?{}:{body:JSON.stringify(body)})});
           const get=async(path,token)=>{const r=await req(base+"/"+path,token);if(r.status===404)return null;if(!r.ok)throw Error("Firestore GET HTTP "+r.status);return r.json();};
@@ -79,8 +131,8 @@ jobs:
             serviceTokenCache=j.access_token; return serviceTokenCache;
           }
           async function ensureTestMemberProfile(){
-            const uid=process.env.EXPECTED_MEMBER_UID;
-            if(member.uid!==uid)throw Error("Authenticated member UID does not match the approved test UID.");
+            const uid=member?.uid;
+            if(!uid)throw Error("Authenticated Firebase ID token did not provide a UID.");
             let existing=await get("members/"+uid,member.token);
             if(existing){
               const fields=existing.fields||{};
@@ -110,9 +162,14 @@ jobs:
           try {
             try {
               member=await auth(process.env.MEMBER_EMAIL,process.env.MEMBER_PASSWORD);
+              fs.appendFileSync(process.env.GITHUB_ENV,"IRPA_TEST_UID="+member.uid+"\n");
               add("Member Firebase sign-in","200","200",true,true);
             } catch(e){add("Member Firebase sign-in","200",e.message,false,true);}
             if(member){
+              try {
+                const legacy=await get("members/35DB21ai9ERpshQ3FKa51ilOqxm1",await serviceAccountToken());
+                add("Legacy UID profile residue","ABSENT",legacy?"EXISTS: members/35DB21ai9ERpshQ3FKa51ilOqxm1 (read-only; not modified)":"ABSENT: members/35DB21ai9ERpshQ3FKa51ilOqxm1",!legacy,true);
+              } catch(e) { add("Legacy UID profile residue","ABSENT",e.message,false,false); }
               try { add("Test member profile","active role=Member; testAccount=true",await ensureTestMemberProfile(),true,true); }
               catch(e){add("Test member profile","active role=Member; testAccount=true",e.message,false,true);}
               add("Member attendance Worker call","isolated test meeting + complete fixture cleanup","SKIPPED: no safe isolated fixture/cleanup contract; no live meeting attendance was touched",true,false);
@@ -187,9 +244,11 @@ jobs:
               }catch(e){add("Allowed-write cleanup","exact restoration",e.message,false,true);}
             } else add("Allowed-write cleanup","no residual temporary field","not written / not required",true,true);
 
-            // Final cleanup is restricted to the single approved UID and exact testAccount=true marker.
+            // Final cleanup is restricted to the UID from the authenticated Firebase ID token
+            // and the exact testAccount=true marker. Never fall back to a configured/static UID.
             try {
-              const uid=process.env.EXPECTED_MEMBER_UID, adminToken=await serviceAccountToken(), path="members/"+uid;
+              if(!member?.uid)throw Error("Skipped: no authenticated Firebase ID-token UID is available; no profile was targeted.");
+              const uid=member.uid, adminToken=await serviceAccountToken(), path="members/"+uid;
               const current=await get(path,adminToken);
               if(current?.fields?.testAccount?.booleanValue===true){
                 const del=await req(base+"/"+path,adminToken,"DELETE");
@@ -205,7 +264,7 @@ jobs:
                 productionWrites.push({record:path,action:"ABSENT",detail:"no profile remains"});
                 add("Test profile final cleanup","delete only if testAccount=true","ABSENT: no profile remains",true,true);
               }
-            }catch(e){console.error("TEST PROFILE CLEANUP FAILED: "+e.message);add("Test profile final cleanup","members/"+process.env.EXPECTED_MEMBER_UID+" deleted only if testAccount=true",e.message,false,true);}
+            }catch(e){console.error("TEST PROFILE CLEANUP FAILED: "+e.message);add("Test profile final cleanup","signed-in token UID; delete only if testAccount=true",e.message,false,true);}
 
             const testTable=["| test | expected | actual | pass/fail |","|---|---|---|---|",...rows.map(x=>`| ${x.t} | ${x.e} | ${x.a.replace(/\\|/g,"/")} | ${x.p?"PASS":"FAIL"} |`)].join("\n");
             const remaining=productionWrites.some(x=>x.action==="PRESERVED")?"One or more records were preserved; inspect rows above":"NONE";
@@ -215,6 +274,10 @@ jobs:
             fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,"## Production verification results\n\n"+testTable+"\n\n## Final production writes\n\n"+writeTable+"\n");
             if(memberFailures.length){console.error("Member test failures: "+memberFailures.join(", "));process.exitCode=1;}
           }
+          })().catch((error) => {
+            console.error("Inline Node task failed:", error);
+            process.exitCode = 1;
+          });
           NODE
       - name: Final test-profile cleanup (always)
         if: always()
@@ -222,12 +285,26 @@ jobs:
         env:
           SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
           PROJECT: irpa-digital-board-governance
-          TEST_UID: 35DB21ai9ERpshQ3FKa51ilOqxm1
+          API_KEY: ${{ secrets.FIREBASE_WEB_API_KEY }}
+          MEMBER_EMAIL: ${{ secrets.PROD_TEST_MEMBER_EMAIL }}
+          MEMBER_PASSWORD: ${{ secrets.PROD_TEST_MEMBER_PASSWORD }}
         run: |
           set -euo pipefail
           node <<'NODE'
+          (async () => {
           const crypto=require("node:crypto");
-          const project=process.env.PROJECT, uid=process.env.TEST_UID, raw=process.env.SERVICE_ACCOUNT_JSON;
+          const fs=require("node:fs");
+          const project=process.env.PROJECT, raw=process.env.SERVICE_ACCOUNT_JSON;
+          if(!process.env.API_KEY||!process.env.MEMBER_EMAIL||!process.env.MEMBER_PASSWORD) throw Error("Final cleanup blocked: member sign-in credentials are unavailable; no profile was targeted.");
+          const signIn=await fetch("https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key="+encodeURIComponent(process.env.API_KEY),{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({email:process.env.MEMBER_EMAIL,password:process.env.MEMBER_PASSWORD,returnSecureToken:true})});
+          const signed=await signIn.json().catch(()=>({}));
+          if(!signIn.ok||!signed.idToken||!signed.localId) throw Error("Final cleanup member sign-in failed (HTTP "+signIn.status+"); no profile was targeted.");
+          const tokenParts=signed.idToken.split(".");
+          if(tokenParts.length!==3) throw Error("Final cleanup received a malformed Firebase ID token.");
+          let claims;
+          try{claims=JSON.parse(Buffer.from(tokenParts[1],"base64url").toString("utf8"));}catch{throw Error("Final cleanup could not decode Firebase ID-token claims.");}
+          const uid=claims.sub;
+          if(!uid||uid!==signed.localId||uid!==process.env.IRPA_TEST_UID||claims.aud!==project||claims.iss!=="https://securetoken.google.com/"+project||!Number.isFinite(claims.exp)||claims.exp<=Math.floor(Date.now()/1000)) throw Error("Final cleanup Firebase ID-token UID/project claims failed validation or does not match the UID used by the verification step.");
           if(!raw) throw Error("Final cleanup blocked: production service-account secret is unavailable.");
           const sa=JSON.parse(raw), now=Math.floor(Date.now()/1000);
           if(sa.project_id!==project||!sa.client_email||!sa.private_key) throw Error("Final cleanup blocked: service-account project/key metadata mismatch.");
@@ -240,18 +317,23 @@ jobs:
           const base=`https://firestore.googleapis.com/v1/projects/${project}/databases/(default)/documents/members/${uid}`;
           const headers={Authorization:"Bearer "+tj.access_token,"Content-Type":"application/json"};
           const read=await fetch(base,{headers});
+          const legacyUid="35DB21ai9ERpshQ3FKa51ilOqxm1";
+          const legacyRead=await fetch(`https://firestore.googleapis.com/v1/projects/${project}/databases/(default)/documents/members/${legacyUid}`,{headers});
+          if(legacyRead.status===404) console.log("LEGACY UID CHECK: members/"+legacyUid+" ABSENT (read-only).");
+          else if(legacyRead.ok) console.error("LEGACY UID CHECK: members/"+legacyUid+" EXISTS (read-only; no change made).");
+          else throw Error("Legacy UID read-only verification failed (HTTP "+legacyRead.status+").");
           if(read.status===404){
             const table="| production record | action | detail |\\n|---|---|---|\\n| members/"+uid+" | ABSENT | final cleanup verified no profile remains |";
             console.log("FINAL PRODUCTION WRITES\\n"+table);
-            require("node:fs").appendFileSync(process.env.GITHUB_STEP_SUMMARY,"\\n## Final cleanup verification\\n\\n"+table+"\\n");
-            process.exit(0);
+            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,"\\n## Final cleanup verification\\n\\n"+table+"\\n");
+            return;
           }
           if(!read.ok) throw Error("Final cleanup profile read failed (HTTP "+read.status+").");
           const doc=await read.json();
           if(doc.fields?.testAccount?.booleanValue!==true){
             const table="| production record | action | detail |\\n|---|---|---|\\n| members/"+uid+" | PRESERVED | testAccount is not exactly true; no deletion performed |";
             console.error("FINAL PRODUCTION WRITES\\n"+table);
-            require("node:fs").appendFileSync(process.env.GITHUB_STEP_SUMMARY,"\\n## Final cleanup verification\\n\\n"+table+"\\n");
+            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,"\\n## Final cleanup verification\\n\\n"+table+"\\n");
             throw Error("Test profile remains but testAccount is not exactly true; safety guard preserved it.");
           }
           const del=await fetch(base,{method:"DELETE",headers});
@@ -260,5 +342,9 @@ jobs:
           if(verify.status!==404) throw Error("Final cleanup verification failed; test profile still exists (HTTP "+verify.status+").");
           const table="| production record | action | detail |\\n|---|---|---|\\n| members/"+uid+" | DELETED | deleted only after testAccount == true; absence verified |";
           console.log("FINAL PRODUCTION WRITES\\n"+table);
-          require("node:fs").appendFileSync(process.env.GITHUB_STEP_SUMMARY,"\\n## Final cleanup verification\\n\\n"+table+"\\n");
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,"\\n## Final cleanup verification\\n\\n"+table+"\\n");
+          })().catch((error) => {
+            console.error("Inline Node task failed:", error);
+            process.exitCode = 1;
+          });
           NODE
