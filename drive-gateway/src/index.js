@@ -226,6 +226,12 @@ const signatureRecoveryRouter = createSignatureRecoveryRouter({
       async list(collection) {
         if (!allowedCollections.has(collection)) throw new Error("Recovery Firestore collection is not permitted.");
         return listFirestoreCollectionDocuments(env, collection, adminToken);
+      },
+      async query(collection, fieldPath, op, value) {
+        if (!allowedCollections.has(collection)) throw new Error("Recovery Firestore collection is not permitted.");
+        if (!["ownerUid","senderUid","participantUids"].includes(fieldPath)) throw new Error("Recovery Firestore query field is not permitted.");
+        if (!["EQUAL","ARRAY_CONTAINS"].includes(op)) throw new Error("Recovery Firestore query operator is not permitted.");
+        return queryFirestoreCollectionDocuments(env, collection, fieldPath, op, value, adminToken);
       }
     };
     return ctx;
@@ -4006,6 +4012,40 @@ async function getFirestoreDocument(env, path, firebaseToken) {
     throw new Error(`Firestore GET ${path} failed: HTTP ${response.status} ${googleStatus} ${googleMessage}`);
   }
   return response.json();
+}
+
+async function queryFirestoreCollectionDocuments(env, collectionName, fieldPath, operator, value, firebaseToken) {
+  const rows=[];
+  let cursor=null;
+  let pages=0;
+  while(true) {
+    const structuredQuery={
+      from:[{collectionId:collectionName}],
+      where:{fieldFilter:{field:{fieldPath},op:operator,value:{stringValue:String(value)}}},
+      orderBy:[{field:{fieldPath:"__name__"},direction:"ASCENDING"}],
+      limit:100
+    };
+    if(cursor)structuredQuery.startAt={values:[{referenceValue:cursor}],before:false};
+    const response=await fetch("https://firestore.googleapis.com/v1/projects/"+getFirebaseProjectId(env)+"/databases/(default)/documents:runQuery",{
+      method:"POST",headers:{Authorization:"Bearer "+firebaseToken,"Content-Type":"application/json"},
+      body:JSON.stringify({structuredQuery})
+    });
+    if(!response.ok){
+      const error=new Error("Unable to query Firestore "+collectionName+" by "+fieldPath+".");
+      error.status=response.status;error.code="FIRESTORE_QUERY_FAILED";throw error;
+    }
+    const result=await response.json();
+    const page=(Array.isArray(result)?result:[]).filter(item=>item.document).map(item=>{
+      const document=item.document;
+      return {...(firestoreDocumentToPlain(document)||{}),id:String(document.name||"").split("/").pop()};
+    });
+    rows.push(...page);
+    if(page.length<100)break;
+    cursor=String(result.filter(item=>item.document).at(-1)?.document?.name||"");
+    if(!cursor)throw new Error("Firestore query cursor missing.");
+    pages+=1;if(pages>1000)throw new Error("Firestore query pagination safety limit exceeded.");
+  }
+  return rows;
 }
 
 async function listFirestoreCollectionDocuments(env, collectionName, firebaseToken) {
