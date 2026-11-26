@@ -843,7 +843,7 @@ test("inactive canonical institutional records remain blocked by portal activati
           }
         }]),{status:200});
       }
-      if(collection==="employees") return new Response(JSON.stringify([]),{status:200});
+      if(collection==="employees" || collection==="signatureProfiles") return new Response(JSON.stringify([]),{status:200});
     }
 
     throw new Error("Unexpected external request: "+target);
