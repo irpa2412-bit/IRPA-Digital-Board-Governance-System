@@ -277,7 +277,7 @@ export async function buildRecoveryPreview(ctx,user,id){
 const EMERGENCY_COPY_LABEL="EMERGENCY-RETRIEVAL-COPY, NOT ARCHIVED";
 const EMERGENCY_COPY_DISCLAIMER="Cryptographic PDF seal: NOT APPLIED. Emergency retrieval copy, not archived.";
 const emergencyOwner=(envelope,user)=>Boolean(user?.uid)&&(envelope.createdBy===user.uid||envelope.createdByUid===user.uid||envelope.ownerUid===user.uid||envelope.senderUid===user.uid||user.isAdmin===true);
-async function appendEmergencyCertificatePage(bytes,events,signers,completedAt){
+async function appendEmergencyCertificatePage(bytes,events,signers,completedAt,envelopeStatus){
   const pdf=await PDFDocument.load(bytes);
   let page=pdf.addPage([612,792]);
   const font=await pdf.embedFont(StandardFonts.Helvetica);
@@ -301,6 +301,7 @@ async function appendEmergencyCertificatePage(bytes,events,signers,completedAt){
   };
   write(EMERGENCY_COPY_LABEL,12,true); y-=8;
   write(EMERGENCY_COPY_DISCLAIMER,9,true);
+  write("Envelope status: "+envelopeStatus+" — THIS RETRIEVAL DOES NOT MARK IT COMPLETED",8,true);
   write("Completion timestamp: "+completedAt,8);
   write("Verified signer names:",8,true);
   for(const signer of signers)write(signer.name,7.5);
@@ -344,7 +345,8 @@ const EMERGENCY_FAILURE_EXPLANATIONS={
   TIMEOUT:["The recovery operation exceeded its execution time limit.","Operesheni ya urejeshaji imezidi muda wa utekelezaji."],
   UNKNOWN:["The recovery operation failed an unclassified verification step.","Operesheni ya urejeshaji imeshindwa katika hatua ya uthibitishaji isiyotambuliwa."]
 };
-const EMERGENCY_UNARCHIVED_LABEL="UNARCHIVED COPY. Certificate page not verified. Audit chain, source hash and 12 stamps verified. The envelope is NOT Completed.";
+const EMERGENCY_UNARCHIVED_LABEL="UNARCHIVED COPY. Certificate page not verified. Audit chain, source hash and signature fields verified. The envelope is NOT Completed.";
+const PARTIAL_SIGNED_EVIDENCE_LABEL="PARTIAL SIGNED-EVIDENCE COPY — NOT COMPLETED OR ARCHIVED. Pending signers have not signed.";
 function safeRecoveryErrorClass(error){
   const value=String(error?.name||"Error");
   return /^[A-Za-z][A-Za-z0-9]{0,47}$/.test(value)?value:"Error";
@@ -366,7 +368,7 @@ export async function buildEmergencyRetrieval(ctx,user,id,{extractText=extractPd
     const envelope=await getRecoveryEnvelope(ctx,id);
     if(!envelope)throw Object.assign(new Error("Recovery record not found."),{status:404});
     if(!emergencyOwner(envelope,user))throw Object.assign(new Error("This envelope belongs to another owner."),{status:403});
-    if(envelope.status!=="CompletionFailed")throw Object.assign(new Error("Only failed-completion envelopes are eligible for emergency retrieval."),{status:409});
+    if(!["CompletionFailed","InProgress"].includes(String(envelope.status||"")))throw Object.assign(new Error("Only InProgress or CompletionFailed envelopes are eligible for read-only emergency evidence retrieval."),{status:409});
     let document;
     try{document=envelope.__source==="firestore"&&ctx.firestore?.get?await ctx.firestore.get("documents",envelope.documentId):await ctx.meta.get("documents",envelope.documentId);}catch(error){return fail("SOURCE_READ",error);}
     const sourceStorageId=document?.primaryStorageId||document?.storageId||document?.driveFileId||document?.fileId||envelope.primaryStorageId||envelope.sourcePdfStorageId||null;
@@ -387,7 +389,7 @@ export async function buildEmergencyRetrieval(ctx,user,id,{extractText=extractPd
     stage("AUDIT_CHAIN","PASS");
     let assessment;
     try{assessment=await assessRecoveryEvidence(ctx,user,id,{recordAccess:false});}catch(error){return fail("STAMP_LOAD",error);}
-    if(assessment.stampSlots.length!==12||assessment.stampSlots.some(row=>row.status!=="VERIFIED_EXISTING"))return fail("STAMP_LOAD",new Error("STAMP_EVIDENCE_NOT_12_FULLY_VERIFIED_STAMPS"));
+    if(assessment.stampSlots.length===0||assessment.stampSlots.some(row=>row.status!=="VERIFIED_EXISTING"))return fail("STAMP_LOAD",new Error("SIGNATURE_FIELD_EVIDENCE_NOT_FULLY_VERIFIED"));
     stage("STAMP_LOAD","PASS");
     const verifiedIds=new Set(assessment.stampSlots.map(row=>row.fieldId));
     const fields=(envelope.fields||[]).filter(field=>verifiedIds.has(field.fieldId));
@@ -395,7 +397,7 @@ export async function buildEmergencyRetrieval(ctx,user,id,{extractText=extractPd
     if(!signers.length)return fail("PDF_BUILD",new Error("NO_VERIFIED_SIGNERS"));
     const completionEvent=[...events].reverse().find(event=>/^(envelope|document|signing)[._-]?(completed|complete)$/i.test(String(event.type||""))&&typeof event.at==="string");
     const completedAt=completionEvent?.at||"NOT RECORDED";
-    const info={envelopeId:envelope.id,documentId:envelope.documentId,title:envelope.title||"",originalHash:sourceHash,chainHead:events.at(-1)?.hash||"GENESIS",completedAt,signers,fields,events};
+    const info={envelopeId:envelope.id,documentId:envelope.documentId,title:envelope.title||"",originalHash:sourceHash,chainHead:events.at(-1)?.hash||"GENESIS",completedAt,envelopeStatus:envelope.status,signers,fields,events};
     let inputCheck;
     try{inputCheck=verifyCertificateInput(info,events,signers);}catch(error){return fail("CERT_VERIFY",error);}
     if(!inputCheck.ok)return fail("CERT_VERIFY",new Error("VERIFIED_BUILDER_INPUT_MISMATCH"));
@@ -405,7 +407,7 @@ export async function buildEmergencyRetrieval(ctx,user,id,{extractText=extractPd
     stage("PDF_BUILD","PASS");
     stage("STAMP_RENDER","PASS");
     let output;
-    try{output=await appendEmergencyCertificatePage(built,events,signers,completedAt);}catch(error){return fail("PDF_BUILD",error);}
+    try{output=await appendEmergencyCertificatePage(built,events,signers,completedAt,envelope.status);}catch(error){return fail("PDF_BUILD",error);}
     if(!(output instanceof Uint8Array)||output.byteLength>MAX_PDF_BYTES)return fail("SIZE_LIMIT",new RangeError("RECOVERY_PDF_SIZE_LIMIT"));
     stage("SIZE_LIMIT","PASS");
     let certificateVerified=true,pageText=null;
@@ -428,8 +430,8 @@ export async function buildEmergencyRetrieval(ctx,user,id,{extractText=extractPd
     try{outputHash=await sha256Hex(output);}catch(error){return fail("OUTPUT_SHA256",error);}
     stage("OUTPUT_SHA256","PASS");
     stage("TIMEOUT","PASS");
-    const label=certificateVerified?EMERGENCY_COPY_LABEL:EMERGENCY_UNARCHIVED_LABEL;
-    return {ok:true,bytes:output,outputHash,stages,label,certificateVerified,sourceHash,auditChainStatus:"PASS",stampResults:assessment.stampSlots.map(row=>({fieldId:row.fieldId,page:row.page,status:"PASS"})),environmentDiagnostics:assessment.environmentDiagnostics,signerSummary:(envelope.signers||[]).filter(signer=>events.some(event=>event.type==="signer.signed"&&event.signerId===signer.id)).map(signer=>({name:String(signer.name||"Signer").slice(0,100),maskedAddress:maskRecoveryEmail(signer.email),signedAt:formatRecoveryTimestampEAT(signer.signedAt)}))};
+    const label=envelope.status==="InProgress"?PARTIAL_SIGNED_EVIDENCE_LABEL:(certificateVerified?EMERGENCY_COPY_LABEL:EMERGENCY_UNARCHIVED_LABEL);
+    return {ok:true,bytes:output,outputHash,stages,label,certificateVerified,sourceHash,envelopeStatus:envelope.status,isCompleted:false,auditChainStatus:"PASS",stampResults:assessment.stampSlots.map(row=>({fieldId:row.fieldId,page:row.page,status:"PASS"})),environmentDiagnostics:assessment.environmentDiagnostics,signerSummary:(envelope.signers||[]).filter(signer=>events.some(event=>event.type==="signer.signed"&&event.signerId===signer.id)).map(signer=>({name:String(signer.name||"Signer").slice(0,100),maskedAddress:maskRecoveryEmail(signer.email),signedAt:formatRecoveryTimestampEAT(signer.signedAt)}))};
   }catch(error){
     const status=Number(error?.status)||500;
     const failureCode=classifyEmergencyRetrievalFailure("REQUEST",error);
