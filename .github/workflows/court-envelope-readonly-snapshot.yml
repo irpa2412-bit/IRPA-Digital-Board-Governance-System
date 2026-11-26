@@ -112,8 +112,8 @@ jobs:
               const fields=(Array.isArray(envelope.fields)?envelope.fields:[]).filter(f=>String(f.signerId||"")===signerId||(signerUid&&String(f.signerUid||"")===signerUid));
               const fieldResults=fields.map(field=>{
                 const fieldId=String(field.fieldId||field.id||"");
-                const signatureRecord=signatures.find(record=>String(record.signerId||record.signerUid||"")===signerId&&String(record.fieldId||"")===fieldId);
-                const eventEvidence=envelopeEvents.some(event=>String(event.signerId||"")===signerId&&(event.signatureFieldHashes||[]).some(item=>String(item.fieldId||"")===fieldId&&/^[a-f0-9]{64}$/i.test(String(item.hash||""))));
+                const signatureRecord=signatures.find(record=>(String(record.signerId||"")===signerId||(signerUid&&String(record.signerUid||"")===signerUid))&&String(record.fieldId||"")===fieldId);
+                const eventEvidence=[...envelopeEvents,...queriedEvents].some(event=>(String(event.signerId||"")===signerId||(signerUid&&String(event.signerUid||event.uid||"")===signerUid))&&(event.signatureFieldHashes||[]).some(item=>String(item.fieldId||"")===fieldId&&/^[a-f0-9]{64}$/i.test(String(item.hash||""))));
                 const signerValue=signer.fieldValues&&fieldId?signer.fieldValues[fieldId]:null;
                 const completed=Boolean(signatureRecord||eventEvidence||((signed)&&typeof signerValue==="string"&&signerValue.length));
                 return {fieldId,completed};
