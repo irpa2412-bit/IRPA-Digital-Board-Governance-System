@@ -13,7 +13,7 @@ async function loadRecoveryPage(offset,button="Load recovery queue"){
  if(!gateway)throw new Error("The recovery service is not configured. (RECOVERY_SERVICE_URL_MISSING)");
  const token=await getIdToken(user,true);
  const route="/api/recovery/envelopes?limit=50&offset="+offset;
- const response=await fetch(gateway+route,{method:"GET",headers:{Authorization:"Bearer "+token,Accept:"application/json","Cache-Control":"no-cache"},cache:"no-store"});
+ const response=await fetch(gateway+route,{method:"GET",headers:{Authorization:"Bearer "+token,Accept:"application/json"},cache:"no-store"});
  const body=await response.json().catch(()=>({}));
  if(!response.ok||body?.ok!==true)throw new Error(formatRecoveryRouteError({status:response.status,body,requestId:body?.requestId||response.headers.get("x-request-id"),button,route:"/api/recovery/envelopes"}));
  return body;
