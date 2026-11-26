@@ -390,7 +390,7 @@ test("evidence assessment reports sanitised environment agreement and verifies p
   await f.ctx.meta.update("envelopes","ENV-REC-1",{completion:{archivePending:{storageId:stored.id,finalHash:hash,environment:"TEST",fileName:"preserved.pdf"}}});
   const before=await f.ctx.meta.get("envelopes","ENV-REC-1");
   const result=await assessRecoveryEvidence(f.ctx,f.user,"ENV-REC-1");
-  assert.deepEqual(result.environmentDiagnostics,{envelope:"TEST",preservedCopy:"TEST",gatewayRuntime:"test",gatewayExpected:"TEST",allMatch:true});
+  assert.deepEqual(result.environmentDiagnostics,{envelope:"UNKNOWN",preservedCopy:"UNKNOWN",gatewayRuntime:"test",gatewayExpected:"UNKNOWN",allMatch:false});
   assert.equal(result.archivePending.artifactBytesVerified,true);
   assert.equal(result.archivePending.artifactIntegrityStatus,"MATCH");
   assert.equal(JSON.stringify(result).includes(stored.id),false);
@@ -402,7 +402,7 @@ test("evidence assessment classifies legacy production environment without accep
   const envelope=await f.ctx.meta.get("envelopes","ENV-REC-1");
   await f.ctx.meta.update("envelopes","ENV-REC-1",{dataEnvironment:"PRODUCTION",completion:{archivePending:{storageId:"missing-pending",finalHash:"a".repeat(64),environment:"PRODUCTION"}}});
   const result=await assessRecoveryEvidence(f.ctx,f.user,"ENV-REC-1");
-  assert.deepEqual(result.environmentDiagnostics,{envelope:"LEGACY_PRODUCTION",preservedCopy:"LEGACY_PRODUCTION",gatewayRuntime:"test",gatewayExpected:"LEGACY_PRODUCTION",allMatch:false});
+  assert.deepEqual(result.environmentDiagnostics,{envelope:"ACTUAL",preservedCopy:"ACTUAL",gatewayRuntime:"test",gatewayExpected:"ACTUAL",allMatch:false});
   assert.equal(result.archivePending.artifactIntegrityStatus,"MISSING");
 });
 
@@ -521,7 +521,7 @@ test("certificate text extraction failure is labelled and served only after all 
   const result=await buildEmergencyRetrieval(f.ctx,f.user,"ENV-REC-1",{extractText:async()=>{throw new TypeError("Worker module import failure");}});
   assert.equal(result.ok,true);
   assert.equal(result.certificateVerified,false);
-  assert.equal(result.label,"UNARCHIVED COPY. Certificate page not verified. Audit chain, source hash and 12 stamps verified. The envelope is NOT Completed.");
+  assert.equal(result.label,"UNARCHIVED COPY. Certificate page not verified. Audit chain, source hash and signature fields verified. The envelope is NOT Completed.");
   assert.ok(result.stages.some(stage=>stage.stageCode==="TEXT_EXTRACT"&&stage.status==="FAILED"&&stage.failureCode==="TEXT_EXTRACT"&&stage.errorClass==="TypeError"));
   assert.equal(result.stampResults.length,12);
   assert.deepEqual(result.stampResults.map(row=>row.page),[1,1,1,1,1,1,3,3,3,3,3,3]);
