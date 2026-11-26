@@ -1,0 +1,29 @@
+name: Court auth-only regression checks
+
+on:
+  push:
+    branches:
+      - fix/court-auth-only-20261126
+    paths:
+      - drive-gateway/**
+      - .github/workflows/court-auth-only-ci.yml
+
+permissions:
+  contents: read
+
+jobs:
+  auth-only:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: drive-gateway
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: drive-gateway/package-lock.json
+      - run: npm ci
+      - run: node --test tests/court-auth-isolation.test.mjs
+      - run: npm test
