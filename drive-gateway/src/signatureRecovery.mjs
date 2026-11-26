@@ -240,7 +240,7 @@ export async function buildRecoveryPreview(ctx,user,id){
   const assessment=await assessRecoveryEvidence(ctx,user,id);
   if(assessment.auditChain.status!=="VERIFIED")throw new HttpError(409,"Preview unavailable because the signing audit chain is not verified.");
   if(assessment.sourceHashStatus!=="VERIFIED")throw new HttpError(409,"Preview unavailable because the original source hash is not verified.");
-  const document=await ctx.meta.get("documents",envelope.documentId);
+  const document=envelope.__source==="firestore"&&ctx.firestore?.get?await ctx.firestore.get("documents",envelope.documentId):await ctx.meta.get("documents",envelope.documentId);
   const original=await ctx.storage.get(document.primaryStorageId);
   const verifiedIds=new Set(assessment.stampSlots.filter(x=>x.status==="VERIFIED_EXISTING").map(x=>x.fieldId));
   const safeFields=(envelope.fields||[]).filter(field=>verifiedIds.has(field.fieldId));
@@ -365,7 +365,7 @@ export async function buildEmergencyRetrieval(ctx,user,id,{extractText=extractPd
     if(!emergencyOwner(envelope,user))throw Object.assign(new Error("This envelope belongs to another owner."),{status:403});
     if(envelope.status!=="CompletionFailed")throw Object.assign(new Error("Only failed-completion envelopes are eligible for emergency retrieval."),{status:409});
     let document;
-    try{document=await ctx.meta.get("documents",envelope.documentId);}catch(error){return fail("SOURCE_READ",error);}
+    try{document=envelope.__source==="firestore"&&ctx.firestore?.get?await ctx.firestore.get("documents",envelope.documentId):await ctx.meta.get("documents",envelope.documentId);}catch(error){return fail("SOURCE_READ",error);}
     const sourceStorageId=document?.primaryStorageId||document?.storageId||document?.driveFileId||document?.fileId||envelope.primaryStorageId||envelope.sourcePdfStorageId||null;
     if(!sourceStorageId)return fail("SOURCE_READ",new Error("SOURCE_REFERENCE_MISSING"));
     let source;
