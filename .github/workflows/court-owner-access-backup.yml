@@ -1,0 +1,153 @@
+name: Court envelope owner-access forensic backup (read only)
+
+on:
+  push:
+    branches:
+      - incident/owner-access-20261126
+    paths:
+      - .github/workflows/court-owner-access-backup.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: court-owner-access-forensic-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install Firebase Admin SDK
+        run: npm install --no-save firebase-admin@^13
+      - name: Read and export production owner-access evidence (no writes)
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$FIREBASE_SERVICE_ACCOUNT"
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          import crypto from "node:crypto";
+          import { initializeApp, cert } from "firebase-admin/app";
+          import { getFirestore, FieldPath } from "firebase-admin/firestore";
+          import { getAuth } from "firebase-admin/auth";
+
+          const project = "irpa-digital-board-governance";
+          const target = {
+            envelopeReference: "IRPA-ENV-2026-11501354",
+            envelopeId: "ENV-4b06e60941f8eb1d",
+            title: "Muhtasari wa Kikao cha Familia"
+          };
+          const sa = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+          if (sa.project_id !== project || !sa.client_email || !sa.private_key) {
+            throw new Error("Production service-account metadata validation failed.");
+          }
+          initializeApp({ credential: cert(sa), projectId: project });
+          const db = getFirestore();
+          const collections = ["envelopes","signatureEnvelopes","documents","signatures","signatureEvents","signatureProfiles"];
+          const exported = {};
+          const references = new Set([target.envelopeId,target.envelopeReference]);
+          const matched = new Map();
+          const scan = async name => {
+            const ref = db.collection(name);
+            let cursor = null, count = 0, pages = 0;
+            const rows = [];
+            while (true) {
+              let q = ref.orderBy(FieldPath.documentId()).limit(500);
+              if (cursor) q = q.startAfter(cursor);
+              const snap = await q.get();
+              pages++;
+              if (snap.empty) break;
+              for (const doc of snap.docs) {
+                const data = doc.data();
+                const row = { id: doc.id, path: doc.ref.path, data };
+                rows.push(row);
+                count++;
+                const flat = JSON.stringify(data);
+                if (name === "envelopes" || name === "signatureEnvelopes") {
+                  if (doc.id === target.envelopeId || doc.id === target.envelopeReference ||
+                      flat.includes(target.envelopeId) || flat.includes(target.envelopeReference) ||
+                      flat.includes(target.title)) matched.set(doc.ref.path,row);
+                  for (const key of ["documentId","ownerUid","senderUid"]) {
+                    if (typeof data[key] === "string" && data[key]) references.add(data[key]);
+                  }
+                  for (const uid of Array.isArray(data.participantUids) ? data.participantUids : []) {
+                    if (typeof uid === "string" && uid) references.add(uid);
+                  }
+                } else if (name === "documents" &&
+                  (doc.id === target.envelopeReference || flat.includes(target.envelopeId) || flat.includes(target.envelopeReference) || flat.includes(target.title))) {
+                  matched.set(doc.ref.path,row);
+                }
+              }
+              cursor = snap.docs[snap.docs.length-1];
+              if (snap.size < 500) break;
+            }
+            exported[name] = { count, pages, rows };
+          };
+          for (const name of collections) await scan(name);
+
+          const envelopeRows = [...matched.values()].filter(row => ["envelopes","signatureEnvelopes"].includes(row.path.split("/")[0]));
+          const ownerUids = new Set();
+          const emails = new Set();
+          for (const row of envelopeRows) {
+            const d = row.data || {};
+            for (const key of ["ownerUid","senderUid","createdBy","createdByUid"]) if (d[key]) ownerUids.add(String(d[key]));
+            for (const uid of Array.isArray(d.participantUids) ? d.participantUids : []) ownerUids.add(String(uid));
+            for (const key of ["ownerEmail","senderEmail","email"]) if (d[key]) emails.add(String(d[key]).trim().toLowerCase());
+            for (const signer of Array.isArray(d.signers) ? d.signers : []) if (signer.email) emails.add(String(signer.email).trim().toLowerCase());
+          }
+          for (const row of exported.signatureProfiles.rows) {
+            const d = row.data || {};
+            const uid = String(d.uid || row.id);
+            const email = String(d.email || "").trim().toLowerCase();
+            if (ownerUids.has(uid) || (email && emails.has(email))) matched.set(row.path,row);
+          }
+          const authUsers = [];
+          let pageToken;
+          do {
+            const page = await getAuth().listUsers(1000,pageToken);
+            for (const u of page.users) {
+              const email = String(u.email || "").trim().toLowerCase();
+              if (ownerUids.has(u.uid) || (email && emails.has(email))) {
+                authUsers.push({ uid:u.uid,email:u.email||null,emailVerified:u.emailVerified,disabled:u.disabled,creationTime:u.metadata?.creationTime||null,lastSignInTime:u.metadata?.lastSignInTime||null,providerIds:(u.providerData||[]).map(p=>p.providerId) });
+              }
+            }
+            pageToken = page.pageToken;
+          } while (pageToken);
+
+          const payload = {
+            generatedAt: new Date().toISOString(),
+            projectId: project,
+            readOnly: true,
+            target,
+            collectionCounts: Object.fromEntries(Object.entries(exported).map(([k,v])=>[k,{count:v.count,pages:v.pages}])),
+            ownerUidCandidates: [...ownerUids],
+            ownerEmailCandidates: [...emails],
+            matchingAuthAccounts: authUsers,
+            matchedRecords: [...matched.values()],
+            collections: exported
+          };
+          const raw = Buffer.from(JSON.stringify(payload,null,2));
+          fs.mkdirSync("forensic-backup",{recursive:true});
+          fs.writeFileSync("forensic-backup/court-owner-access-backup.json",raw,{flag:"wx"});
+          const sha = crypto.createHash("sha256").update(raw).digest("hex");
+          fs.writeFileSync("forensic-backup/SHA256SUMS.txt",sha+"  court-owner-access-backup.json\n",{flag:"wx"});
+          fs.writeFileSync("forensic-backup/manifest.json",JSON.stringify({projectId:project,generatedAt:payload.generatedAt,readOnly:true,bytes:raw.length,sha256:sha,collectionCounts:payload.collectionCounts,matchingAuthAccountCount:authUsers.length,matchedRecordCount:matched.size},null,2),{flag:"wx"});
+          console.log("READ_ONLY_BACKUP_CREATED");
+          console.log(JSON.stringify({projectId:project,readOnly:true,bytes:raw.length,sha256:sha,collectionCounts:payload.collectionCounts,matchingAuthAccountCount:authUsers.length,matchedRecordCount:matched.size}));
+          NODE
+      - name: Upload immutable forensic backup artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: court-owner-access-backup-${{ github.sha }}
+          path: forensic-backup/
+          if-no-files-found: error
+          retention-days: 30
