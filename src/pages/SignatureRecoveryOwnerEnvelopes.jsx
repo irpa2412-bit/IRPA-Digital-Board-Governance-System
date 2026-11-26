@@ -41,7 +41,7 @@ export default function SignatureRecoveryOwnerEnvelopes(){
   }catch(err){setError(err?.message||"Unable to load recovery assessments.");}
   finally{setLastRefreshed(new Date().toLocaleString());setBusy(false);}
  },[offset]);
- useEffect(()=>{const unsubscribe=onAuthStateChanged(auth,()=>{void load(true)});return()=>unsubscribe()},[load]);
+ useEffect(()=>{const unsubscribe=onAuthStateChanged(auth,()=>{void load(true)});return()=>unsubscribe()},[]);
  return <section className="panel signature-owner-envelopes" aria-labelledby="owner-envelopes-heading" style={{margin:"14px 0",padding:18,border:"1px solid var(--border-color,#cbd5e1)",borderRadius:12}}>
   <div style={{display:"flex",justifyContent:"space-between",gap:12,alignItems:"center",flexWrap:"wrap"}}><div><span className="eyebrow">RESTRICTED · OWNER / ADMIN RECOVERY</span><h2 id="owner-envelopes-heading">Signature Recovery Assessment / Tathmini ya Urejeshaji wa Saini</h2><p className="muted">Every non-completed envelope you own is listed here. Administrators can assess across owners. The Gateway verifies access for every request.</p></div><button type="button" className="secondary-button" onClick={()=>load(true)} disabled={busy}>{busy?"Refreshing…":"Refresh recovery queue"}</button></div>
   <div aria-label="Recovery service versions" style={{fontSize:12,margin:"8px 0",display:"grid",gap:3}}><span>Web build: <strong>{webBuild}</strong></span><span>Worker version: <strong>{workerHealth.version}</strong>{workerHealth.httpStatus? " · HTTP "+workerHealth.httpStatus:""}</span></div>
