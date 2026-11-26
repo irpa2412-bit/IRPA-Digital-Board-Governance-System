@@ -612,7 +612,7 @@ test("recovery queue and evidence resolve signatureEnvelopes when legacy lookup 
   assert.equal((await f.ctx.meta.list("recoveryAccessEvents")).length,0);
 });
 
-test("recovery queue reads Firestore signatureEnvelopes and never grants an admin owner bypass",async()=>{
+test("recovery queue reads Firestore signatureEnvelopes and filters non-admin owners",async()=>{
   const f=await fixture();
   const envelopeId="IRPA-ENV-2026-54530056";
   const sourceDoc=await f.ctx.meta.get("documents","DOC-REC-1");
@@ -637,9 +637,9 @@ test("recovery queue reads Firestore signatureEnvelopes and never grants an admi
     list:async collection=>collection==="signatureEnvelopes"?[candidate,other]:[],
     get:async(collection,id)=>collection==="signatureEnvelopes"&&id===envelopeId?candidate:collection==="documents"&&id===document.id?document:null
   };
-  const queue=await getRecoveryQueue(f.ctx,{uid:f.user.uid,isAdmin:true},{recordAccess:false});
+  const queue=await getRecoveryQueue(f.ctx,{uid:f.user.uid},{recordAccess:false});
   assert.deepEqual(queue.items.map(item=>item.envelopeId),[envelopeId]);
-  const evidence=await assessRecoveryEvidence(f.ctx,{uid:f.user.uid,isAdmin:true},envelopeId,{recordAccess:false});
+  const evidence=await assessRecoveryEvidence(f.ctx,{uid:f.user.uid},envelopeId,{recordAccess:false});
   assert.equal(evidence.envelopeId,envelopeId);
   assert.equal(evidence.sourceHashStatus,"VERIFIED");
   assert.equal(evidence.auditChain.status,"NOT_HASH_CHAINED");
