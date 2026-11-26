@@ -775,7 +775,6 @@ test("activated canonical Board Member record authorizes portal access when its 
         }]),{status:200});
       }
       if(collection==="employees" || collection==="signatureProfiles") return new Response(JSON.stringify([]),{status:200});
-      if(collection==="signatureProfiles") return new Response(JSON.stringify([]),{status:200});
     }
 
     throw new Error("Unexpected external request: "+target);
