@@ -33,7 +33,7 @@ test("staging Gateway cannot finalise an ACTUAL envelope even when its source dr
 
 test("production Gateway does not accept an unlinked legacy TRIAL envelope",async()=>{
  const {ctx,envelope}=fixture({externalReference:null});
- await assert.rejects(()=>resolveEnvelopeFinalisationEnvironment(ctx,envelope),error=>error.status===409&&/active data environment/.test(error.message));
+ await assert.rejects(()=>resolveEnvelopeFinalisationEnvironment(ctx,envelope),error=>error.status===409&&/legacy TRIAL envelope has no verified source draft/.test(error.message));
 });
 
 
