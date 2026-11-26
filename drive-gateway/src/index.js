@@ -1390,7 +1390,7 @@ async function getSignatureWorkflowListRoute(request, env) {
     const active = record => {
       const data = toPlain(record) || {};
       const states = [data.status,data.registrationStatus,data.employmentStatus].map(v=>String(v||"").trim().toLowerCase());
-      return states.some(v=>v==="active"||v==="activated") && data.accountActivated !== false;
+      return (states.some(v=>v==="active"||v==="activated")||data.active===true||data.accountActivated===true) && data.accountActivated !== false;
     };
     const rolesOf = record => {
       const data = toPlain(record) || {};
@@ -1447,8 +1447,7 @@ async function getSignatureWorkflowListRoute(request, env) {
         const rows=[];
         for(const fieldPath of ["status","registrationStatus","employmentStatus"]) {
           for(const value of ["Active","Activated"]) {
-            try { rows.push(...await queryField(collectionId,fieldPath,"EQUAL",value)); }
-            catch(error) { if(!/Unable to query signing envelopes/.test(String(error?.message||""))) throw error; }
+            rows.push(...await queryField(collectionId,fieldPath,"EQUAL",value));
           }
         }
         for(const row of rows) {
@@ -1456,7 +1455,7 @@ async function getSignatureWorkflowListRoute(request, env) {
           if(active(row)) queryOwnerUids.add(String(data.uid||row.name.split("/").pop()));
         }
       };
-      await Promise.all([readActiveOwners("members"),readActiveOwners("employees")]);
+      await Promise.all([readActiveOwners("members"),readActiveOwners("employees"),readActiveOwners("signatureProfiles")]);
     }
     const requestUrl=new URL(request.url);
     const rawEnvironment=requestUrl.searchParams.get("environment");
@@ -1466,12 +1465,14 @@ async function getSignatureWorkflowListRoute(request, env) {
     }
     const rows=[];
     for(const ownerUid of queryOwnerUids) {
-      const [byOwner,bySender,byParticipant]=await Promise.all([
-        queryField("signatureEnvelopes","ownerUid","EQUAL",ownerUid),
-        queryField("signatureEnvelopes","senderUid","EQUAL",ownerUid),
-        queryField("signatureEnvelopes","participantUids","ARRAY_CONTAINS",ownerUid)
-      ]);
-      rows.push(...byOwner,...bySender,...byParticipant);
+      for(const collectionId of ["envelopes","signatureEnvelopes"]) {
+        const [byOwner,bySender,byParticipant]=await Promise.all([
+          queryField(collectionId,"ownerUid","EQUAL",ownerUid),
+          queryField(collectionId,"senderUid","EQUAL",ownerUid),
+          queryField(collectionId,"participantUids","ARRAY_CONTAINS",ownerUid)
+        ]);
+        rows.push(...byOwner,...bySender,...byParticipant);
+      }
     }
     const unique=new Map(rows.map(row=>[String(row.name||"").split("/").pop(),row]));
     const envelopes=[];
