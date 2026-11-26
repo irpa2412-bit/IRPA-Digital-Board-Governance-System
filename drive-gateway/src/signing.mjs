@@ -494,11 +494,12 @@ export async function sign(ctx,{token,signature,fieldValues,fieldApplications=[]
 export async function declineSigning(ctx,{token,reason,ip,user}){const{env,signer}=await load(ctx,token);active(ctx,env,signer);assertSignerAuthentication(signer,user);await mutate(ctx,env.id,async cur=>{const s=cur.signers.find(x=>x.id===signer.id);if(s.status!=="Pending")throw new HttpError(409,"This envelope can no longer be declined.");const at=ctx.now().toISOString();const emailLink=s.identityType==="email-link";s.status="Declined";if(emailLink){s.emailLinkTokenHistory=[...(s.emailLinkTokenHistory||[]),{tokenHash:s.tokenHash,status:"revoked_by_signer",revokedAt:at}].slice(-10);s.emailLinkStatus="revoked";s.emailLinkSessionStatus="revoked";s.emailLinkSessionHash=null;s.emailLinkSessions=(Array.isArray(s.emailLinkSessions)?s.emailLinkSessions:[]).map(session=>({...session,status:"revoked",revokedAt:at}));}return{patch:{signers:cur.signers,status:"Declined",events:await chainEvents(cur.events,{type:emailLink?"email_link.revoked_by_signer":"signer.declined",signerId:s.id,at,ip:ip||null,reason:cleanText(reason||"",300),identityType:s.identityType||"firebase-uid"})}}});return{ok:true,status:"Declined",revoked:signer.identityType==="email-link"}}
 export async function resolveEnvelopeFinalisationEnvironment(ctx,envelope){
  const workerEnvironment=String(ctx.env?.IRPA_ENVIRONMENT||ctx.env?.IRPA_WORKER_ENVIRONMENT||"").trim().toLowerCase();
- const testFixture=workerEnvironment==="test"&&ctx.env?.DRIVE_MOCK==="true"&&String(envelope?.dataEnvironment||"").trim().toUpperCase()==="TEST";
+ const testFixture=workerEnvironment==="test"&&(ctx.env?.DRIVE_MOCK==="true"||ctx.allowReturnTokens===true)&&String(envelope?.dataEnvironment||"").trim().toUpperCase()==="TEST";
  const envelopeEnvironment=normalizeSignatureEnvironment(envelope).environment;
  if(testFixture)return "TEST";
  if(envelopeEnvironment==="UNKNOWN")throw new HttpError(409,"Finalisation is blocked because the envelope environment is missing or inconsistent.");
  let sourceEnvironment=envelopeEnvironment;
+ if(workerEnvironment==="production"&&envelopeEnvironment==="TRIAL"&&(!envelope?.externalReference||typeof ctx.resolveEnvelopeDataEnvironment!=="function"))throw new HttpError(409,"Finalisation is blocked because a legacy TRIAL envelope has no verified source draft.");
  if(envelope?.externalReference&&typeof ctx.resolveEnvelopeDataEnvironment==="function"){
   const sourceValue=String(await ctx.resolveEnvelopeDataEnvironment(envelope.externalReference,envelope.createdBy)||"").trim();
   sourceEnvironment=normalizeSignatureEnvironment({dataEnvironment:sourceValue}).environment;
