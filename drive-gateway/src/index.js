@@ -1385,6 +1385,16 @@ async function getSignatureWorkflowListRoute(request, env) {
     const token = await getFirestoreAdminAccessToken(env);
     const adminProfile = await getFirestoreDocument(env, "adminProfiles/" + actorUid, token);
     const isAdmin = String(claims.email || "").trim().toLowerCase() === "irpa2412@gmail.com" || Boolean(adminProfile?.fields?.active?.booleanValue === true && adminProfile?.fields?.role?.stringValue === "Administrator");
+    let personalProfile = await getFirestoreDocument(env, "signatureProfiles/" + actorUid, token);
+    if (!personalProfile && claims.email) {
+      const matches = await getFirestoreDocumentsByEmail(env, "signatureProfiles", claims.email, token);
+      personalProfile = matches[0] || null;
+    }
+    const profileFields = personalProfile?.fields || {};
+    const profileEmails = ["email","primaryEmail","secondaryEmail","alternateEmail","personalEmail","workEmail","contactEmail"]
+      .map(key => String(profileFields[key]?.stringValue || "").trim().toLowerCase()).filter(Boolean);
+    if (claims.firebaseClaims?.emailVerified && claims.email) profileEmails.push(String(claims.email).trim().toLowerCase());
+    const authenticatedEmails = [...new Set(profileEmails)];
     const listCollection = async collectionId => {
       const rows = [];
       let pageToken = "";
@@ -1415,8 +1425,8 @@ async function getSignatureWorkflowListRoute(request, env) {
     const envelopes = [];
     for (const [id,row] of unique) {
       const envelope = {id,...(firestoreDocumentToPlain(row)||{})};
-      const filtered = filterSignatureEnvelopeForCaller(envelope,{authenticatedUid:actorUid,isAdmin});
-      if (filtered.allowed && !["Cancelled","Declined"].includes(String(envelope.status||""))) envelopes.push(filtered.view);
+      const filtered = filterSignatureEnvelopeForCaller(envelope,{authenticatedUid:actorUid,authenticatedEmails,isAdmin});
+      if (filtered.allowed) envelopes.push(filtered.view);
     }
     envelopes.sort((a,b)=>String(b.updatedAt||b.createdAt||"").localeCompare(String(a.updatedAt||a.createdAt||"")));
     return json({ok:true,requestId,totalScanned:signatureRows.length+legacyRows.length,envelopes},200,{...corsHeaders(request),"Cache-Control":"no-store"});
@@ -3603,7 +3613,8 @@ async function authenticateFirebaseRequest(request, env, options = {}) {
       irpaRoles: Array.isArray(payload.irpaRoles) ? payload.irpaRoles : [],
       name: payload.name || "",
       phoneNumber: payload.phone_number || "",
-      emailDeliveryService: payload.irpaEmailDeliveryService === true
+      emailDeliveryService: payload.irpaEmailDeliveryService === true,
+      emailVerified: payload.email_verified === true
     }
   };
   if (options.skipActivation !== true) await assertActivatedPortalUser(claims, env);
