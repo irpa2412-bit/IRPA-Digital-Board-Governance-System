@@ -3624,11 +3624,6 @@ async function assertActivatedPortalUser(claims, env) {
   // email-fallback profile used by upload authorization so activated
   // invitees are not rejected before the storage layer.
   const { memberRecord, employeeRecord } = await getInstitutionalProfileForUser(env, claims, adminToken);
-  let personal = await getFirestoreDocument(env, `signatureProfiles/${claims.user_id}`, adminToken);
-  if (!personal && claims.email) {
-    const matches = await getFirestoreDocumentsByEmail(env, "signatureProfiles", claims.email, adminToken);
-    personal = matches[0] || null;
-  }
   const memberActivated = memberRecord && (
     memberRecord.fields?.registrationStatus?.stringValue === "Activated" ||
     memberRecord.fields?.status?.stringValue === "Activated" ||
@@ -3640,13 +3635,21 @@ async function assertActivatedPortalUser(claims, env) {
     employeeRecord.fields?.employmentStatus?.stringValue === "Active"
   ) && employeeRecord.fields?.accountActivated?.booleanValue !== false;
 
-  const activeStatus = value => ["active","activated"].includes(String(value || "").trim().toLowerCase());
-  const personalActive = personal && (
-    activeStatus(personal.fields?.status?.stringValue) ||
-    activeStatus(personal.fields?.registrationStatus?.stringValue) ||
-    personal.fields?.active?.booleanValue === true ||
-    personal.fields?.accountActivated?.booleanValue === true
-  ) && personal.fields?.accountActivated?.booleanValue !== false;
+  let personalActive = false;
+  if (!memberActivated && !employeeActive) {
+    let personal = await getFirestoreDocument(env, `signatureProfiles/${claims.user_id}`, adminToken);
+    if (!personal && claims.email) {
+      const matches = await getFirestoreDocumentsByEmail(env, "signatureProfiles", claims.email, adminToken);
+      personal = matches[0] || null;
+    }
+    const activeStatus = value => ["active","activated"].includes(String(value || "").trim().toLowerCase());
+    personalActive = Boolean(personal && (
+      activeStatus(personal.fields?.status?.stringValue) ||
+      activeStatus(personal.fields?.registrationStatus?.stringValue) ||
+      personal.fields?.active?.booleanValue === true ||
+      personal.fields?.accountActivated?.booleanValue === true
+    ) && personal.fields?.accountActivated?.booleanValue !== false);
+  }
   if (!memberActivated && !employeeActive && !personalActive) {
     const error = new Error("IRPA_INVITATION_FAILURE:PORTAL_ACTIVATION_REQUIRED");
     error.status = 403;
