@@ -401,8 +401,8 @@ export async function buildEmergencyRetrieval(ctx,user,id,{extractText=extractPd
     try{outputHash=await sha256Hex(output);}catch(error){return fail("OUTPUT_SHA256",error);}
     stage("OUTPUT_SHA256","PASS");
     stage("TIMEOUT","PASS");
-    const label=certificateVerified?EMERGENCY_COPY_LABEL:EMERGENCY_UNARCHIVED_LABEL;
-    return {ok:true,bytes:output,outputHash,stages,label,certificateVerified,sourceHash,auditChainStatus:"PASS",stampResults:assessment.stampSlots.map(row=>({fieldId:row.fieldId,page:row.page,status:"PASS"})),environmentDiagnostics:assessment.environmentDiagnostics,signerSummary:(envelope.signers||[]).filter(signer=>events.some(event=>event.type==="signer.signed"&&event.signerId===signer.id)).map(signer=>({name:String(signer.name||"Signer").slice(0,100),maskedAddress:maskRecoveryEmail(signer.email),signedAt:formatRecoveryTimestampEAT(signer.signedAt)}))};
+    const label=envelope.status==="InProgress"?PARTIAL_SIGNED_EVIDENCE_LABEL:(certificateVerified?EMERGENCY_COPY_LABEL:EMERGENCY_UNARCHIVED_LABEL);
+    return {ok:true,bytes:output,outputHash,stages,label,certificateVerified,sourceHash,envelopeStatus:envelope.status,isCompleted:false,auditChainStatus:"PASS",stampResults:assessment.stampSlots.map(row=>({fieldId:row.fieldId,page:row.page,status:"PASS"})),environmentDiagnostics:assessment.environmentDiagnostics,signerSummary:(envelope.signers||[]).filter(signer=>events.some(event=>event.type==="signer.signed"&&event.signerId===signer.id)).map(signer=>({name:String(signer.name||"Signer").slice(0,100),maskedAddress:maskRecoveryEmail(signer.email),signedAt:formatRecoveryTimestampEAT(signer.signedAt)}))};
   }catch(error){
     const status=Number(error?.status)||500;
     const failureCode=classifyEmergencyRetrievalFailure("REQUEST",error);
