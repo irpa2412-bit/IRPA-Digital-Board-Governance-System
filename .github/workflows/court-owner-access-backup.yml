@@ -6,6 +6,7 @@ on:
       - incident/owner-access-20261126
     paths:
       - .github/workflows/court-owner-access-backup.yml
+      - '!docs/incident/results-20261126.md'
   workflow_dispatch:
 
 permissions:
@@ -42,20 +43,19 @@ jobs:
           import { getAuth } from "firebase-admin/auth";
 
           const project = "irpa-digital-board-governance";
-          const target = {
-            envelopeReference: "IRPA-ENV-2026-11501354",
-            envelopeId: "ENV-4b06e60941f8eb1d",
-            title: "Muhtasari wa Kikao cha Familia"
-          };
+          const identity = { uid: "UQxfLOXCl7bEQ7KNM6Tt4eKoJlg1", email: "molleld@irpa.or.tz", since: "2026-11-01T00:00:00.000Z" };
+          const excludedOldIds = new Set(["IRPA-ENV-2026-11501354","ENV-4b06e60941f8eb1d"]);
+          const knownUids = new Set([identity.uid]);
+          const knownEmails = new Set([identity.email]);
           const sa = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
           if (sa.project_id !== project || !sa.client_email || !sa.private_key) {
             throw new Error("Production service-account metadata validation failed.");
           }
           initializeApp({ credential: cert(sa), projectId: project });
           const db = getFirestore();
-          const collections = ["envelopes","signatureEnvelopes","documents","signatures","signatureEvents","signatureProfiles"];
+          const collections = ["signatureProfiles","envelopes","signatureEnvelopes","documents","signatures","signatureEvents"];
           const exported = {};
-          const references = new Set([target.envelopeId,target.envelopeReference]);
+          const references = new Set([identity.uid,identity.email]);
           const matched = new Map();
           const scan = async name => {
             const ref = db.collection(name);
@@ -72,20 +72,19 @@ jobs:
                 const row = { id: doc.id, path: doc.ref.path, data };
                 rows.push(row);
                 count++;
-                const flat = JSON.stringify(data);
+                if (name === "signatureProfiles") {
+                  const uid=String(data.uid||data.ownerUid||doc.id||"");
+                  const profileEmails=["email","primaryEmail","secondaryEmail","alternateEmail","personalEmail","workEmail","contactEmail"].map(k=>String(data[k]||"").trim().toLowerCase()).filter(Boolean);
+                  if(uid===identity.uid||profileEmails.includes(identity.email)){matched.set(doc.ref.path,row);for(const email of profileEmails)knownEmails.add(email);}
+                }
                 if (name === "envelopes" || name === "signatureEnvelopes") {
-                  if (doc.id === target.envelopeId || doc.id === target.envelopeReference ||
-                      flat.includes(target.envelopeId) || flat.includes(target.envelopeReference) ||
-                      flat.includes(target.title)) matched.set(doc.ref.path,row);
-                  for (const key of ["documentId","ownerUid","senderUid"]) {
-                    if (typeof data[key] === "string" && data[key]) references.add(data[key]);
-                  }
-                  for (const uid of Array.isArray(data.participantUids) ? data.participantUids : []) {
-                    if (typeof uid === "string" && uid) references.add(uid);
-                  }
-                } else if (name === "documents" &&
-                  (doc.id === target.envelopeReference || flat.includes(target.envelopeId) || flat.includes(target.envelopeReference) || flat.includes(target.title))) {
-                  matched.set(doc.ref.path,row);
+                  const ownerIds=[data.ownerUid,data.senderUid,data.createdBy,data.createdByUid,...(Array.isArray(data.participantUids)?data.participantUids:[])].filter(Boolean).map(String);
+                  const recordEmails=[data.ownerEmail,data.senderEmail,data.email,...(Array.isArray(data.signers)?data.signers.map(x=>x?.email):[])].filter(Boolean).map(x=>String(x).trim().toLowerCase());
+                  const stamp=value=>value?.toDate?value.toDate().toISOString():String(value||"");
+                  const recent=stamp(data.createdAt)>=identity.since||stamp(data.updatedAt)>=identity.since;
+                  const belongs=ownerIds.some(uid=>knownUids.has(uid))||recordEmails.some(email=>knownEmails.has(email));
+                  if(recent&&belongs&&!excludedOldIds.has(doc.id)&&!excludedOldIds.has(String(data.envelopeReference||"")))matched.set(doc.ref.path,row);
+                  for(const uid of ownerIds)references.add(uid);
                 }
               }
               cursor = snap.docs[snap.docs.length-1];
@@ -96,8 +95,8 @@ jobs:
           for (const name of collections) await scan(name);
 
           const envelopeRows = [...matched.values()].filter(row => ["envelopes","signatureEnvelopes"].includes(row.path.split("/")[0]));
-          const ownerUids = new Set();
-          const emails = new Set();
+          const ownerUids = new Set(knownUids);
+          const emails = new Set(knownEmails);
           for (const row of envelopeRows) {
             const d = row.data || {};
             for (const key of ["ownerUid","senderUid","createdBy","createdByUid"]) if (d[key]) ownerUids.add(String(d[key]));
@@ -109,7 +108,10 @@ jobs:
             const d = row.data || {};
             const uid = String(d.uid || row.id);
             const email = String(d.email || "").trim().toLowerCase();
-            if (ownerUids.has(uid) || (email && emails.has(email))) matched.set(row.path,row);
+            if (uid===identity.uid || (email&&emails.has(email))) {
+              matched.set(row.path,row);
+              for(const key of ["email","primaryEmail","secondaryEmail","alternateEmail","personalEmail","workEmail","contactEmail"]){const v=String(d[key]||"").trim().toLowerCase();if(v)emails.add(v);}
+            }
           }
           const authUsers = [];
           let pageToken;
@@ -124,25 +126,35 @@ jobs:
             pageToken = page.pageToken;
           } while (pageToken);
 
-          const identityRecords = [...matched.values()].map(row => {
-            const d = row.data || {};
-            return { path: row.path, id: row.id, ownerUid:d.ownerUid||d.createdByUid||d.createdBy||null,
-              senderUid:d.senderUid||null, participantUids:Array.isArray(d.participantUids)?d.participantUids:[],
-              documentId:d.documentId||d.documentRef||null };
+          const identityRecords = [...matched.values()].filter(row=>["envelopes","signatureEnvelopes"].includes(row.path.split("/")[0])).map(row=>{
+            const d=row.data||{},signers=Array.isArray(d.signers)?d.signers:[],fields=Array.isArray(d.fields)?d.fields:[];
+            const doc=exported.documents.rows.find(x=>x.id===d.documentId)?.data||{};
+            const iso=v=>v?.toDate?v.toDate().toISOString():v||null;
+            return {collection:row.path.split("/")[0],envelopeId:row.id,documentId:d.documentId||null,title:d.title||doc.title||null,
+              environment:d.dataEnvironment||d.environment||d.recordOrigin||null,status:d.status||null,createdAt:iso(d.createdAt),
+              updatedAt:iso(d.updatedAt),ownerUid:d.ownerUid||d.createdByUid||d.createdBy||null,senderUid:d.senderUid||null,
+              ownerEmail:d.ownerEmail||d.senderEmail||d.email||null,participantUids:Array.isArray(d.participantUids)?d.participantUids:[],
+              signerCount:signers.length,signedFieldsCount:fields.filter(x=>x?.signedAt||x?.signatureData||x?.value||x?.status==="Signed").length,
+              sourcePdfStorageId:doc.primaryStorageId||d.primaryStorageId||d.sourcePdfStorageId||null};
           });
+          const allEnvelopes=["envelopes","signatureEnvelopes"].flatMap(name=>exported[name].rows.map(row=>({collection:name,id:row.id,data:row.data||{}})));
+          const mostRecentFive=allEnvelopes.sort((a,b)=>String(b.data.createdAt||"").localeCompare(String(a.data.createdAt||""))).slice(0,5).map(x=>({collection:x.collection,envelopeId:x.id,documentId:x.data.documentId||null,title:x.data.title||null,environment:x.data.dataEnvironment||x.data.environment||x.data.recordOrigin||null,status:x.data.status||null,createdAt:x.data.createdAt?.toDate?.().toISOString?.()||x.data.createdAt||null}));
           const emailGroups = new Map();
           for (const u of authUsers) { const e=String(u.email||"").toLowerCase(); if(e) emailGroups.set(e,[...(emailGroups.get(e)||[]),u]); }
           const duplicateEmails = [...emailGroups.entries()].filter(([,users])=>users.length>1).map(([email,users])=>({email,uids:users.map(u=>u.uid),created:users.map(u=>u.creationTime)}));
           const identityComparison = { records: identityRecords, authAccounts: authUsers, duplicateEmails,
             possibleRecreatedAccounts: duplicateEmails.map(x=>({email:x.email,accounts:x.uids.length,created:x.created})) };
           console.log("COURT_ENVELOPE_IDENTITY_COMPARISON");
-          console.log(JSON.stringify(identityComparison));
+          console.log(JSON.stringify({courtCandidates:identityRecords,mostRecentFiveOverall:mostRecentFive,authAccounts:authUsers.map(x=>({uid:x.uid,email:x.email,creationTime:x.creationTime,providerIds:x.providerIds})),duplicateEmails}));
           const artifactName = "court-owner-access-backup-" + process.env.GITHUB_SHA;
           const payload = {
             generatedAt: new Date().toISOString(),
             projectId: project,
             readOnly: true,
-            target,
+            identity,
+            excludedOldIds:[...excludedOldIds],
+            courtCandidates:identityRecords,
+            mostRecentFiveOverall:mostRecentFive,
             collectionCounts: Object.fromEntries(Object.entries(exported).map(([k,v])=>[k,{count:v.count,pages:v.pages}])),
             ownerUidCandidates: [...ownerUids],
             ownerEmailCandidates: [...emails],
@@ -195,7 +207,11 @@ jobs:
             `| Matched record count | ${records.length} |`,
             `| Duplicate login email groups | ${(p.identityComparison?.duplicateEmails||[]).length} |`,"",
             "## Collection counts","","| Collection | Count |","|---|---:|",counts,"",
-            "## Court stored IDs vs matching Firebase Auth IDs","",
+            "## Court envelope candidates","","| Collection | Envelope ID | Document ID | Title | Environment | Status | Created | Owner UID | Owner email | Signers | Signed fields | Source PDF storage ID |","|---|---|---|---|---|---|---|---|---|---:|---:|---|",
+            ...records.map(x=>`| ${x.collection} | ${x.envelopeId} | ${x.documentId||""} | ${x.title||""} | ${x.environment||""} | ${x.status||""} | ${x.createdAt||""} | ${x.ownerUid||""} | ${x.ownerEmail||""} | ${x.signerCount} | ${x.signedFieldsCount} | ${x.sourcePdfStorageId||""} |`),"",
+            "## Five most recent envelopes overall","","| Collection | Envelope ID | Document ID | Title | Environment | Status | Created |","|---|---|---|---|---|---|---|",
+            ...(p.mostRecentFiveOverall||[]).map(x=>`| ${x.collection} | ${x.envelopeId} | ${x.documentId||""} | ${x.title||""} | ${x.environment||""} | ${x.status||""} | ${x.createdAt||""} |`),"",
+            "## Stored owner IDs vs matching Firebase Auth IDs","",
             `- Stored owner/sender/participant UIDs: ${owners.join(", ")||"NONE"}`,
             `- Matching Firebase Auth UIDs: ${logins.join(", ")||"NONE"}`,
             `- UID overlap: ${owners.some(x=>logins.includes(x))?"MATCH":"NO MATCH"}`,""
