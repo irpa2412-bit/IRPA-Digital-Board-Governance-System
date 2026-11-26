@@ -39,10 +39,13 @@ test("Signature Recovery refresh makes two fresh authenticated requests on mobil
   await expect(page.getByRole("heading", { name: /Signature Recovery Assessment/ })).toBeVisible({ timeout: 45000 });
   await expect(page.getByText("Read-only refresh fixture")).toBeVisible({ timeout: 20000 });
   expect(await page.evaluate(() => matchMedia("(display-mode: standalone)").matches)).toBe(true);
+  await expect(page.getByText("worker-fixture-v2")).toBeVisible();
+  await expect(page.getByText(/Web build:/)).toBeVisible();
 
   queueRequests = [];
   const refresh = page.getByRole("button", { name: "Refresh recovery queue" });
   await refresh.click();
+  await expect.poll(() => queueRequests.length).toBe(1);
   await expect(refresh).toBeEnabled();
   await refresh.click();
   await expect.poll(() => queueRequests.length).toBe(2);
