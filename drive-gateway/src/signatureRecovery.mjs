@@ -38,10 +38,13 @@ export async function getRecoveryQueue(ctx,user,{limit=25,offset=0,recordAccess=
     signerCount:Array.isArray(e.signers)?e.signers.length:0
   }))};
 }
+const isRecoveryNotFound=error=>Number(error?.status||error?.statusCode||error?.response?.status)===404||error?.code==="NOT_FOUND"||/not found|does not exist/i.test(String(error?.message||""));
 async function getRecoveryEnvelope(ctx,id){
-  const legacy=await ctx.meta.get("envelopes",id);
+  let legacy=null;
+  try{legacy=await ctx.meta.get("envelopes",id);}catch(error){if(!isRecoveryNotFound(error))throw error;}
   if(legacy)return {...legacy,__collection:"envelopes"};
-  const signature=await ctx.meta.get("signatureEnvelopes",id);
+  let signature=null;
+  try{signature=await ctx.meta.get("signatureEnvelopes",id);}catch(error){if(!isRecoveryNotFound(error))throw error;}
   if(signature)return {...signature,__collection:"signatureEnvelopes"};
   return null;
 }
