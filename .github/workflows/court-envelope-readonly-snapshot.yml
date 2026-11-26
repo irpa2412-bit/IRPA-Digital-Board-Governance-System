@@ -88,6 +88,7 @@ jobs:
             if(body.prevHash!==previous||expected!==hash){auditChainValid=false;break;}
             previous=hash;
           }
+          const recipients=Array.isArray(envelope.recipients)?envelope.recipients:[];
           const signers=(Array.isArray(envelope.signers)?envelope.signers:[])
             .map((signer,index)=>{
               const signerId=String(signer.id||signer.signerId||"");
@@ -95,41 +96,58 @@ jobs:
               const signerEmail=String(signer.email||"");
               const signedEvent=envelopeEvents.filter(e=>e?.type==="signer.signed"&&(String(e.signerId||"")===signerId||(signerUid&&String(e.signerUid||e.uid||"")===signerUid))).at(-1);
               const signed=String(signer.status||"").toLowerCase()==="signed"||Boolean(signer.signedAt)||Boolean(signedEvent);
-              const tokenValue=get(signer,"signingToken","linkToken","invitationToken","token","tokenHash","tokenId");
+              const recipient=recipients.find(item=>String(item.name||"").trim().toLowerCase()===String(signer.name||"").trim().toLowerCase()&&String(item.email||"").trim().toLowerCase()===String(signer.email||"").trim().toLowerCase())||null;
+              const tokenValue=get(signer,"tokenHash","signingTokenHash","linkTokenHash","signingToken","linkToken","invitationToken","token","tokenId");
+              const recipientLinkStatus=String(recipient?.emailLinkStatus||"UNKNOWN");
               const expiry=get(signer,"tokenExpiresAt","linkExpiresAt","expiresAt","invitationExpiresAt");
               const expiryMs=expiry?.toDate?expiry.toDate().getTime():Date.parse(String(expiry||""));
-              const linkExists=Boolean(tokenValue||get(signer,"signingUrl","invitationUrl","linkUrl"));
+              const linkExists=tokenValue?true:recipientLinkStatus.toLowerCase()==="not issued"?false:null;
+              const emailLink=String(signer.identityType||recipient?.identityType||"").toLowerCase()==="email-link";
+              const linkRevoked=["revoked","replaced"].includes(String(signer.emailLinkStatus||"").toLowerCase());
+              const opened=Number(signer.emailLinkOpenCount||0)>0||String(signer.emailLinkStatus||"").toLowerCase()==="opened"||["active","used"].includes(String(signer.emailLinkSessionStatus||"").toLowerCase());
               const used=Boolean(signed||get(signer,"tokenUsedAt","usedAt","linkUsedAt","consumedAt"));
-              const boundEnvelope=String(get(signer,"envelopeId","envelopeReference")||envelopeId)===envelopeId;
-              const boundDocument=String(get(signer,"documentId")||documentId)===documentId;
-              const boundSigner=String(get(signer,"signerId","id")||signerId)===signerId;
+              const boundEnvelope=Boolean(tokenValue)&&envelopeId===String(envelopeSnap.id);
+              const boundDocument=Boolean(tokenValue)&&documentId===String(envelope.documentId||"");
+              const boundSigner=Boolean(tokenValue)&&Boolean(signerId);
               const linkStatus={
                 exists:linkExists,
-                unexpired:linkExists&&Number.isFinite(expiryMs)?expiryMs>Date.now():null,
-                boundToDocumentAndSigner:linkExists?Boolean(boundEnvelope&&boundDocument&&boundSigner):null,
-                used:linkExists?used:null
+                unexpired:linkExists===true?(emailLink?!linkRevoked:(Number.isFinite(expiryMs)?expiryMs>Date.now():null)):null,
+                boundToDocumentAndSigner:linkExists===true?Boolean(boundEnvelope&&boundDocument&&boundSigner):linkExists===false?false:null,
+                opened:linkExists===true?opened:null,
+                used:linkExists===true?(signed||String(signer.emailLinkSessionStatus||"").toLowerCase()==="used"):null,
+                sourceStatus:recipientLinkStatus
               };
-              const fields=(Array.isArray(envelope.fields)?envelope.fields:[]).filter(f=>String(f.signerId||"")===signerId||(signerUid&&String(f.signerUid||"")===signerUid));
+              const assignedUid=String(recipient?.uid||signer.uid||signer.profileUid||"");
+              const fields=(Array.isArray(envelope.fields)?envelope.fields:[]).filter(f=>String(f.signerId||"")===signerId||(assignedUid&&String(f.signerUid||"")===assignedUid)||(signerUid&&String(f.signerUid||"")===signerUid));
               const fieldResults=fields.map(field=>{
                 const fieldId=String(field.fieldId||field.id||"");
                 const signatureRecord=signatures.find(record=>(String(record.signerId||"")===signerId||(signerUid&&String(record.signerUid||"")===signerUid))&&String(record.fieldId||"")===fieldId);
-                const eventEvidence=[...envelopeEvents,...queriedEvents].some(event=>(String(event.signerId||"")===signerId||(signerUid&&String(event.signerUid||event.uid||"")===signerUid))&&(event.signatureFieldHashes||[]).some(item=>String(item.fieldId||"")===fieldId&&/^[a-f0-9]{64}$/i.test(String(item.hash||""))));
+                const eventEvidence=[...envelopeEvents,...queriedEvents].some(event=>{
+                  const details=event.details||{};
+                  const eventName=String(event.type||event.event||"").toLowerCase();
+                  const signerMatches=String(event.signerId||details.signerId||"")===signerId||(assignedUid&&String(event.signerUid||event.actorUid||details.signerUid||details.actorUid||"")===assignedUid);
+                  const fieldHashes=event.signatureFieldHashes||details.signatureFieldHashes||[];
+                  const paneRecords=event.signaturePaneRecords||details.signaturePaneRecords||[];
+                  return signerMatches&&(/sign|complete/.test(eventName))&&(fieldHashes.some(item=>String(item.fieldId||"")===fieldId&&/^[a-f0-9]{64}$/i.test(String(item.hash||"")) )||paneRecords.some(item=>String(item.fieldId||"")===fieldId&&/^[a-f0-9]{64}$/i.test(String(item.signatureAssetHash||""))));
+                });
                 const signerValue=signer.fieldValues&&fieldId?signer.fieldValues[fieldId]:null;
-                const completed=Boolean(signatureRecord||eventEvidence||((signed)&&typeof signerValue==="string"&&signerValue.length));
-                return {fieldId,completed};
+                const evidenceVerified=Boolean(signatureRecord||eventEvidence);
+                const completed=Boolean(evidenceVerified||(signed&&Boolean(signer.signedAt)));
+                return {fieldId,completed,evidenceVerified};
               });
               return {
-                role:String(signer.role||signer.designation||"Signer"),
-                order:Number(signer.order||signer.signingOrder||index+1),
+                role:String(signer.role||signer.designation||recipient?.role||"Signer"),
+                order:Number(signer.order||signer.signingOrder||recipient?.routingOrder||String(signer.signerId||"").replace(/^S/,"")||index+1),
                 status:signed?"SIGNED":"PENDING",
                 signedAt:iso(signer.signedAt||signedEvent?.at),
                 email:masked(signerEmail),
                 linkStatus,
                 fieldsTotal:fields.length,
-                fieldsCompleted:fieldResults.filter(x=>x.completed).length
+                fieldsCompleted:fieldResults.filter(x=>x.completed).length,
+                fieldsEvidenceVerified:fieldResults.filter(x=>x.evidenceVerified).length
               };
             }).sort((a,b)=>a.order-b.order);
-          const sourceId=get(document,"primaryStorageId","storageId","driveFileId","googleDriveFileId","fileId","sourceFileId");
+          const sourceId=get(document,"primaryStorageId","storageId","driveFileId","googleDriveFileId","fileId","sourceFileId","archiveFileId","governanceArchiveFileId");
           const pendingCopy=envelope.completion?.archivePending||{};
           const partialId=get(pendingCopy,"storageId")||get(envelope,"latestPartialPdfStorageId","partialPdfStorageId","partialStorageId");
           const pdfs=[];
@@ -178,7 +196,7 @@ jobs:
             generatedAt:new Date().toISOString(),envelopeId,documentId,collection,
             status:String(envelope.status||"UNKNOWN"),environment:String(envelope.recordOrigin||envelope.dataEnvironment||"UNKNOWN"),
             signers,signersSigned:signedCount,signersPending:pendingCount,pendingSigner,
-            fieldsTotal,fieldsCompleted,auditChainValid,auditEvents:envelopeEvents.length,queriedSignatureEvents:queriedEvents.length,signatureRecords:signatures.length,
+            fieldsTotal,fieldsCompleted,fieldsEvidenceVerified:signers.reduce((n,s)=>n+s.fieldsEvidenceVerified,0),auditChainValid,auditEvents:envelopeEvents.length,queriedSignatureEvents:queriedEvents.length,signatureRecords:signatures.length,
             pdfs:safePdfs,driveCopy
           };
           fs.mkdirSync("forensic-court-snapshot",{recursive:true});
@@ -190,11 +208,12 @@ jobs:
             `- Collection: ${collection}`,
             `- Status / environment: ${result.status} / ${result.environment}`,
             `- Signers: ${signedCount} signed; ${pendingCount} pending; total ${signers.length}`,
-            `- Fields: ${fieldsCompleted} completed / ${fieldsTotal} total`,
+            `- Fields: ${fieldsCompleted} marked complete by signer state / ${fieldsTotal} assigned; ${result.fieldsEvidenceVerified} independently evidenced by signature records/events`,
+            `- Related signatureEvents records: ${queriedEvents.length}; related signatures records: ${signatures.length}`,
             `- Audit chain: ${auditChainValid?"VALID":"NOT VERIFIED"} (${envelopeEvents.length} chained events)`,"",
-            "| Order | Role | Status | Signed at | Masked email | Link exists | Unexpired | Bound to document+signer | Used | Fields completed / total |",
-            "|---:|---|---|---|---|---|---|---|---|---:|",
-            ...signers.map(s=>`| ${s.order} | ${s.role} | ${s.status} | ${s.signedAt||"—"} | ${s.email} | ${s.linkStatus.exists} | ${s.linkStatus.unexpired??"UNKNOWN"} | ${s.linkStatus.boundToDocumentAndSigner??"UNKNOWN"} | ${s.linkStatus.used??"UNKNOWN"} | ${s.fieldsCompleted}/${s.fieldsTotal} |`),"",
+            "| Order | Role | Status | Signed at | Masked email | Link exists | Unexpired | Bound to document+signer | Opened | Used | Link source status | Fields completed / total |",
+            "|---:|---|---|---|---|---|---|---|---|---|---:|",
+            ...signers.map(s=>`| ${s.order} | ${s.role} | ${s.status} | ${s.signedAt||"—"} | ${s.email} | ${s.linkStatus.exists} | ${s.linkStatus.unexpired??"UNKNOWN"} | ${s.linkStatus.boundToDocumentAndSigner??"UNKNOWN"} | ${s.linkStatus.opened??"UNKNOWN"} | ${s.linkStatus.used??"UNKNOWN"} | ${s.linkStatus.sourceStatus} | ${s.fieldsCompleted}/${s.fieldsTotal} |`),"",
             "## PDF hashes and copies","",
             "| PDF | Read status | SHA-256 | Byte length |","|---|---|---|---:|",
             ...safePdfs.map(p=>`| ${p.label} | ${p.status} | ${p.sha256||"—"} | ${p.byteLength??"—"} |`),"",
