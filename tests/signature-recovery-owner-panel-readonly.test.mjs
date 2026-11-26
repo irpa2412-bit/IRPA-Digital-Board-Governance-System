@@ -56,9 +56,9 @@ test("each recovery action passes its own button label into the route error form
 });
 
 test("refresh always forces a fresh Firebase ID token, bypasses HTTP caches and clears stale results before requesting",()=>{
- assert.match(queue,/getIdToken\\(user,true\\)/);
+ assert.match(queue,/getIdToken\(user,true\)/);
  assert.match(queue,/cache:"no-store"/);
- assert.match(queue,/if\\(reset\\)\\{setRows\\(\\[\\]\\);setTotal\\(0\\);setOffset\\(0\\);setSelected\\(null\\);\\}/);
+ assert.match(queue,/if\(reset\)\{setRows\(\[\]\);setTotal\(0\);setOffset\(0\);setSelected\(null\);\}/);
  assert.match(queue,/Last refreshed at:/);
  assert.match(queue,/Worker version:/);
  assert.match(queue,/VITE_BUILD_COMMIT/);
@@ -67,14 +67,13 @@ test("PWA worker activates immediately, claims clients, versions its cache and b
  const sw=fs.readFileSync(new URL("../public/sw.js",import.meta.url),"utf8");
  const main=fs.readFileSync(new URL("../src/main.jsx",import.meta.url),"utf8");
  const install=fs.readFileSync(new URL("../public/install.js",import.meta.url),"utf8");
- assert.match(sw,/self\\.skipWaiting\\(\\)/);
- assert.match(sw,/self\\.clients\\.claim\\(\\)/);
- assert.match(sw,/p\\.startsWith\\("\/api\/"\\)/);
- assert.match(sw,/CACHE_PREFIX\\+BUILD_KEY/);
+ assert.match(sw,/self\.skipWaiting\(\)/);
+ assert.match(sw,/self\.clients\.claim\(\)/);
+ assert.match(sw,/p\.startsWith\("\/api\/"\)/);
+ assert.match(sw,/CACHE_PREFIX\+BUILD_KEY/);
  assert.match(sw,/BUILD_KEY="20261126-refresh-pwa-1"/);
- assert.match(sw,/CACHE_PREFIX\\+BUILD_KEY/);
- assert.match(main,/serviceWorker\\.register/);
- assert.match(install,/serviceWorker\\.register/);
+ assert.match(main,/serviceWorker\.register/);
+ assert.match(install,/serviceWorker\.register/);
  assert.match(main,/updateViaCache: "none"/);
  assert.match(install,/updateViaCache:"none"/);
 });
