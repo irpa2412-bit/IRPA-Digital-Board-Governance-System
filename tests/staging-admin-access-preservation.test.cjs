@@ -27,6 +27,33 @@ beforeEach(async () => {
   });
 });
 
+test("member with invitationId cannot self-assign role arrays under staging rules", async () => {
+  const uid = "member-profile-with-invitation";
+  const email = "member-profile-with-invitation@example.test";
+  await env.withSecurityRulesDisabled(async context => {
+    await context.firestore().doc(`members/${uid}`).set({
+      uid,
+      email,
+      status: "Active",
+      role: "Member",
+      invitationId: "TEST-INVITATION-ID"
+    });
+  });
+
+  const member = env.authenticatedContext(uid, { email }).firestore();
+  await assertSucceeds(member.doc(`members/${uid}`).update({
+    displayName: "Updated member display name"
+  }));
+  for (const field of ["roles", "assignedRoles", "selectedRoles"]) {
+    await assertFails(member.doc(`members/${uid}`).update({
+      [field]: ["Executive Director"]
+    }));
+  }
+  await assertFails(member.doc(`members/${uid}`).update({
+    role: "Executive Director"
+  }));
+});
+
 async function seedMeeting(id) {
   await env.withSecurityRulesDisabled(async context => {
     await context.firestore().doc(`meetings/${id}`).set({
