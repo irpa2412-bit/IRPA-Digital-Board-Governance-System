@@ -46,10 +46,10 @@ export async function getRecoveryQueue(ctx,user,{limit=25,offset=0,recordAccess=
 }
 const isRecoveryNotFound=error=>Number(error?.status||error?.statusCode||error?.response?.status)===404||error?.code==="NOT_FOUND"||/not found|does not exist/i.test(String(error?.message||""));
 async function getRecoveryEnvelope(ctx,id){
-  let legacy=null;
+  let legacy=null,legacySource="durable-object";
   try{legacy=await ctx.meta.get("envelopes",id);}catch(error){if(!isRecoveryNotFound(error))throw error;}
-  if(!legacy&&ctx.firestore?.get)legacy=await ctx.firestore.get("envelopes",id);
-  if(legacy)return {...legacy,__collection:"envelopes",__source:legacy.__source||"durable-object"};
+  if(!legacy&&ctx.firestore?.get){legacy=await ctx.firestore.get("envelopes",id);legacySource="firestore";}
+  if(legacy)return {...legacy,__collection:"envelopes",__source:legacySource};
   let signature=null;
   if(ctx.firestore?.get)signature=await ctx.firestore.get("signatureEnvelopes",id);
   if(signature)return {...signature,__collection:"signatureEnvelopes",__source:"firestore"};
