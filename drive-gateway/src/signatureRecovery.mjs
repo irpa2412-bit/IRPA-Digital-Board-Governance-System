@@ -415,9 +415,14 @@ export function createSignatureRecoveryRouter({authenticateFirebaseRequest,getFi
     const emergencyPath=pathname.match(/^\/api\/recovery\/envelopes\/([A-Za-z0-9_-]{3,64})\/emergency-retrieval$/);
     if(emergencyPath&&request.method!=="POST")return json({ok:false,error:"Emergency retrieval requires POST."},405,corsHeaders(request));
     if(!emergencyPath&&request.method!=="GET")return json({ok:false,error:"Recovery evidence endpoints are read-only GET operations."},405,corsHeaders(request));
+    const requestId=crypto.randomUUID();
     let claims;
     try { claims=await authenticateFirebaseRequest(request,env); }
-    catch { return json({ok:false,error:"A valid IRPA sign-in is required."},401,corsHeaders(request)); }
+    catch(error) {
+      const code=["TOKEN_INVALID","PROFILE_LOOKUP_FAILED","NOT_ACTIVATED"].includes(error?.code)?error.code:"TOKEN_INVALID";
+      const status=code==="PROFILE_LOOKUP_FAILED"?503:code==="NOT_ACTIVATED"?403:401;
+      return json({ok:false,code,requestId},status,corsHeaders(request));
+    }
     const uid=String(claims?.user_id||"").trim();
     if(!uid)return json({ok:false,error:"A valid IRPA sign-in is required."},401,corsHeaders(request));
     const profile=await getFirestoreDocument(env,"adminProfiles/"+uid,claims.token).catch(()=>null);
@@ -427,7 +432,7 @@ export function createSignatureRecoveryRouter({authenticateFirebaseRequest,getFi
     try {
       if(emergencyPath){
         const result=await buildEmergencyRetrieval(ctx,user,decodeURIComponent(emergencyPath[1]));
-        if(!result.ok){const denied=result.status===403;const code=denied?"NOT_YOUR_ENVELOPE":"EMERGENCY_RETRIEVAL_FAILED:"+String(result.failureCode||"UNKNOWN");const explanation=EMERGENCY_FAILURE_EXPLANATIONS[result.failureCode||"UNKNOWN"];return json({ok:false,code,stages:result.stages,error:denied?"This envelope belongs to another owner.":explanation[0]+" / "+explanation[1]},result.status||500,corsHeaders(request));}
+        if(!result.ok){const denied=result.status===403;const code=denied?"NOT_OWNER":"EMERGENCY_RETRIEVAL_FAILED:"+String(result.failureCode||"UNKNOWN");const explanation=EMERGENCY_FAILURE_EXPLANATIONS[result.failureCode||"UNKNOWN"];return json({ok:false,code,requestId,stages:result.stages,error:denied?"This envelope belongs to another owner.":explanation[0]+" / "+explanation[1]},result.status||500,corsHeaders(request));}
         return new Response(result.bytes,{status:200,headers:{...corsHeaders(request),"content-type":"application/pdf",'content-disposition':`attachment; filename="${result.certificateVerified?"EMERGENCY-RETRIEVAL-COPY-NOT-ARCHIVED.pdf":"UNARCHIVED-COPY-CERTIFICATE-NOT-VERIFIED.pdf"}"`,"cache-control":"no-store, private","pragma":"no-cache","x-content-type-options":"nosniff","x-irpa-copy-source":"emergency-build","x-irpa-copy-label":result.label,"x-irpa-output-sha256":result.outputHash,"x-irpa-stage-log":JSON.stringify(result.stages)}});
       }
       if(pathname==="/api/recovery/envelopes") {
@@ -481,7 +486,8 @@ export function createSignatureRecoveryRouter({authenticateFirebaseRequest,getFi
     } catch(error) {
       const status=Number(error?.status)||500;
       const message=String(error?.message||"EMERGENCY_RETRIEVAL_REQUEST_FAILED");
-      return json({ok:false,error:message,stages:[{stageCode:"REQUEST",status:"fail",error:message}]},status,corsHeaders(request));
+      const code=status===403?"NOT_OWNER":String(error?.code||"RECOVERY_REQUEST_FAILED");
+      return json({ok:false,code,requestId,stages:[{stageCode:"REQUEST",status:"fail",error:message}]},status,corsHeaders(request));
     }
   };
 }
