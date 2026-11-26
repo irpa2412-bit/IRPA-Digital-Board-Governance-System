@@ -7,7 +7,7 @@ permissions:
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'security/member-role-array-emulator-proof']
   pull_request:
     branches: [main]
 
@@ -41,4 +41,4 @@ jobs:
           distribution: temurin
           java-version: "21"
       - name: Run Firestore security rules regression tests
-        run: npx firebase emulators:exec --only firestore "node tests/firestore.rules.test.cjs && node --test --test-concurrency=1 tests/meeting-category-policy.test.mjs tests/meeting-category-firestore-rules.test.cjs tests/finance-portal-policy.test.cjs"
+        run: npx firebase emulators:exec --only firestore "node tests/firestore.rules.test.cjs && node --test --test-concurrency=1 tests/member-profile-role-escalation.test.cjs tests/meeting-category-policy.test.mjs tests/meeting-category-firestore-rules.test.cjs tests/finance-portal-policy.test.cjs"
