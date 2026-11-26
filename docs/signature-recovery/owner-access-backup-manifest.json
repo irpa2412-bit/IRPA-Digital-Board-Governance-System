@@ -1,10 +1,10 @@
 {
   "projectId": "irpa-digital-board-governance",
-  "generatedAt": "2026-11-26T04:54:19.500Z",
+  "generatedAt": "2026-11-26T04:57:47.129Z",
   "readOnly": true,
   "exportFile": "court-owner-access-backup.json",
-  "byteLength": 2375146,
-  "sha256": "7e88600fec28ab1226c71da9d67c1311b8749348a670c304c0bbffd799e3c2a3",
+  "byteLength": 2373195,
+  "sha256": "2d426933bb7c374253c97ca0ac6732b675cdcbf6b5c6c7e99667306349ad0665",
   "collectionCounts": {
     "envelopes": {
       "count": 0,
@@ -31,6 +31,6 @@
       "pages": 1
     }
   },
-  "artifactName": "court-owner-access-backup-ea821cb68524a07c1c563eb267bba5cd84a40e12",
+  "artifactName": "court-owner-access-backup-962b0671197bcf72cf196338c961bf5709c09646",
   "retentionDays": 90
 }
