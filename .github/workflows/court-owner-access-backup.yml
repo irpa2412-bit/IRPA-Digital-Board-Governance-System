@@ -43,10 +43,19 @@ jobs:
           import { getAuth } from "firebase-admin/auth";
 
           const project = "irpa-digital-board-governance";
-          const identity = { uid: "UQxfLOXCl7bEQ7KNM6Tt4eKoJlg1", email: "molleld@irpa.or.tz", since: "2026-11-01T00:00:00.000Z" };
+          const identity = {
+            uid: "UQxfLOXCl7bEQ7KNM6Tt4eKoJlg1",
+            email: "molleld@irpa.or.tz",
+            accounts: [
+              {uid:"UQxfLOXCl7bEQ7KNM6Tt4eKoJlg1",email:"molleld@irpa.or.tz"},
+              {uid:"qkwrd5Tk9TbbfcqHUapNdQsQXXo2",email:"irpa2412@gmail.com"},
+              {uid:"yPW2PVTDagZREYWluu3biGKXEel2",email:"danielmollel26@gmail.com"}
+            ],
+            since: "2026-11-01T00:00:00.000Z"
+          };
           const excludedOldIds = new Set(["IRPA-ENV-2026-11501354","ENV-4b06e60941f8eb1d"]);
-          const knownUids = new Set([identity.uid]);
-          const knownEmails = new Set([identity.email]);
+          const knownUids = new Set(identity.accounts.map(x=>x.uid));
+          const knownEmails = new Set(identity.accounts.map(x=>x.email));
           const sa = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
           if (sa.project_id !== project || !sa.client_email || !sa.private_key) {
             throw new Error("Production service-account metadata validation failed.");
@@ -75,7 +84,7 @@ jobs:
                 if (name === "signatureProfiles") {
                   const uid=String(data.uid||data.ownerUid||doc.id||"");
                   const profileEmails=["email","primaryEmail","secondaryEmail","alternateEmail","personalEmail","workEmail","contactEmail"].map(k=>String(data[k]||"").trim().toLowerCase()).filter(Boolean);
-                  if(uid===identity.uid||profileEmails.includes(identity.email)){matched.set(doc.ref.path,row);for(const email of profileEmails)knownEmails.add(email);}
+                  if(knownUids.has(uid)||profileEmails.some(email=>knownEmails.has(email))){matched.set(doc.ref.path,row);for(const email of profileEmails)knownEmails.add(email);}
                 }
                 if (name === "envelopes" || name === "signatureEnvelopes") {
                   const ownerIds=[data.ownerUid,data.senderUid,data.createdBy,data.createdByUid,...(Array.isArray(data.participantUids)?data.participantUids:[])].filter(Boolean).map(String);
@@ -144,7 +153,7 @@ jobs:
           const allEnvelopes=["envelopes","signatureEnvelopes"].flatMap(name=>exported[name].rows.map(row=>({collection:name,id:row.id,data:row.data||{}})));
           const dateMs=v=>{if(v?.toDate)return v.toDate().getTime();const n=Date.parse(String(v||""));return Number.isFinite(n)?n:0;};
           const mostRecentFive=allEnvelopes.sort((a,b)=>dateMs(b.data.createdAt)-dateMs(a.data.createdAt)).slice(0,5).map(x=>({collection:x.collection,envelopeId:x.id,documentId:x.data.documentId||null,title:x.data.title||null,environment:x.data.dataEnvironment||x.data.environment||x.data.recordOrigin||null,status:x.data.status||null,createdAt:x.data.createdAt?.toDate?.().toISOString?.()||x.data.createdAt||null}));
-          const ownerAuthUsers=authUsers.filter(u=>u.uid===identity.uid||(u.email&&emails.has(String(u.email).trim().toLowerCase())));
+          const ownerAuthUsers=authUsers;
           const emailGroups = new Map();
           for (const u of ownerAuthUsers) { const e=String(u.email||"").toLowerCase(); if(e) emailGroups.set(e,[...(emailGroups.get(e)||[]),u]); }
           const duplicateEmails = [...emailGroups.entries()].filter(([,users])=>users.length>1).map(([email,users])=>({email,uids:users.map(u=>u.uid),created:users.map(u=>u.creationTime)}));
