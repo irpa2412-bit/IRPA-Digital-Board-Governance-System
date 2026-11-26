@@ -7,7 +7,7 @@ import { buildUnarchivedCompletedCopy } from "./courtRecoveryCopy.mjs";
 import { buildSignedPdf, MAX_PDF_BYTES } from "./pdf.mjs";
 import { verifyCertificateInput, verifyCertificatePageText, extractPdfText } from "./recoveryCertificateVerifier.mjs";
 
-const isOwner=(envelope,user)=>Boolean(user?.uid)&&(envelope.createdBy===user.uid||envelope.createdByUid===user.uid||envelope.ownerUid===user.uid||user.isAdmin===true);
+const isOwner=(envelope,user)=>Boolean(user?.uid)&&(envelope.createdBy===user.uid||envelope.createdByUid===user.uid||envelope.ownerUid===user.uid||envelope.senderUid===user.uid||user.isAdmin===true);
 async function validChain(events){
   if(!Array.isArray(events))return false;
   let previous="GENESIS";
@@ -26,25 +26,35 @@ export async function getRecoveryQueue(ctx,user,{limit=25,offset=0,recordAccess=
   if(!user?.uid)throw new HttpError(401,"Authentication required.");
   const safeLimit=Math.max(1,Math.min(50,limit==null?25:(Number.isInteger(Number(limit))?Number(limit):25)));
   const safeOffset=Math.max(0,Math.min(10000,Number.isInteger(Number(offset))?Number(offset):0));
-  const rows=await ctx.meta.list("envelopes");
-  const eligible=(rows||[]).filter(row=>row.status!=="Completed"&&isOwner(row,user))
+  const [legacyRows,signatureRows]=await Promise.all([ctx.meta.list("envelopes"),ctx.meta.list("signatureEnvelopes")]);
+  const byId=new Map();
+  for(const row of legacyRows||[])byId.set(row.id,{...row,__collection:"envelopes"});
+  for(const row of signatureRows||[])byId.set(row.id,{...row,__collection:"signatureEnvelopes"});
+  const eligible=[...byId.values()].filter(row=>row.status!=="Completed"&&isOwner(row,user))
     .sort((a,b)=>String(b.updatedAt||b.createdAt||"").localeCompare(String(a.updatedAt||a.createdAt||"")));
-  const page=eligible.slice(safeOffset,safeOffset+safeLimit);if(recordAccess)for(const envelope of page)await appendRecoveryAccessEvent(ctx,user,envelope.id,"recovery.queue.viewed");return {ok:true,total:eligible.length,limit:safeLimit,offset:safeOffset,items:page.map(e=>({
-    envelopeId:e.id,documentId:e.documentId,title:e.title||"",status:e.status,
+  const page=eligible.slice(safeOffset,safeOffset+safeLimit);if(recordAccess)for(const envelope of page)await appendRecoveryAccessEvent(ctx,user,envelope.id,"recovery.queue.viewed", {collection:envelope.__collection});return {ok:true,total:eligible.length,limit:safeLimit,offset:safeOffset,items:page.map(e=>({
+    collection:e.__collection,envelopeId:e.id,documentId:e.documentId,title:e.title||"",status:e.status,
     failedAt:e.completionFailure?.failedAt||null,stage:e.completionFailure?.stage||"NOT_RECORDED",
     signerCount:Array.isArray(e.signers)?e.signers.length:0
   }))};
 }
+async function getRecoveryEnvelope(ctx,id){
+  const legacy=await ctx.meta.get("envelopes",id);
+  if(legacy)return {...legacy,__collection:"envelopes"};
+  const signature=await ctx.meta.get("signatureEnvelopes",id);
+  if(signature)return {...signature,__collection:"signatureEnvelopes"};
+  return null;
+}
 async function appendRecoveryAccessEvent(ctx,user,id,type,details={}){
-  const current=await ctx.meta.get("envelopes",id);
+  const current=await getRecoveryEnvelope(ctx,id);
   if(!current||!isOwner(current,user)||current.status==="Completed")throw new HttpError(409,"Recovery record changed or is no longer eligible; refresh before continuing.");
   const at=ctx.now().toISOString();
   const eventId="recovery-"+id+"-"+Date.parse(at)+"-"+randomHex(8);
-  await ctx.meta.create("recoveryAccessEvents",eventId,{envelopeId:id,type,actor:user.uid,at,...details});
+  await ctx.meta.create("recoveryAccessEvents",eventId,{envelopeId:id,envelopeCollection:current.__collection,type,actor:user.uid,at,...details});
 }
 async function loadOwnedIncompleteEnvelope(ctx,user,id){
   if(!user?.uid)throw new HttpError(401,"Authentication required.");
-  const envelope=await ctx.meta.get("envelopes",id);
+  const envelope=await getRecoveryEnvelope(ctx,id);
   if(!envelope)throw new HttpError(404,"Recovery record not found.");
   if(!isOwner(envelope,user))throw new HttpError(403,"This envelope belongs to another owner.");
   if(envelope.status==="Completed")throw new HttpError(409,"Completed envelopes do not require recovery assessment.");
@@ -322,7 +332,7 @@ export async function buildEmergencyRetrieval(ctx,user,id,{extractText=extractPd
     return {ok:false,status:409,stages,failureCode,errorClass:safeRecoveryErrorClass(error)};
   };
   try{
-    const envelope=await ctx.meta.get("envelopes",id);
+    const envelope=await getRecoveryEnvelope(ctx,id);
     if(!envelope)throw Object.assign(new Error("Recovery record not found."),{status:404});
     if(!emergencyOwner(envelope,user))throw Object.assign(new Error("This envelope belongs to another owner."),{status:403});
     if(envelope.status!=="CompletionFailed")throw Object.assign(new Error("Only failed-completion envelopes are eligible for emergency retrieval."),{status:409});
