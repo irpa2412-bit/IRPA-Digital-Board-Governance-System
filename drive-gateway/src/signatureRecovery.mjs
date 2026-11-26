@@ -245,7 +245,7 @@ export async function buildRecoveryPreview(ctx,user,id){
 
 const EMERGENCY_COPY_LABEL="EMERGENCY-RETRIEVAL-COPY, NOT ARCHIVED";
 const EMERGENCY_COPY_DISCLAIMER="Cryptographic PDF seal: NOT APPLIED. Emergency retrieval copy, not archived.";
-const emergencyOwner=(envelope,user)=>Boolean(user?.uid)&&(envelope.createdBy===user.uid||envelope.createdByUid===user.uid||envelope.ownerUid===user.uid||user.isAdmin===true);
+const emergencyOwner=(envelope,user)=>Boolean(user?.uid)&&(envelope.createdBy===user.uid||envelope.createdByUid===user.uid||envelope.ownerUid===user.uid||envelope.senderUid===user.uid||user.isAdmin===true);
 async function appendEmergencyCertificatePage(bytes,events,signers,completedAt){
   const pdf=await PDFDocument.load(bytes);
   let page=pdf.addPage([612,792]);
