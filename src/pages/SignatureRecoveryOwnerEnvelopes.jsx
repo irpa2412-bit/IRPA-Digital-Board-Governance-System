@@ -34,12 +34,13 @@ export default function SignatureRecoveryOwnerEnvelopes(){
   if(!auth.currentUser){if(reset){setRows([]);setTotal(0);setSelected(null);setError("Sign in to view your recovery assessment queue. (AUTH_REQUIRED)");}return}
   setBusy(true);setError("");
   if(reset){setRows([]);setTotal(0);setOffset(0);setSelected(null);}
+  const healthRequest=loadWorkerHealth();
   try{
-   const [page,health]=await Promise.all([loadRecoveryPage(reset?0:offset,reset?"Refresh recovery queue":"Load more recovery queue"),loadWorkerHealth()]);
+   const page=await loadRecoveryPage(reset?0:offset,reset?"Refresh recovery queue":"Load more recovery queue");
    const items=Array.isArray(page.items)?page.items:[];
-   setRows(current=>reset?items:[...current,...items]);setTotal(Number(page.total)||0);setOffset((reset?0:offset)+items.length);setWorkerHealth(health);
+   setRows(current=>reset?items:[...current,...items]);setTotal(Number(page.total)||0);setOffset((reset?0:offset)+items.length);
   }catch(err){setError(err?.message||"Unable to load recovery assessments.");}
-  finally{setLastRefreshed(new Date().toLocaleString());setBusy(false);}
+  finally{setWorkerHealth(await healthRequest);setLastRefreshed(new Date().toLocaleString());setBusy(false);}
  },[offset]);
  useEffect(()=>{const unsubscribe=onAuthStateChanged(auth,()=>{void load(true)});return()=>unsubscribe()},[]);
  return <section className="panel signature-owner-envelopes" aria-labelledby="owner-envelopes-heading" style={{margin:"14px 0",padding:18,border:"1px solid var(--border-color,#cbd5e1)",borderRadius:12}}>
