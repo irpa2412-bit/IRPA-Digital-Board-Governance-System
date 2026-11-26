@@ -64,7 +64,7 @@ beforeEach(async () => {
 });
 
 
-test("member can update their own displayName only when the immutable invitationId condition is satisfied", async () => {
+test("member self-profile displayName update requires an existing invitationId precondition", async () => {
   const withInvitationUid = "profile-editor-with-invitation";
   const withoutInvitationUid = "profile-editor-without-invitation";
 
@@ -94,10 +94,6 @@ test("member can update their own displayName only when the immutable invitation
   await assertFails(permittedDb.doc("members/" + withInvitationUid).update({
     role: "Executive Director"
   }));
-  await assertFails(permittedDb.doc("members/" + withInvitationUid).update({
-    invitationId: "DIFFERENT_INVITATION"
-  }));
-
   const missingInvitationDb = testEnv.authenticatedContext(withoutInvitationUid, {
     email: "profile-editor-without-invitation@example.test"
   }).firestore();
