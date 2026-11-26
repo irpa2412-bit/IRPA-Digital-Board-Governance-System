@@ -33,21 +33,21 @@ async function validChain(events){
 function signedEvent(envelope,signerId){
   return (envelope.events||[]).filter(event=>event.type==="signer.signed"&&event.signerId===signerId).at(-1)||null;
 }
-export async function getRecoveryQueue(ctx,user,{limit=25,offset=0}={}){
+export async function getRecoveryQueue(ctx,user,{limit=25,offset=0,recordAccess=true}={}){
   if(!user?.uid)throw new HttpError(401,"Authentication required.");
   const safeLimit=Math.max(1,Math.min(50,limit==null?25:(Number.isInteger(Number(limit))?Number(limit):25)));
   const safeOffset=Math.max(0,Math.min(10000,Number.isInteger(Number(offset))?Number(offset):0));
   const rows=await listEnvelopeRecords(ctx);
   const eligible=(rows||[]).filter(row=>row.status!=="Completed"&&isOwner(row,user))
     .sort((a,b)=>String(b.updatedAt||b.createdAt||"").localeCompare(String(a.updatedAt||a.createdAt||"")));
-  const page=eligible.slice(safeOffset,safeOffset+safeLimit);for(const envelope of page)await appendRecoveryAccessEvent(ctx,user,envelope.id,"recovery.queue.viewed");return {ok:true,total:eligible.length,limit:safeLimit,offset:safeOffset,items:page.map(e=>({
+  const page=eligible.slice(safeOffset,safeOffset+safeLimit);if(recordAccess)for(const envelope of page)await appendRecoveryAccessEvent(ctx,user,envelope.id,"recovery.queue.viewed");return {ok:true,total:eligible.length,limit:safeLimit,offset:safeOffset,items:page.map(e=>({
     envelopeId:e.id,documentId:e.documentId,title:e.title||"",status:e.status,
     failedAt:e.completionFailure?.failedAt||null,stage:e.completionFailure?.stage||"NOT_RECORDED",
     signerCount:Array.isArray(e.signers)?e.signers.length:0
   }))};
 }
 async function appendRecoveryAccessEvent(ctx,user,id,type,details={}){
-  const current=await ctx.meta.get("envelopes",id);
+  const current=await getEnvelopeRecord(ctx,id);
   if(!current||!isOwner(current,user)||current.status==="Completed")throw new HttpError(409,"Recovery record changed or is no longer eligible; refresh before continuing.");
   const at=ctx.now().toISOString();
   const eventId="recovery-"+id+"-"+Date.parse(at)+"-"+randomHex(8);
