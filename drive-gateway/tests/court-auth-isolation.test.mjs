@@ -42,3 +42,8 @@ test("signing-link router wiring remains present and separate from activation re
   assert.match(source, /openGatewayEmailSigning/);
   assert.match(source, /getGatewaySigningPdf/);
 });
+
+test("Gateway responses expose distinct authentication codes and request IDs", () => {
+  assert.match(source, /const authCode=\["TOKEN_INVALID","PROFILE_LOOKUP_FAILED","NOT_ACTIVATED"\]/);
+  assert.match(source, /requestId:error\.requestId\|\|crypto\.randomUUID\(\)/);
+});
