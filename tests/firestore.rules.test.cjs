@@ -103,7 +103,7 @@ test("member self-profile displayName update requires an existing invitationId p
 });
 
 
-test("SECURITY REPRODUCTION (pre-fix): member with invitationId can self-add institutional role arrays", async () => {
+test("member with invitationId cannot self-add institutional role arrays", async () => {
   const uid = "self-escalating-member";
   await testEnv.withSecurityRulesDisabled(async context => {
     await context.firestore().doc("members/" + uid).set({
@@ -125,9 +125,9 @@ test("SECURITY REPRODUCTION (pre-fix): member with invitationId can self-add ins
 
   // Each write keeps uid, role, status and invitationId unchanged, so it
   // exercises the overly broad self(id) update alternative on its own.
-  await assertSucceeds(profile.update({ roles: ["Executive Director"] }));
-  await assertSucceeds(profile.update({ assignedRoles: ["Executive Director"] }));
-  await assertSucceeds(profile.update({ selectedRoles: ["Executive Director"] }));
+  await assertFails(profile.update({ roles: ["Executive Director"] }));
+  await assertFails(profile.update({ assignedRoles: ["Executive Director"] }));
+  await assertFails(profile.update({ selectedRoles: ["Executive Director"] }));
 });
 
 
