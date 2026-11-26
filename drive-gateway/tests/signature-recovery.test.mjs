@@ -470,7 +470,8 @@ test("emergency retrieval rejects a non-owner explicitly",async()=>{
   assert.equal(response.status,403);
   const body=await response.json();
   assert.equal(body.error,"This envelope belongs to another owner.");
-  assert.equal(body.code,"NOT_YOUR_ENVELOPE");
+  assert.equal(body.code,"NOT_OWNER");
+  assert.match(body.requestId,/^[0-9a-f-]{36}$/i);
 });
 
 test("emergency retrieval returns stage log and SHA-256 without changing envelope or using a new timestamp",async()=>{
