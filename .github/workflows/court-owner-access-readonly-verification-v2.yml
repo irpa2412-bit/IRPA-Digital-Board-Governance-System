@@ -68,7 +68,7 @@ jobs:
               const sa=JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT||"{}");
               if(sa.project_id!=="irpa-digital-board-governance"||!sa.client_email||!sa.private_key)throw new Error("SERVICE_ACCOUNT_CONFIG_INVALID");
               const html=fs.readFileSync("public/administrator.html","utf8");
-              const apiKey=html.match(/apiKey\\s*:\\s*["']([^"']+)["']/)?.[1];
+              const apiKey=html.match(/apiKey\s*:\s*["']([^"']+)["']/)?.[1];
               if(!apiKey)throw new Error("FIREBASE_API_KEY_NOT_FOUND");
               const now=Math.floor(Date.now()/1000),b64=x=>Buffer.from(JSON.stringify(x)).toString("base64url");
               const unsigned=b64({alg:"RS256",typ:"JWT"})+"."+b64({iss:sa.client_email,sub:sa.client_email,aud:"https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit",iat:now,exp:now+3600,uid});
@@ -135,6 +135,9 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p docs/incident
+          if [[ ! -f docs-results.md ]]; then
+            printf '%s\\n' '# Court owner-access Gateway verification' '- Status: VERIFICATION_WORKFLOW_FAILED_BEFORE_RESULTS' '- Error code: CHECK_VERIFY_STEP_LOGS' > docs-results.md
+          fi
           if [[ -f docs-results.md ]]; then
             node --input-type=module -e 'import fs from "node:fs";const p="docs/incident/results-20261126.md";const next=fs.readFileSync("docs-results.md","utf8");if(fs.existsSync(p))fs.appendFileSync(p,"\n---\n\n"+next);else fs.writeFileSync(p,next);'
           fi
