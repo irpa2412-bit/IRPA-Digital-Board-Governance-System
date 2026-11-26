@@ -10,7 +10,7 @@ const authSource = workerSource.slice(authStart, authEnd);
 
 test("18-document mocked Worker batch sends one document per request, caps concurrency at 3, retries at most 3 times, and stays within 8 subrequests", async () => {
   assert.match(authSource, /getFirebaseJwks\(\)/, "Firebase ID-token signature verification uses one cold JWKS fetch");
-  assert.match(authSource, /assertActivatedPortalUser\(claims, env\)/, "authentication performs the activation-profile Firestore read");
+  assert.match(authSource, /assertActivatedPortalUser\(claims, env(?:, requestId)?\)/, "authentication performs the activation-profile Firestore read");
   const reconcileStart = workerSource.indexOf("async function reconcileSignatureDocumentIds");
   const reconcileEnd = workerSource.indexOf("async function controlledDocumentUploadPolicyCheck", reconcileStart);
   const reconcileSource = workerSource.slice(reconcileStart, reconcileEnd);
