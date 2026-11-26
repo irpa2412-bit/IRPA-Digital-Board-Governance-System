@@ -89,6 +89,13 @@ jobs:
             previous=hash;
           }
           const recipients=Array.isArray(envelope.recipients)?envelope.recipients:[];
+          const recipientQueues=new Map();
+          for(const item of recipients){
+            const key=String(item.name||"").trim().toLowerCase()+"|"+String(item.email||"").trim().toLowerCase();
+            if(!recipientQueues.has(key))recipientQueues.set(key,[]);
+            recipientQueues.get(key).push(item);
+          }
+          const recipientOffsets=new Map();
           const signers=(Array.isArray(envelope.signers)?envelope.signers:[])
             .map((signer,index)=>{
               const signerId=String(signer.id||signer.signerId||"");
@@ -96,7 +103,11 @@ jobs:
               const signerEmail=String(signer.email||"");
               const signedEvent=envelopeEvents.filter(e=>e?.type==="signer.signed"&&(String(e.signerId||"")===signerId||(signerUid&&String(e.signerUid||e.uid||"")===signerUid))).at(-1);
               const signed=String(signer.status||"").toLowerCase()==="signed"||Boolean(signer.signedAt)||Boolean(signedEvent);
-              const recipient=recipients.find(item=>String(item.name||"").trim().toLowerCase()===String(signer.name||"").trim().toLowerCase()&&String(item.email||"").trim().toLowerCase()===String(signer.email||"").trim().toLowerCase())||null;
+              const identityKey=String(signer.name||"").trim().toLowerCase()+"|"+String(signer.email||"").trim().toLowerCase();
+              const recipientMatches=recipientQueues.get(identityKey)||[];
+              const recipientOffset=recipientOffsets.get(identityKey)||0;
+              const recipient=recipientMatches[recipientOffset]||null;
+              recipientOffsets.set(identityKey,recipientOffset+1);
               const tokenValue=get(signer,"tokenHash","signingTokenHash","linkTokenHash","signingToken","linkToken","invitationToken","token","tokenId");
               const recipientLinkStatus=String(recipient?.emailLinkStatus||"UNKNOWN");
               const expiry=get(signer,"tokenExpiresAt","linkExpiresAt","expiresAt","invitationExpiresAt");
@@ -137,7 +148,7 @@ jobs:
               });
               return {
                 role:String(signer.role||signer.designation||recipient?.role||"Signer"),
-                order:Number(signer.order||signer.signingOrder||recipient?.routingOrder||String(signer.signerId||"").replace(/^S/,"")||index+1),
+                order:Number(signer.order||signer.signingOrder||String(signer.signerId||"").replace(/^S/,"")||recipient?.routingOrder||index+1),
                 status:signed?"SIGNED":"PENDING",
                 signedAt:iso(signer.signedAt||signedEvent?.at),
                 email:masked(signerEmail),
@@ -191,11 +202,12 @@ jobs:
           const pendingCount=signers.length-signedCount;
           const fieldsTotal=signers.reduce((n,s)=>n+s.fieldsTotal,0);
           const fieldsCompleted=signers.reduce((n,s)=>n+s.fieldsCompleted,0);
-          const pendingSigner=signers.find(s=>s.status==="PENDING")||null;
+          const pendingSigners=signers.filter(s=>s.status==="PENDING");
+          const pendingSigner=pendingSigners[0]||null;
           const result={
             generatedAt:new Date().toISOString(),envelopeId,documentId,collection,
             status:String(envelope.status||"UNKNOWN"),environment:String(envelope.recordOrigin||envelope.dataEnvironment||"UNKNOWN"),
-            signers,signersSigned:signedCount,signersPending:pendingCount,pendingSigner,
+            signers,signersSigned:signedCount,signersPending:pendingCount,pendingSigner,pendingSigners,
             fieldsTotal,fieldsCompleted,fieldsEvidenceVerified:signers.reduce((n,s)=>n+s.fieldsEvidenceVerified,0),auditChainValid,auditEvents:envelopeEvents.length,queriedSignatureEvents:queriedEvents.length,signatureRecords:signatures.length,
             pdfs:safePdfs,driveCopy
           };
@@ -210,6 +222,7 @@ jobs:
             `- Signers: ${signedCount} signed; ${pendingCount} pending; total ${signers.length}`,
             `- Fields: ${fieldsCompleted} marked complete by signer state / ${fieldsTotal} assigned; ${result.fieldsEvidenceVerified} independently evidenced by signature records/events`,
             `- Related signatureEvents records: ${queriedEvents.length}; related signatures records: ${signatures.length}`,
+            `- signatureEvents types: ${[...new Set(queriedEvents.map(e=>String(e.event||e.type||"UNKNOWN")))].join(", ")||"NONE"}`,
             `- Audit chain: ${auditChainValid?"VALID":"NOT VERIFIED"} (${envelopeEvents.length} chained events)`,"",
             "| Order | Role | Status | Signed at | Masked email | Link exists | Unexpired | Bound to document+signer | Opened | Used | Link source status | Fields completed / total |",
             "|---:|---|---|---|---|---|---|---|---|---|---:|",
@@ -220,7 +233,7 @@ jobs:
             `- Drive snapshot copy: ${driveCopy.status}`,
             `- Snapshot folder: ${driveCopy.folderUrl||"NOT AVAILABLE"}`,
             `- Retrieval Vault: ${driveCopy.retrievalVaultUrl||"NOT AVAILABLE"}`,"",
-            `- Pending signer: ${pendingSigner?pendingSigner.order+" / "+pendingSigner.role+" / "+pendingSigner.email:"NONE"}`,
+            `- Pending signers: ${pendingSigners.map(s=>s.order+" / "+s.role+" / "+s.email).join("; ")||"NONE"}`,
             "- Signing-link token values: NOT OUTPUT."
           ].join("\n");
           fs.writeFileSync("forensic-court-snapshot/report.md",report+"\n");
