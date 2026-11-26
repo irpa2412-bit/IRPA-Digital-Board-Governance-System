@@ -7,7 +7,7 @@ import { buildUnarchivedCompletedCopy } from "./courtRecoveryCopy.mjs";
 import { buildSignedPdf, MAX_PDF_BYTES } from "./pdf.mjs";
 import { verifyCertificateInput, verifyCertificatePageText, extractPdfText } from "./recoveryCertificateVerifier.mjs";
 
-const isOwner=(envelope,user)=>Boolean(user?.uid)&&(envelope.createdBy===user.uid||envelope.createdByUid===user.uid||envelope.ownerUid===user.uid||envelope.senderUid===user.uid||user.isAdmin===true);
+const isOwner=(envelope,user)=>Boolean(user?.uid)&&(envelope.createdBy===user.uid||envelope.createdByUid===user.uid||envelope.ownerUid===user.uid||envelope.senderUid===user.uid);
 async function validChain(events){
   if(!Array.isArray(events))return false;
   let previous="GENESIS";
@@ -26,10 +26,16 @@ export async function getRecoveryQueue(ctx,user,{limit=25,offset=0,recordAccess=
   if(!user?.uid)throw new HttpError(401,"Authentication required.");
   const safeLimit=Math.max(1,Math.min(50,limit==null?25:(Number.isInteger(Number(limit))?Number(limit):25)));
   const safeOffset=Math.max(0,Math.min(10000,Number.isInteger(Number(offset))?Number(offset):0));
-  const [legacyRows,signatureRows]=await Promise.all([ctx.meta.list("envelopes"),ctx.meta.list("signatureEnvelopes")]);
+  const [legacyRows,signatureRows,firestoreLegacyRows,firestoreSignatureRows]=await Promise.all([
+    ctx.meta.list("envelopes"),ctx.meta.list("signatureEnvelopes"),
+    ctx.firestore?.list?ctx.firestore.list("envelopes"):Promise.resolve([]),
+    ctx.firestore?.list?ctx.firestore.list("signatureEnvelopes"):Promise.resolve([])
+  ]);
   const byId=new Map();
-  for(const row of legacyRows||[])byId.set(row.id,{...row,__collection:"envelopes"});
-  for(const row of signatureRows||[])byId.set(row.id,{...row,__collection:"signatureEnvelopes"});
+  for(const row of legacyRows||[])byId.set("envelopes/"+row.id,{...row,__collection:"envelopes",__source:"durable-object"});
+  for(const row of signatureRows||[])byId.set("signatureEnvelopes/"+row.id,{...row,__collection:"signatureEnvelopes",__source:"durable-object"});
+  for(const row of firestoreLegacyRows||[])byId.set("envelopes/"+row.id,{...row,__collection:"envelopes",__source:"firestore"});
+  for(const row of firestoreSignatureRows||[])byId.set("signatureEnvelopes/"+row.id,{...row,__collection:"signatureEnvelopes",__source:"firestore"});
   const eligible=[...byId.values()].filter(row=>row.status!=="Completed"&&isOwner(row,user))
     .sort((a,b)=>String(b.updatedAt||b.createdAt||"").localeCompare(String(a.updatedAt||a.createdAt||"")));
   const page=eligible.slice(safeOffset,safeOffset+safeLimit);if(recordAccess)for(const envelope of page)await appendRecoveryAccessEvent(ctx,user,envelope.id,"recovery.queue.viewed", {collection:envelope.__collection});return {ok:true,total:eligible.length,limit:safeLimit,offset:safeOffset,items:page.map(e=>({
@@ -42,10 +48,13 @@ const isRecoveryNotFound=error=>Number(error?.status||error?.statusCode||error?.
 async function getRecoveryEnvelope(ctx,id){
   let legacy=null;
   try{legacy=await ctx.meta.get("envelopes",id);}catch(error){if(!isRecoveryNotFound(error))throw error;}
-  if(legacy)return {...legacy,__collection:"envelopes"};
+  if(!legacy&&ctx.firestore?.get)legacy=await ctx.firestore.get("envelopes",id);
+  if(legacy)return {...legacy,__collection:"envelopes",__source:legacy.__source||"durable-object"};
   let signature=null;
+  if(ctx.firestore?.get)signature=await ctx.firestore.get("signatureEnvelopes",id);
+  if(signature)return {...signature,__collection:"signatureEnvelopes",__source:"firestore"};
   try{signature=await ctx.meta.get("signatureEnvelopes",id);}catch(error){if(!isRecoveryNotFound(error))throw error;}
-  if(signature)return {...signature,__collection:"signatureEnvelopes"};
+  if(signature)return {...signature,__collection:"signatureEnvelopes",__source:"durable-object"};
   return null;
 }
 async function appendRecoveryAccessEvent(ctx,user,id,type,details={}){
@@ -74,7 +83,7 @@ export async function assessRecoveryEvidence(ctx,user,id,{recordAccess=true}={})
   const events=Array.isArray(envelope.events)?envelope.events:[];
   const modernEnvelope=envelope.__collection==="signatureEnvelopes";
   const auditChainStatus=modernEnvelope&&events.length===0?"NOT_HASH_CHAINED":events.length===0?"NO_EVENTS":(await validChain(events)?"VERIFIED":"FAILED");
-  const document=await ctx.meta.get("documents",envelope.documentId);
+  const document=envelope.__source==="firestore"&&ctx.firestore?.get?await ctx.firestore.get("documents",envelope.documentId):await ctx.meta.get("documents",envelope.documentId);
   const sourceStorageId=document?.primaryStorageId||document?.storageId||document?.driveFileId||document?.fileId||envelope.primaryStorageId||envelope.sourcePdfStorageId||null;
   const expectedHashes=[...new Set([document?.sha256,document?.hash,envelope.sha256,envelope.documentHash,envelope.originalHash,envelope.gatewayOriginalHash].filter(value=>typeof value==="string"&&value.trim()).map(value=>value.trim().toLowerCase()))];
   let sourceHash=null,sourceHashStatus="NO_STORED_HASH",sourceHashCode="SOURCE_HASH_MISSING",sourceHashReason="No stored source hash is available.";
@@ -264,7 +273,7 @@ export async function buildRecoveryPreview(ctx,user,id){
 
 const EMERGENCY_COPY_LABEL="EMERGENCY-RETRIEVAL-COPY, NOT ARCHIVED";
 const EMERGENCY_COPY_DISCLAIMER="Cryptographic PDF seal: NOT APPLIED. Emergency retrieval copy, not archived.";
-const emergencyOwner=(envelope,user)=>Boolean(user?.uid)&&(envelope.createdBy===user.uid||envelope.createdByUid===user.uid||envelope.ownerUid===user.uid||envelope.senderUid===user.uid||user.isAdmin===true);
+const emergencyOwner=(envelope,user)=>Boolean(user?.uid)&&(envelope.createdBy===user.uid||envelope.createdByUid===user.uid||envelope.ownerUid===user.uid||envelope.senderUid===user.uid);
 async function appendEmergencyCertificatePage(bytes,events,signers,completedAt){
   const pdf=await PDFDocument.load(bytes);
   let page=pdf.addPage([612,792]);
