@@ -792,9 +792,11 @@ export default {
         message === "Firebase token is expired." ||
         message === "Firebase token signing key not found.";
 
+      const authCode=["TOKEN_INVALID","PROFILE_LOOKUP_FAILED","NOT_ACTIVATED"].includes(error?.code)?error.code:null;
       return json({
         ok: false,
         error: message,
+        ...(authCode?{code:authCode,requestId:error.requestId||crypto.randomUUID()}:{}),
         ...(error?.googleStatus ? {googleStatus:error.googleStatus} : {}),
         ...(error?.googleMessage ? {googleMessage:error.googleMessage} : {})
       }, Number(error?.status || 0) || (isAuthError ? 401 : 500), corsHeaders(request));
@@ -3584,12 +3586,14 @@ async function driveFetch(env, accessToken, path, options = {}) {
 }
 
 async function authenticateFirebaseRequest(request, env, options = {}) {
+  const requestId = crypto.randomUUID();
   const header = request.headers.get("Authorization") || "";
   const match = header.match(/^Bearer\s+([^\s]+)$/i);
   if (!match) {
     const error = new Error("Firebase authentication is required.");
     error.status = 401;
     error.code = "TOKEN_INVALID";
+    error.requestId = requestId;
     throw error;
   }
 
@@ -3609,6 +3613,7 @@ async function authenticateFirebaseRequest(request, env, options = {}) {
     const error = new Error("Firebase ID token is invalid, expired, or not issued for this production project.");
     error.status = 401;
     error.code = "TOKEN_INVALID";
+    error.requestId = requestId;
     error.cause = cause;
     throw error;
   }
@@ -3618,6 +3623,7 @@ async function authenticateFirebaseRequest(request, env, options = {}) {
     const error = new Error("Firebase ID token subject is invalid.");
     error.status = 401;
     error.code = "TOKEN_INVALID";
+    error.requestId = requestId;
     throw error;
   }
   const claims = {
@@ -3633,11 +3639,11 @@ async function authenticateFirebaseRequest(request, env, options = {}) {
       emailVerified: payload.email_verified === true
     }
   };
-  if (options.skipActivation !== true) await assertActivatedPortalUser(claims, env);
+  if (options.skipActivation !== true) await assertActivatedPortalUser(claims, env, requestId);
   return claims;
 }
 
-async function assertActivatedPortalUser(claims, env) {
+async function assertActivatedPortalUser(claims, env, requestId = crypto.randomUUID()) {
   let adminToken;
   try {
     adminToken = await getFirestoreAdminAccessToken(env);
@@ -3681,6 +3687,7 @@ async function assertActivatedPortalUser(claims, env) {
     const error = new Error("IRPA_INVITATION_FAILURE:PORTAL_ACTIVATION_REQUIRED");
     error.status = 403;
     error.code = "NOT_ACTIVATED";
+    error.requestId = requestId;
     throw error;
   }
   } catch (cause) {
@@ -3688,6 +3695,7 @@ async function assertActivatedPortalUser(claims, env) {
     const error = new Error("Portal activation profile lookup failed.");
     error.status = 503;
     error.code = "PROFILE_LOOKUP_FAILED";
+    error.requestId = requestId;
     error.cause = cause;
     throw error;
   }
