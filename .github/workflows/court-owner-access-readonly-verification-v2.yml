@@ -88,7 +88,10 @@ jobs:
                   out.routes.push(item);out.pdfs.push(item);return {item,body:null};
                 }
                 const body=await r.json().catch(()=>({}));
-                const item={route:label,status:r.status,code:body.code||body.errorCode||null,requestId:body.requestId||null};
+                const item={route:label,status:r.status,code:body.code||body.errorCode||null,requestId:body.requestId||null,
+                  auditChainStatus:body.auditChain?.status||null,auditChainCode:body.auditChain?.code||null,
+                  sourceHashStatus:body.sourceHashStatus||null,sourceHashCode:body.sourceHashCode||null,
+                  summary:body.summary||null,total:body.total??null};
                 out.routes.push(item);return {item,body};
               };
               const list=await call("my-envelope-list","/api/signature-workflow/list");
@@ -117,8 +120,8 @@ jobs:
           const lines=["# Court owner-access Gateway verification — 2026-11-26","",`- Status: ${out.status}`,`- Personal login UID: ${uid}`,`- Candidate envelope: ${candidateId}`,
             `- Worker commit: ${out.workerBefore?.commit||"NOT_VERIFIED"}`,`- Candidate found in personal list: ${out.listResult?.candidateFound?"YES":"NO"}`,
             `- Stored owner UID: ${out.candidate?.ownerUid||"NOT_RETURNED"}`,`- Stored owner email: ${out.candidate?.ownerEmail||"NOT_RETURNED"}`,"",
-            "## Route results","| Route | HTTP | Error code | SHA-256 |","|---|---:|---|---|",
-            ...out.routes.map(x=>`| ${x.route} | ${x.status} | ${x.code||""} | ${x.sha256||""} |`),"",
+            "## Route results","| Route | HTTP | Error code | Request ID | Evidence / source hash | SHA-256 |","|---|---:|---|---|---|---|",
+            ...out.routes.map(x=>`| ${x.route} | ${x.status} | ${x.code||""} | ${x.requestId||""} | ${x.auditChainStatus||x.sourceHashStatus||x.total||""} ${x.auditChainCode||x.sourceHashCode||""} | ${x.sha256||""} |`),"",
             "## PDF outputs",...(out.pdfs.length?out.pdfs.map(x=>`- ${x.file}: SHA-256 ${x.sha256} (${x.bytes} bytes)`):["- No PDF was returned by the read-only routes."])];
           fs.writeFileSync("docs-results.md",lines.join("\n")+"\n");
           console.log(JSON.stringify({status:out.status,candidate:out.candidate||null,routes:out.routes,pdfs:out.pdfs}));
