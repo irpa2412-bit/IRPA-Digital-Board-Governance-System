@@ -3992,6 +3992,33 @@ async function getFirestoreDocument(env, path, firebaseToken) {
   return response.json();
 }
 
+async function listFirestoreCollectionDocuments(env, collectionName, firebaseToken) {
+  const rows = [];
+  let pageToken = "";
+  let pages = 0;
+  do {
+    const url = new URL(`https://firestore.googleapis.com/v1/projects/${getFirebaseProjectId(env)}/databases/(default)/documents/${encodeURIComponent(collectionName)}`);
+    url.searchParams.set("pageSize", "1000");
+    if (pageToken) url.searchParams.set("pageToken", pageToken);
+    const response = await fetch(url.toString(), { headers: { Authorization: `Bearer ${firebaseToken}` } });
+    if (!response.ok) {
+      const error = new Error(`Unable to retrieve Firestore collection ${collectionName}.`);
+      error.status = response.status;
+      error.code = "FIRESTORE_COLLECTION_LIST_FAILED";
+      throw error;
+    }
+    const payload = await response.json();
+    for (const document of payload.documents || []) {
+      const id = String(document.name || "").split("/").pop();
+      if (id) rows.push({ id, ...(firestoreDocumentToPlain(document) || {}) });
+    }
+    pageToken = payload.nextPageToken || "";
+    pages += 1;
+    if (pages > 500) throw new Error("Firestore collection pagination safety limit exceeded.");
+  } while (pageToken);
+  return rows;
+}
+
 function firestoreMapArray(field) {
   if (!Array.isArray(field?.arrayValue?.values)) return [];
   return field.arrayValue.values.map(v => {
