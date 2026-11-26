@@ -31,7 +31,8 @@ jobs:
           node-version: 20
 
       - name: Install Firebase Admin SDK
-        run: npm --prefix functions install --omit=dev --ignore-scripts
+        working-directory: functions
+        run: npm install --omit=dev --ignore-scripts
 
       - name: Read member profiles and calculate counts only
         env:
@@ -43,10 +44,11 @@ jobs:
             echo "::error::FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE is unavailable to this GitHub Actions run."
             exit 1
           fi
+          cd functions
           node <<'NODE'
           const fs = require("node:fs");
-          const { initializeApp, cert } = require("./functions/node_modules/firebase-admin/app");
-          const { getFirestore } = require("./functions/node_modules/firebase-admin/firestore");
+          const { initializeApp, cert } = require("firebase-admin/app");
+          const { getFirestore } = require("firebase-admin/firestore");
 
           (async () => {
             const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
