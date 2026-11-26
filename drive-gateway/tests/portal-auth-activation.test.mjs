@@ -142,3 +142,30 @@ test("invalid Firebase token returns TOKEN_INVALID with a request ID", async () 
     global.fetch = originalFetch;
   }
 });
+
+test("Firestore profile lookup failure returns PROFILE_LOOKUP_FAILED with a request ID", async () => {
+  const originalFetch = global.fetch;
+  const token = idToken("portal-lookup-failure-uid", "lookup-failure@example.org");
+  global.fetch = async url => {
+    const target = String(url);
+    if (target.includes("securetoken@system.gserviceaccount.com")) return new Response(JSON.stringify({ keys: [jwk] }), { status: 200 });
+    if (target === "https://oauth2.googleapis.com/token") return new Response(JSON.stringify({ error: "temporarily_unavailable" }), { status: 503 });
+    throw new Error("Unexpected external request in lookup-failure test: " + target);
+  };
+  try {
+    const response = await handler.fetch(new Request("https://gw.test/api/session/profile", {
+      method: "POST",
+      headers: { Authorization: "Bearer " + token },
+      body: "{}"
+    }), {
+      FIREBASE_PROJECT_ID: "irpa-digital-board-governance",
+      FIREBASE_SERVICE_ACCOUNT_JSON: JSON.stringify(serviceAccount)
+    });
+    assert.equal(response.status, 503);
+    const body = await response.json();
+    assert.equal(body.code, "PROFILE_LOOKUP_FAILED");
+    assert.match(body.requestId, /^[0-9a-f-]{36}$/i);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
