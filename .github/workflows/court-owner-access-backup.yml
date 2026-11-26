@@ -10,6 +10,7 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
 
 concurrency:
   group: court-owner-access-forensic-backup
@@ -127,9 +128,7 @@ jobs:
             const d = row.data || {};
             return { path: row.path, id: row.id, ownerUid:d.ownerUid||d.createdByUid||d.createdBy||null,
               senderUid:d.senderUid||null, participantUids:Array.isArray(d.participantUids)?d.participantUids:[],
-              ownerEmail:d.ownerEmail||d.senderEmail||d.email||null,
-              senderEmail:d.senderEmail||null, email:d.email||null,
-              documentId:d.documentId||d.documentRef||null, status:d.status||null };
+              documentId:d.documentId||d.documentRef||null };
           });
           const emailGroups = new Map();
           for (const u of authUsers) { const e=String(u.email||"").toLowerCase(); if(e) emailGroups.set(e,[...(emailGroups.get(e)||[]),u]); }
@@ -169,16 +168,44 @@ jobs:
           if-no-files-found: error
           retention-days: 90
 
-      - name: Commit manifest only (never export data)
+      - name: Commit counts, hashes and IDs; comment on PR #982
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p docs/signature-recovery
+          mkdir -p docs/signature-recovery docs/incident
           cp forensic-backup/manifest.json docs/signature-recovery/owner-access-backup-manifest.json
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          const m=JSON.parse(fs.readFileSync("forensic-backup/manifest.json","utf8"));
+          const p=JSON.parse(fs.readFileSync("forensic-backup/court-owner-access-backup.json","utf8"));
+          const records=p.identityComparison?.records||[];
+          const auth=p.identityComparison?.authAccounts||[];
+          const owners=[...new Set(records.flatMap(x=>[x.ownerUid,x.senderUid,...(x.participantUids||[])].filter(Boolean)))].sort();
+          const logins=[...new Set(auth.map(x=>x.uid).filter(Boolean))].sort();
+          const counts=Object.entries(m.collectionCounts||{}).map(([k,v])=>`| ${k} | ${v.count} |`).join("\\n");
+          const report=[
+            "# Court owner-access incident results — 2026-11-26","",
+            "| Backup field | Value |","|---|---|",
+            `| Export exists | ${m.byteLength>0?"YES":"NO"} |`,
+            `| Export byte length | ${m.byteLength} |`,
+            `| Export SHA-256 | ${m.sha256} |`,
+            `| Artifact | ${m.artifactName} (90 days) |`,
+            `| Matched record count | ${records.length} |`,
+            `| Duplicate login email groups | ${(p.identityComparison?.duplicateEmails||[]).length} |`,"",
+            "## Collection counts","","| Collection | Count |","|---|---:|",counts,"",
+            "## Court stored IDs vs matching Firebase Auth IDs","",
+            `- Stored owner/sender/participant UIDs: ${owners.join(", ")||"NONE"}`,
+            `- Matching Firebase Auth UIDs: ${logins.join(", ")||"NONE"}`,
+            `- UID overlap: ${owners.some(x=>logins.includes(x))?"MATCH":"NO MATCH"}`,""
+          ].join("\\n");
+          fs.writeFileSync("docs/incident/results-20261126.md",report+"\\n");
+          fs.writeFileSync("/tmp/pr-comment.md",report+"\\n");
+          NODE
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs/signature-recovery/owner-access-backup-manifest.json
-          git commit -m "Record Court owner-access backup manifest"
+          git add docs/signature-recovery/owner-access-backup-manifest.json docs/incident/results-20261126.md
+          git commit -m "Record Court owner-access forensic results"
           git push origin "HEAD:incident/owner-access-20261126"
+          gh pr review 982 --repo "${{ github.repository }}" --comment --body-file /tmp/pr-comment.md
