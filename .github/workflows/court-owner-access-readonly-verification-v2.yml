@@ -45,7 +45,7 @@ jobs:
           const excluded=new Set(["IRPA-ENV-2026-11501354","ENV-4b06e60941f8eb1d"]);
           const out={status:"PENDING",ownerUid:uid,candidateId,routes:[],pdfs:[]};
           const callRaw=(path,options={})=>fetch(base+path,options);
-          const prResponse=await fetch(`https://api.github.com/repos/${repo}/pulls/987`,{headers:{Authorization:"Bearer "+process.env.GH_TOKEN,Accept:"application/vnd.github+json"}});
+          const prResponse=await fetch(`https://api.github.com/repos/${repo}/pulls/989`,{headers:{Authorization:"Bearer "+process.env.GH_TOKEN,Accept:"application/vnd.github+json"}});
           if(!prResponse.ok)throw new Error("FIX_PR_LOOKUP_FAILED");
           const pr=await prResponse.json();
           if(!pr.merged){
@@ -106,16 +106,62 @@ jobs:
                 const id=encodeURIComponent(candidateId);
                 let recoveryOffset=0,recoveryTotal=0,recoveryPages=0,recoveryItems=[];
                 do {
-                  const recovery=await call(`recovery-envelope-list-page-${recoveryPages+1}`,`/api/recovery/envelopes?limit=100&offset=${recoveryOffset}&diagnostic=1`);
+                  const recovery=await call(`recovery-envelope-list-page-${recoveryPages+1}`,`/api/recovery/envelopes?limit=50&offset=${recoveryOffset}&diagnostic=1`);
                   recoveryItems.push(...(recovery.body?.items||[]));
                   recoveryTotal=Number(recovery.body?.total||0);
-                  recoveryOffset+=100;
+                  recoveryOffset+=(recovery.body?.items||[]).length;
                   recoveryPages+=1;
                 } while(recoveryOffset<recoveryTotal&&recoveryPages<50);
                 out.recoveryQueueCandidateFound=recoveryItems.some(e=>String(e.envelopeId||e.id||"")===candidateId);
                 out.recoveryQueueTotal=recoveryTotal;
                 out.recoveryQueuePages=recoveryPages;
                 await call("court-evidence","/api/recovery/envelopes/"+id+"/evidence?diagnostic=1");
+                const view=await call("court-envelope-view","/api/signature-workflow/view?envelopeId="+id);
+                if(view.body?.envelope){
+                  const envelope=view.body.envelope;
+                  const signers=Array.isArray(envelope.signers)?envelope.signers:(Array.isArray(envelope.recipients)?envelope.recipients:[]);
+                  const fields=Array.isArray(envelope.fields)?envelope.fields:[];
+                  const maskEmail=value=>{
+                    const email=String(value||"").trim();
+                    const at=email.indexOf("@");
+                    if(at<1)return email?"[masked]":"";
+                    const local=email.slice(0,at),domain=email.slice(at+1);
+                    return local.slice(0,2)+"***@"+domain;
+                  };
+                  const applied=field=>Boolean(field?.applied===true||field?.isApplied===true||field?.signed===true||field?.valueApplied===true||field?.appliedAt||field?.signedAt||field?.completedAt||field?.signatureApplied===true||field?.signatureData||field?.signatureImage||field?.signatureUrl||field?.signatureImageUrl||field?.signatureDataUrl||field?.signedValue);
+                  const safeSigners=signers.map((signer,index)=>{
+                    const uid=String(signer.uid||signer.signerUid||"");
+                    const email=String(signer.email||signer.signerEmail||"").trim().toLowerCase();
+                    const assigned=fields.filter(field=>(uid&&String(field.signerUid||"")===uid)||(email&&String(field.signerEmail||"").trim().toLowerCase()===email));
+                    const linkMetadataPresent=["tokenHash","linkTokenHash","emailLinkTokenHash","signingLinkHash","linkSentAt","emailLinkSentAt","emailSentAt","sentAt"].some(key=>Boolean(signer[key]));
+                    return{
+                      order:signer.order??signer.signingOrder??signer.level??index+1,
+                      orderSource:["order","signingOrder","level"].some(key=>signer[key]!==undefined)?"stored":"array-position",
+                      role:signer.role||signer.signerRole||"UNSPECIFIED",
+                      status:String(signer.status||(signer.signedAt?"SIGNED":"PENDING")).toUpperCase(),
+                      signedAt:signer.signedAt||signer.completedAt||null,
+                      email:maskEmail(email),
+                      fieldsAssigned:assigned.length,
+                      fieldsCompleted:assigned.filter(applied).length,
+                      linkStatus:linkMetadataPresent?"LINK_METADATA_PRESENT_VALIDITY_NOT_CHECKED":"UNKNOWN_NO_LINK_METADATA",
+                      tokenExposed:false
+                    };
+                  });
+                  out.courtSnapshot={
+                    envelopeId:candidateId,
+                    status:envelope.status||null,
+                    environment:envelope.dataEnvironment||envelope.environment||envelope.recordOrigin||null,
+                    totalSigners:safeSigners.length,
+                    signedCount:safeSigners.filter(s=>s.status==="SIGNED"||s.signedAt).length,
+                    pendingCount:safeSigners.filter(s=>!s.signedAt&&s.status!=="SIGNED").length,
+                    totalFields:fields.length,
+                    fieldsCompleted:safeSigners.reduce((n,s)=>n+s.fieldsCompleted,0),
+                    signers:safeSigners,
+                    tokenValuesReadOrReturned:false
+                  };
+                }else{
+                  out.courtSnapshot={status:"UNAVAILABLE",reason:"ENVELOPE_VIEW_NOT_RETURNED",tokenValuesReadOrReturned:false};
+                }
                 await call("emergency-retrieval","/api/recovery/envelopes/"+id+"/emergency-retrieval","POST");
                 await call("completed-copy","/api/recovery/envelopes/"+id+"/completed-copy.pdf");
                 out.status="VERIFICATION_COMPLETED";
@@ -132,6 +178,7 @@ jobs:
             `- Stored owner UID: ${out.candidate?.ownerUid||"NOT_RETURNED"}`,`- Stored owner email: ${out.candidate?.ownerEmail||"NOT_RETURNED"}`,"",
             "## Route results","| Route | HTTP | Error code | Request ID | Evidence / source hash | SHA-256 |","|---|---:|---|---|---|---|",
             ...out.routes.map(x=>`| ${x.route} | ${x.status} | ${x.code||""} | ${x.requestId||""} | ${x.auditChainStatus||x.sourceHashStatus||x.total||""} ${x.auditChainCode||x.sourceHashCode||""} | ${x.sha256||x.sourceHash||""} |`),"",
+            "## Court snapshot",...(out.courtSnapshot?.signers||[]).map(x=>`- Order ${x.order} (${x.role}) | ${x.status} | ${x.email||"masked"} | fields ${x.fieldsCompleted}/${x.fieldsAssigned} | link: ${x.linkStatus}`),`- Signers: ${out.courtSnapshot?.signedCount??"unknown"} signed / ${out.courtSnapshot?.pendingCount??"unknown"} pending / ${out.courtSnapshot?.totalSigners??"unknown"} total`,`- Fields: ${out.courtSnapshot?.fieldsCompleted??"unknown"}/${out.courtSnapshot?.totalFields??"unknown"} completed`,`- Token values exposed: NO`,"",
             "## PDF outputs",...(out.pdfs.length?out.pdfs.map(x=>`- ${x.file}: SHA-256 ${x.sha256} (${x.bytes} bytes)`):["- No PDF was returned by the read-only routes."])];
           fs.writeFileSync("docs-results.md",lines.join("\n")+"\n");
           console.log(JSON.stringify({status:out.status,candidate:out.candidate||null,routes:out.routes,pdfs:out.pdfs}));
