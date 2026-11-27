@@ -9,6 +9,7 @@ test("meeting fixture isolation guard is classified only as Meeting Portal sourc
   const guard = "scripts/meeting-portal-fixture-isolation-guard.sh";
   assert.equal(isProtectionFile(guard), false);
   assert.ok(registry.portals["Meeting Portal"].paths.includes(guard));
+  assert.equal(registry.shared.some(entry => entry.path === guard), false);
   const meetingRecord = {
     status: "complete",
     declaration: {
