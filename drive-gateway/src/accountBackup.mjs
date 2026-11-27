@@ -89,7 +89,7 @@ export function createAccountBackupRouter({ authenticateFirebaseRequest, getDriv
         const metadataResponse = await fetch("https://www.googleapis.com/drive/v3/files/" + encodeURIComponent(fileId) + "?fields=id,name,mimeType,parents,trashed,size", { headers:{ Authorization:"Bearer " + accessToken } });
         const metadata = await metadataResponse.json().catch(() => ({}));
         if (!metadataResponse.ok || metadata.trashed === true || metadata.mimeType !== BACKUP_MIME ||
-            !(metadata.parents || []).includes(folderId) || !/^[a-zA-Z0-9._-]{1,120}\\.enc\\.json$/.test(String(metadata.name || ""))) {
+            !(metadata.parents || []).includes(folderId) || !/^[a-zA-Z0-9._-]{1,120}\.enc\.json$/.test(String(metadata.name || ""))) {
           return json({ ok:false, error:"BACKUP_FILE_OUTSIDE_CUSTODIAN_FOLDER" }, 403, headers);
         }
         const declaredSize = Number(metadata.size || 0);
