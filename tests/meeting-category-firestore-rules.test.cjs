@@ -51,6 +51,21 @@ function meeting(overrides = {}) {
     ...overrides
   };
 }
+test("inactive IRPA identities can read scheduled meetings but not ongoing meetings without invitation", async () => {
+  await testEnv.withSecurityRulesDisabled(async context=>{
+    const db=context.firestore();
+    await db.doc("members/inactive-member").set({uid:"inactive-member",status:"Suspended"});
+    await db.doc("employees/former-employee").set({uid:"former-employee",status:"Former"});
+    await db.doc("meetings/scheduled").set({meetingCategory:"GENERAL",status:"Scheduled",initiatorUid:"other-user"});
+    await db.doc("meetings/ongoing").set({meetingCategory:"GENERAL",status:"In Progress",initiatorUid:"other-user",participantUids:["invited-user"]});
+  });
+  const member=testEnv.authenticatedContext("inactive-member").firestore();
+  const employee=testEnv.authenticatedContext("former-employee").firestore();
+  await assertSucceeds(member.doc("meetings/scheduled").get());
+  await assertSucceeds(employee.doc("meetings/scheduled").get());
+  await assertFails(member.doc("meetings/ongoing").get());
+});
+
 test("active designated departmental director can create a categorized meeting", async () => {
   const db = testEnv.authenticatedContext("departmental-director", {
     email: "director@example.test"
