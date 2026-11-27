@@ -18,55 +18,63 @@ const governance = {
   initiatorUid: "secretary-1"
 };
 
-test("governance category denies an unrelated active staff identity", () => {
+test("private meeting visibility depends on explicit participation, not category or board role", () => {
   assert.equal(canAccessMeetingCategory(governance, {
     uid: "staff-1", active: true, activeEmployee: true, role: "Staff"
   }), false);
-});
-
-test("governance category allows authorised board roles and administrators", () => {
   assert.equal(canAccessMeetingCategory(governance, {
     uid: "board-1", active: true, activeMember: true, isBoardMember: true, role: "Board Member"
+  }), false);
+  assert.equal(canAccessMeetingCategory({ ...governance, participantUids: ["staff-1"] }, {
+    uid: "staff-1", active: true, activeEmployee: true, role: "Staff"
   }), true);
-  assert.equal(canAccessMeetingCategory(governance, { uid: "admin-1", isAdmin: true }), true);
+  assert.equal(canAccessMeetingCategory({ ...governance, participantUids: ["ordinary-member"] }, {
+    uid: "ordinary-member", active: true, activeMember: true, role: "Member"
+  }), true);
 });
 
-test("general meetings allow active institutional members and employees", () => {
+test("administrator-only accounts do not gain private meeting access", () => {
+  assert.equal(canAccessMeetingCategory(governance, { uid: "admin-1", isAdmin: true }), false);
+  assert.equal(canAccessMeetingCategory({ ...governance, participantUids: ["admin-member"] }, {
+    uid: "admin-member", active: true, activeMember: true, isAdmin: true
+  }), true);
+});
+
+test("general meeting category does not grant private access to all active IRPA persons", () => {
   const general = { meetingCategory: "GENERAL", meetingPolicyId: "GENERAL" };
-  assert.equal(canAccessMeetingCategory(general, { active: true, activeMember: true }), true);
-  assert.equal(canAccessMeetingCategory(general, { active: true, activeEmployee: true }), true);
+  assert.equal(canAccessMeetingCategory(general, { uid: "member-1", active: true, activeMember: true }), false);
+  assert.equal(canAccessMeetingCategory({ ...general, participantUids: ["member-1"] }, {
+    uid: "member-1", active: true, activeMember: true
+  }), true);
 });
 
-test("explicitly invited participants can access their meeting regardless of institutional role", () => {
+test("explicitly invited external participants can access only their listed meeting", () => {
   assert.equal(canAccessMeetingCategory(governance, {
-    uid: "external-expert", active: true, role: "External Expert"
+    uid: "external-expert", email: "external@example.test", active: false, role: "External Expert"
   }, { isInvited: true }), true);
+  assert.equal(canAccessMeetingCategory(governance, {
+    uid: "other-external", email: "other@example.test", active: false
+  }), false);
 });
 
-test("any active registered member or employee may initiate a meeting", () => {
-  assert.equal(canRegisterMeeting({ active: true, role: "Departmental Director" }), true);
-  assert.equal(canRegisterMeeting({ active: false, role: "Departmental Director" }), false);
-  assert.equal(canRegisterMeeting({ active: true, role: "Staff" }), true);
-  assert.equal(canRegisterMeeting({ active: true, role: "Member" }), true);
-  assert.equal(canRegisterMeeting({ isAdmin: true }), true);
+test("only an active member or employee may initiate a meeting", () => {
+  assert.equal(canRegisterMeeting({ active: true, activeMember: true, role: "Departmental Director" }), true);
+  assert.equal(canRegisterMeeting({ active: true, activeEmployee: true, role: "Staff" }), true);
+  assert.equal(canRegisterMeeting({ active: true, role: "Staff" }), false);
+  assert.equal(canRegisterMeeting({ active: false, activeMember: true }), false);
+  assert.equal(canRegisterMeeting({ isAdmin: true }), false);
 });
 
-test("released meeting general details remain protected while the initiator may manage appointments before proceedings", () => {
+test("only the active meeting organiser may edit before proceedings begin", () => {
   assert.equal(canEditMeeting({ ...governance, registerStatus: "Registered", initiatorUid: "secretary-1" }, {
-    uid: "secretary-1", active: true, role: "Board Secretary"
+    uid: "secretary-1", active: true, activeMember: true, role: "Board Secretary"
   }), true);
   assert.equal(canEditMeeting({ ...governance, registerStatus: "Registered", initiatorUid: "secretary-1", status: "In Progress" }, {
-    uid: "secretary-1", active: true, role: "Board Secretary"
+    uid: "secretary-1", active: true, activeMember: true, role: "Board Secretary"
   }), false);
-  assert.equal(canEditMeeting({ ...governance, registerStatus: "Registered" }, { isAdmin: true }), true);
-});
-
-test("a designated initiator may edit only an unreleased meeting they initiated", () => {
+  assert.equal(canEditMeeting({ ...governance, registerStatus: "Registered" }, { isAdmin: true }), false);
   assert.equal(canEditMeeting({ ...governance, registerStatus: "Draft" }, {
-    uid: "secretary-1", active: true, role: "Board Secretary"
-  }), true);
-  assert.equal(canEditMeeting({ ...governance, registerStatus: "Draft" }, {
-    uid: "another-user", active: true, role: "Board Secretary"
+    uid: "another-user", active: true, activeEmployee: true
   }), false);
 });
 
@@ -100,9 +108,11 @@ test("meeting register retrieval avoids an unscoped collection read", () => {
   assert.ok(start >= 0 && end > start, "meeting retrieval function must be present");
   const source = meetingDataSource.slice(start, end);
   assert.doesNotMatch(source, /if\s*\(user\.uid\)\s*\{\s*const all\s*=\s*await getDocs\(ref\)/);
-  assert.match(source, /for\(const policy of Object\.values\(MEETING_CATEGORIES\)\)/);
-  assert.match(source, /query\(ref,where\("initiatorUid","==",uid\)\)/);
+  assert.doesNotMatch(source, /MEETING_CATEGORIES|meetingCategory|meetingPolicyId/);
+  assert.match(source, /where\("initiatorUid","==",uid\)/);
   assert.match(source, /for\(const field of \["participantUids"/);
+  assert.match(source, /coOrganizerUids/);
+  assert.match(source, /canAccessMeetingCategory\(meeting,identity\)/);
 });
 
 test("active Meeting Portal attendance screens never call undeployed Firebase attendance callables",()=>{
@@ -126,8 +136,9 @@ test("active Meeting Portal attendance screens never call undeployed Firebase at
 
 const meetingCentreSource = readFileSync(new URL("../src/pages/Meetings.jsx", import.meta.url), "utf8");
 test("Meeting Centre exposes initiation to every active member and employee", () => {
-  assert.ok(meetingCentreSource.includes("const canRegisterMeeting = identity => canRegisterMeetingByRole(identity) || identity.activeMember===true || identity.activeEmployee===true"));
-  assert.equal(meetingCentreSource.split("canRegisterMeeting({...actorIdentity,isAdmin:admin})").length - 1, 4);
+  assert.ok(meetingCentreSource.includes("const canRegisterMeeting = identity => canRegisterMeetingByRole(identity);"));
+  assert.ok(meetingCentreSource.includes("payload.organizerUid=actor.uid"));
+  assert.ok(meetingCentreSource.includes("payload.participantUids=[...new Set([actor.uid"));
 });
 
 const meetingGatewayContext = {
