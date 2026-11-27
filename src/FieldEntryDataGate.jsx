@@ -23,6 +23,7 @@ const verificationMapKey="irpaPortalDataEntryVerifications";
    environment even before any data is typed). The gate still opens only once per portal. Empty this list
    to make every portal wait for a real data-entry attempt. */
 const OPEN_ON_SELECTION=new Set(["Documents"]);
+const OPEN_MEETING_PORTAL_ACCESS=new Set(["Meeting Portal","Meetings","Meeting Room","Participants","Resolutions","Voting","Actions","Decisions"]);
 
 /* Controls that never count as data entry. Add data-irpa-no-gate to any element or container to opt it out. */
 const NEVER_GATE='[data-irpa-field-gate],[data-irpa-no-gate],.sidebar,.topbar,nav,[role="navigation"],[role="search"],[role="searchbox"],.desktop-webapp-navigation-roller,.page-back-next-navigation,[aria-label="Navigate to a sub-portal within the current portal"]';
@@ -123,6 +124,7 @@ export default function FieldEntryDataGate({portal}){
   const actualOnly=ACTUAL_ONLY_TYPES.has(dataType)||portalRequiresActual(field?field.portal:currentPortal);
 
   const isVerified=useCallback(name=>{
+    if(OPEN_MEETING_PORTAL_ACCESS.has(String(name||"").trim()))return true;
     const map=readMap();
     const record=map&&map[name];
     if(!record||record.portal!==name)return false;
