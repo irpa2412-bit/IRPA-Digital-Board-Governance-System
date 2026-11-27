@@ -28,15 +28,16 @@ export function canRegisterMeeting(identity={}){
 export function canAccessMeetingCategory(meeting={},identity={},options={}){
   const uid=String(identity.uid||"").trim();
   const email=String(identity.email||"").trim().toLowerCase();
+  const activeInstitutionalIdentity=identity.activeMember===true||identity.activeEmployee===true;
+  if(activeInstitutionalIdentity)return true;
   const listedUids=[...(Array.isArray(meeting.participantUids)?meeting.participantUids:[]),
     ...(Array.isArray(meeting.attendeeUids)?meeting.attendeeUids:[]),
-        ...(Array.isArray(meeting.invitedUids)?meeting.invitedUids:[]),
+    ...(Array.isArray(meeting.invitedUids)?meeting.invitedUids:[]),
     ...(Array.isArray(meeting.coOrganizerUids)?meeting.coOrganizerUids:[]),
     ...(Array.isArray(meeting.coOrganiserUids)?meeting.coOrganiserUids:[])].map(value=>String(value||"").trim());
   const listedEmails=[...(Array.isArray(meeting.participantEmails)?meeting.participantEmails:[]),
     ...(Array.isArray(meeting.attendeeEmails)?meeting.attendeeEmails:[]),
-    ...(Array.isArray(meeting.invitedEmails)?meeting.invitedEmails:[]),
-].map(value=>String(value||"").trim().toLowerCase());
+    ...(Array.isArray(meeting.invitedEmails)?meeting.invitedEmails:[])].map(value=>String(value||"").trim().toLowerCase());
   const personRows=[...(Array.isArray(meeting.participants)?meeting.participants:[]),
     ...(Array.isArray(meeting.attendees)?meeting.attendees:[])];
   const personMatch=personRows.some(person=>
