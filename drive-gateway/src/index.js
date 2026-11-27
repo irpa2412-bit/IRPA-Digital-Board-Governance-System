@@ -70,6 +70,7 @@ import { createBootstrapPrimaryAdministratorRoute } from "./adminIdentity.mjs";
 import { createPasswordRecoveryRouter } from "./passwordRecovery.mjs";
 import { createSignatureRecoveryRouter } from "./signatureRecovery.mjs";
 import { isEsignPath } from "./esignPathPolicy.mjs";
+import { createAccountBackupRouter } from "./accountBackup.mjs";
 
 function getFirebaseProjectId(env) {
   const projectId = String(env?.FIREBASE_PROJECT_ID || "").trim();
@@ -372,6 +373,8 @@ const metaOAuthRouter = createMetaOAuthRouter({
   corsHeaders
 });
 
+const accountBackupRouter = createAccountBackupRouter({ authenticateFirebaseRequest, getDriveAccessToken, corsHeaders, json });
+
 const emergencyStorageDiscoveryRoute = createEmergencyStorageDiscoveryRoute({
   authenticateFirebaseRequest,
   getFirestoreDocument,
@@ -418,6 +421,8 @@ export default {
 
       // Normalize trailing slashes so portal upload/archive actions cannot be blocked by URL formatting.
       const pathname = url.pathname.replace(/\/+$/, "") || "/";
+      const accountBackupResponse = await accountBackupRouter(request, env, pathname);
+      if (accountBackupResponse) return accountBackupResponse;
 
       if (pathname === "/api/system/smtp-selfcheck" && request.method === "POST") return await smtpSelfcheckRoute(request, env);
       if (pathname === "/api/auth/password-reset/prepare" || pathname === "/api/auth/password-reset/clear") return await passwordRecoveryRouter(request, env, pathname);
