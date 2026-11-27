@@ -228,3 +228,30 @@ test("email and My Documents retry trails continue independently when either sum
   assert.equal(secondResult.distribution.sent,2,"owner and signer email deliveries complete");
   assert.equal(secondResult.personalCopies.status,"Error");
 });
+
+test("summary counts every expected recipient even when an earlier failure leaves later records uncreated",async()=>{
+  const ctx=context(new TextEncoder().encode("%PDF-1.7\\nsummary fixture"),null);
+  const envelope={id:"ENV-PARTIAL-RECORDS",createdBy:"owner-uid",ownerEmail:"owner@example.test",ownerName:"Owner",status:"Completed",title:"Resolution",documentId:"DOC-PARTIAL",signers:[
+    {id:"S1",email:"first@example.test",name:"First",uid:null,status:"Signed",identityType:"email-link"},
+    {id:"S2",email:"second@example.test",name:"Second",uid:null,status:"Pending",identityType:"email-link"}
+  ]};
+  await ctx.meta.create("signatureDistributions","owner-delivery",{envelopeId:envelope.id,recipientKey:"owner:owner-uid",recipientEmail:"owner@example.test",status:"Sent",acceptedByMailServer:true,attempts:1});
+  const summary=await getSignatureDistributionSummary(ctx,envelope.id,envelope);
+  assert.equal(summary.total,3,"owner and both signer positions are expected recipients");
+  assert.equal(summary.sent,1);
+  assert.equal(summary.pending,2,"missing distribution rows must remain pending");
+  assert.equal(summary.complete,false,"partial record persistence must never look complete");
+  assert.equal(summary.status,"InProgress");
+  assert.deepEqual(summary.deliveries.map(row=>row.status),["Sent","Not Attempted","Not Attempted"]);
+});
+
+test("summary preserves an ambiguous SMTP result as Unknown rather than NotStarted",async()=>{
+  const ctx=context(new TextEncoder().encode("%PDF-1.7\\nsummary fixture"),null);
+  const envelope={id:"ENV-UNKNOWN-SUMMARY",createdBy:"owner-uid",ownerEmail:"owner@example.test",ownerName:"Owner",status:"Completed",title:"Resolution",documentId:"DOC-UNKNOWN-SUMMARY",signers:[]};
+  await ctx.meta.create("signatureDistributions","owner-unknown",{envelopeId:envelope.id,recipientKey:"owner:owner-uid",recipientEmail:"owner@example.test",status:"Unknown",deliveryOutcome:"unknown",acceptedByMailServer:false,attempts:1});
+  const summary=await getSignatureDistributionSummary(ctx,envelope.id,envelope);
+  assert.equal(summary.total,1);
+  assert.equal(summary.unknown,1);
+  assert.equal(summary.complete,false);
+  assert.equal(summary.status,"Unknown");
+});
