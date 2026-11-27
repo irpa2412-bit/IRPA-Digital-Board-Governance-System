@@ -129,7 +129,8 @@
         "drive-gateway/src/meetingDeletion.mjs",
         "drive-gateway/src/meetingEnvironment.mjs",
         "drive-gateway/tests/meeting-environment.test.mjs",
-        "scripts/meeting-portal-fixture-isolation-guard.sh"
+        "scripts/meeting-portal-fixture-isolation-guard.sh",
+        "src/FieldEntryDataGate.jsx"
       ],
       "sharedDependencies": [
         "src/App.jsx",
