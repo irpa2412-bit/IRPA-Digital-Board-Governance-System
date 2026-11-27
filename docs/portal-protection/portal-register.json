@@ -310,19 +310,6 @@
         "Meeting Portal"
       ],
       "class": "shared"
-    },
-    {
-      "path": "scripts/meeting-portal-fixture-isolation-guard.sh",
-      "portals": [
-        "Invitation Portal",
-        "Grants Intelligence and Funding Opportunities Portal",
-        "Signature Portal",
-        "Board Members Portal",
-        "Members and Employees Portal",
-        "Communication and Media Portal",
-        "Meeting Portal"
-      ],
-      "class": "shared"
     }
   ],
   "exclusions": [
