@@ -6,7 +6,7 @@
     "affectedPortals": [
       "Meeting Portal"
     ],
-    "reason": "Owner-authorised coordinated shared-file protection cycle for src/App.jsx. This portal independently verifies the shared navigation-shell change while preserving its own authorization, data, workflow and governance boundaries.",
+    "reason": "Owner-authorised Meeting Portal universal-access and meeting-scoped authority repair. The shared application shell and seven-owner protection cycle are handled separately in PR #995; this record covers only Meeting Portal implementation, its isolation guard, and its regression tests.",
     "files": [
       "drive-gateway/src/meetingServices.mjs",
       "drive-gateway/src/meetingDeletion.mjs",
@@ -41,9 +41,13 @@
       "src/pages/OperationalGatewaysParticipants.jsx",
       "tests/meeting-working-documents-security.test.mjs",
       "drive-gateway/src/index.js",
-      "scripts/portal-protection-smoke.mjs"
+      "scripts/portal-protection-smoke.mjs",
+      "drive-gateway/tests/meeting-services-router.test.mjs",
+      "src/FieldEntryDataGate.jsx",
+      "src/pages/Resolutions.jsx",
+      "tests/meeting-isolation-guard.test.mjs"
     ],
-    "expectedEffect": "The shared application shell makes the complete Meeting Portal module set available to every identity with a Members or Employees register record, regardless of active status or selected authority. It does not change this portal's own data, workflows, permissions or role controls.",
+    "expectedEffect": "Every IRPA member or employee identity can access the complete Meeting Portal and initiate/register meetings regardless of status, title, department, membership/employment category, invitation or participant listing. Access to an ongoing meeting, meeting-specific leadership, live-room admission, voting, quorum, resolutions, formal approvals and Board-restricted records remain governed by their existing meeting-specific controls.",
     "prohibitedChanges": [
       "Do not create portal-wide meeting leadership roles.",
       "Do not allow Meeting Administrator to chair, vote, establish quorum, approve resolutions or approve minutes by virtue of that role.",
@@ -79,8 +83,7 @@
     "behaviourDifferences": [
       "Environment is immutable after creation.",
       "Only the exact TRIAL marker at creation qualifies; REAL, missing, invalid, lowercase or whitespace-padded values are non-deletable.",
-      "The shared application shell exposes Meeting Portal navigation to all Members/Employees register identities independent of status or selected authority; no internal portal workflow or authorization boundary is changed.",
-      "The cross-portal browser fixture isolation guard is a shared validation dependency and changes no runtime portal behavior."
+      "The shared application shell exposes Meeting Portal navigation to all Members/Employees register identities independent of status or selected authority; no internal portal workflow or authorization boundary is changed."
     ],
     "evidence": [
       "Owner's exact conditional approval is recorded in PR #845 issue comment 7068716176.",
@@ -165,6 +168,61 @@
         "scripts/portal-protection-smoke.mjs"
       ],
       "reason": "Expose complete failing portal smoke diagnostics without bypassing or weakening any portal lock tests."
+    },
+    {
+      "at": "2026-11-23T19:55:00Z",
+      "action": "scope extended for owner-authorised organisation-wide meeting initiation repair",
+      "pullRequest": 941
+    },
+    {
+      "at": "2026-11-24T06:25:00Z",
+      "action": "owner-authorised-shared-dependency-scope-amendment-for-signature-tracking",
+      "pullRequest": 948,
+      "files": [
+        "src/pages/SignaturePlatform.jsx",
+        "src/firebase/signatureStorage.js",
+        "drive-gateway/src/router.mjs"
+      ],
+      "meetingBehaviorChanged": false
+    },
+    {
+      "at": "2026-11-24T11:11:00Z",
+      "action": "owner-authorised meeting-scoped leadership and Transition Committee governance scope extension",
+      "pullRequest": 955,
+      "files": [
+        "src/firebase/meetingGatewayApi.js",
+        "src/pages/MeetingRoom.jsx",
+        "src/firebase/meetingPolicy.js",
+        "firestore.rules",
+        "tests/meeting-room-authorization-boundary.test.mjs",
+        "tests/meeting-invitation-resend-quorum.test.mjs",
+        "tests/meeting-quorum-reconciliation.test.mjs"
+      ]
+    },
+    {
+      "at": "2026-11-25T07:10:00Z",
+      "action": "owner-directed universal full Meeting Portal access and archive/record authorization correction",
+      "files": [
+        "drive-gateway/src/meetingServices.mjs",
+        "firestore.rules",
+        "firestore.staging.rules",
+        "functions/meetingAttendanceRegister.js",
+        "functions/meetingRecords.js",
+        "scripts/check-meeting-media-governance.mjs",
+        "src/App.jsx",
+        "src/firebase/data.js",
+        "src/firebase/meetingPolicy.js",
+        "src/meeting/IRPADGBSMeetingRoomMedia.jsx",
+        "src/meeting/MeetingAccessControl.jsx",
+        "src/pages/MeetingRoom.jsx",
+        "src/pages/Meetings.jsx",
+        "src/pages/OperationalGatewaysParticipants.jsx",
+        "tests/meeting-category-firestore-rules.test.cjs",
+        "tests/meeting-category-policy.test.mjs",
+        "tests/meeting-room-authorization-boundary.test.mjs",
+        "tests/meeting-working-documents-security.test.mjs",
+        "drive-gateway/src/index.js"
+      ]
     }
   ],
   "attendanceCallableAudit": {
