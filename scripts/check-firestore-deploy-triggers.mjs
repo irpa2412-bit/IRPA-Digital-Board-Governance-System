@@ -31,11 +31,12 @@ for (const name of files) {
       failures.push(name + ': Firestore deploy target is not statically proven production or isolated staging; review and pin the target.');
       continue;
     }
+    const requiredConfirmation = name === 'firestore-production-no-billing.yml' ? 'DEPLOY RULES' : 'yes';
     if (!condition.includes("github.event_name == 'workflow_dispatch'") ||
-        !condition.includes("inputs.confirm_production_firestore_rules_deployment == 'yes'")) {
-      failures.push(name + ': production Firestore deployment lacks manual workflow_dispatch and explicit yes confirmation.');
+        !condition.includes("inputs.confirm_production_firestore_rules_deployment == '" + requiredConfirmation + "'")) {
+      failures.push(name + ': production Firestore deployment lacks manual workflow_dispatch and its required explicit confirmation (' + requiredConfirmation + ').');
     }
   }
 }
 if (failures.length) { console.error('FIRESTORE_DEPLOY_TRIGGER_GUARD_FAILED'); console.error(failures.join('\n')); process.exit(1); }
-console.log('PASS: every production and staging Firestore publisher is manually dispatched and requires explicit yes confirmation; emulator-only commands are excluded.');
+console.log('PASS: every production and staging Firestore publisher is manually dispatched and requires explicit confirmation; emulator-only commands are excluded.');
