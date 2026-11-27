@@ -23,12 +23,12 @@ function identityRoles(identity={}){
   return new Set(values.map(NORMALIZE_ROLE).filter(Boolean));
 }
 export function canRegisterMeeting(identity={}){
-  return identity.activeMember===true||identity.activeEmployee===true;
+  return identity.memberIdentity===true||identity.employeeIdentity===true||identity.activeMember===true||identity.activeEmployee===true;
 }
 export function canAccessMeetingCategory(meeting={},identity={},options={}){
   const uid=String(identity.uid||"").trim();
   const email=String(identity.email||"").trim().toLowerCase();
-  const activeInstitutionalIdentity=identity.activeMember===true||identity.activeEmployee===true;
+  const activeInstitutionalIdentity=identity.memberIdentity===true||identity.employeeIdentity===true||identity.activeMember===true||identity.activeEmployee===true;
   if(activeInstitutionalIdentity)return true;
   const listedUids=[...(Array.isArray(meeting.participantUids)?meeting.participantUids:[]),
     ...(Array.isArray(meeting.attendeeUids)?meeting.attendeeUids:[]),
