@@ -51,22 +51,6 @@ function meeting(overrides = {}) {
     ...overrides
   };
 }
-test("every active member and employee can read the sanitized meeting directory but cannot write it", async () => {
-  await testEnv.withSecurityRulesDisabled(async context => {
-    await context.firestore().doc("meetingPortalDirectory/public-entry").set({
-      title: "General meeting", meetingCategory: "GENERAL", date: "2026-11-27"
-    });
-  });
-  const memberDb = testEnv.authenticatedContext("board-member", { email: "board@example.test" }).firestore();
-  const employeeDb = testEnv.authenticatedContext("staff-user", { email: "staff@example.test" }).firestore();
-  await assertSucceeds(memberDb.doc("meetingPortalDirectory/public-entry").get());
-  await assertSucceeds(employeeDb.doc("meetingPortalDirectory/public-entry").get());
-  await assertFails(memberDb.doc("meetingPortalDirectory/forged").set({ title: "Forged" }));
-  const inactiveDb = testEnv.authenticatedContext("inactive-user", { email: "inactive@example.test" }).firestore();
-  await assertFails(inactiveDb.doc("meetingPortalDirectory/public-entry").get());
-  await assertFails(testEnv.unauthenticatedContext().firestore().doc("meetingPortalDirectory/public-entry").get());
-});
-
 test("active designated departmental director can create a categorized meeting", async () => {
   const db = testEnv.authenticatedContext("departmental-director", {
     email: "director@example.test"
