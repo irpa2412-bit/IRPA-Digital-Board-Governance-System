@@ -22,7 +22,6 @@ export function isProtectionFile(path) {
   return [
     /^scripts\/portal-[^/]+\.mjs$/,
     /^tests\/portal-(?:protection|repair-window)[^/]*\.test\.mjs$/,
-    /^tests\/meeting-isolation-guard\.test\.mjs$/,
     /^tests\/meeting-portal-protection\.test\.mjs$/,
     /^docs\/(?:approvals\.md|implementation-status\.md)$/,
     /^docs\/portal-protection\/.+$/,
