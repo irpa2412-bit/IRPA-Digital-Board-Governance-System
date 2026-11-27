@@ -81,3 +81,65 @@ test("provision refuses a dedicated folder shared with an additional principal",
   assert.equal((await response.json()).error,"BACKUP_FOLDER_HAS_UNAUTHORISED_ACCESS");
   assert.equal(env.DRIVE_KV.value,null);
 });
+
+test("download returns only an encrypted backup file inside the verified custodian folder", async t => {
+  const originalFetch=globalThis.fetch;
+  t.after(()=>{globalThis.fetch=originalFetch;});
+  const encrypted=Buffer.from('{"version":1,"algorithm":"AES-256-GCM"}');
+  globalThis.fetch=async (url,options={})=>{
+    const target=String(url);
+    if(target.includes("/drive/v3/files/backup-folder-123?fields=")) return json({
+      id:"backup-folder-123",name:"IRPA Account Backups (Restricted)",
+      mimeType:"application/vnd.google-apps.folder",trashed:false,owners:[{emailAddress:owner}]
+    });
+    if(target.includes("/permissions?")) return json({permissions:[{type:"user",emailAddress:owner,role:"owner"}]});
+    if(target.includes("/drive/v3/files/backup-file-123?fields=")) return json({
+      id:"backup-file-123",name:"irpa-account-backup-test.enc.json",
+      mimeType:"application/vnd.irpa.account-backup+json",parents:["backup-folder-123"],
+      trashed:false,size:String(encrypted.length)
+    });
+    if(target.includes("/drive/v3/files/backup-file-123?alt=media")) return new Response(encrypted);
+    throw new Error("Unexpected Drive request "+target);
+  };
+  env.DRIVE_KV.value={folderId:"backup-folder-123",folderName:"IRPA Account Backups (Restricted)",custodianEmail:owner};
+  const route=createAccountBackupRouter({
+    authenticateFirebaseRequest:async()=>({firebaseClaims:{admin:true}}),
+    getDriveAccessToken:async()=>"drive-access-token",corsHeaders,json
+  });
+  const response=await route(new Request("https://gateway.example/api/account-backup/download",{
+    method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({fileId:"backup-file-123"})
+  }),env,"/api/account-backup/download");
+  assert.equal(response.status,200);
+  const result=await response.json();
+  assert.equal(result.ok,true);
+  assert.equal(result.sha256,await (async()=>Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256",encrypted))).map(b=>b.toString(16).padStart(2,"0")).join(""))());
+  assert.equal(Buffer.from(result.encryptedPayload,"base64").toString(),encrypted.toString());
+});
+
+test("download refuses a file outside the dedicated backup folder", async t => {
+  const originalFetch=globalThis.fetch;
+  t.after(()=>{globalThis.fetch=originalFetch;});
+  globalThis.fetch=async (url)=>{
+    const target=String(url);
+    if(target.includes("/drive/v3/files/backup-folder-123?fields=")) return json({
+      id:"backup-folder-123",name:"IRPA Account Backups (Restricted)",
+      mimeType:"application/vnd.google-apps.folder",trashed:false,owners:[{emailAddress:owner}]
+    });
+    if(target.includes("/permissions?")) return json({permissions:[{type:"user",emailAddress:owner,role:"owner"}]});
+    if(target.includes("/drive/v3/files/backup-file-999?fields=")) return json({
+      id:"backup-file-999",name:"not-an-irpa-backup.enc.json",
+      mimeType:"application/vnd.irpa.account-backup+json",parents:["other-folder"],trashed:false,size:"32"
+    });
+    throw new Error("Unexpected Drive request "+target);
+  };
+  env.DRIVE_KV.value={folderId:"backup-folder-123",folderName:"IRPA Account Backups (Restricted)",custodianEmail:owner};
+  const route=createAccountBackupRouter({
+    authenticateFirebaseRequest:async()=>({firebaseClaims:{admin:true}}),
+    getDriveAccessToken:async()=>"drive-access-token",corsHeaders,json
+  });
+  const response=await route(new Request("https://gateway.example/api/account-backup/download",{
+    method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({fileId:"backup-file-999"})
+  }),env,"/api/account-backup/download");
+  assert.equal(response.status,403);
+  assert.equal((await response.json()).error,"BACKUP_FILE_OUTSIDE_CUSTODIAN_FOLDER");
+});
