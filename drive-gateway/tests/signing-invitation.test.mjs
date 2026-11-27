@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { buildEsignContext } from "../src/esignContext.mjs";
-import { createEnvelope, getEnvelopeStatus, resendInvitation, revokeInvitation, openEmailSigning, openSigning } from "../src/signing.mjs";
+import { createEnvelope, getEnvelopeStatus, getSigningStatus, resendInvitation, revokeInvitation, openEmailSigning, openSigning } from "../src/signing.mjs";
 import { sha256Hex } from "../src/util.mjs";
 import { route as esignRoute } from "../src/router.mjs";
 import { buildInvitationMessage } from "../src/invitationEmail.mjs";
@@ -244,4 +244,19 @@ test("staging crypto test mode does not return an email-link token for another r
   assert.equal(result.invitations[0].status,"Sent");
   assert.equal(result.tokens,undefined,"A staging owner must not receive another person's email-link token.");
   assert.equal(sent.length,1);
+});
+
+test("owner signing status does not report delivery complete when an expected recipient record is missing",async()=>{
+  const f=await fixture({emailLink:true});
+  const envelope=await f.ctx.meta.get("envelopes",f.created.envelopeId);
+  await f.ctx.meta.update("envelopes",envelope.id,{ownerEmail:"owner@example.test",createdByEmail:"owner@example.test"});
+  const recipientKey="signer:"+envelope.signers[0].id;
+  const id="delivery-"+envelope.id+"-"+(await sha256Hex(recipientKey)).slice(0,32);
+  await f.ctx.meta.create("signatureDistributions",id,{
+    envelopeId:envelope.id,recipientKey,recipientEmail:envelope.signers[0].email,
+    status:"Sent",acceptedByMailServer:true,attempts:1
+  });
+  const invitationToken=new URL(f.sent[0].link).searchParams.get("emailSignToken");
+  const status=await getSigningStatus(f.ctx,invitationToken,{uid:"owner-uid",isAdmin:false});
+  assert.deepEqual(status.distribution,{complete:false,sent:1,total:2});
 });
