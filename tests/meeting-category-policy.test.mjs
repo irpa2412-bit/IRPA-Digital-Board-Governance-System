@@ -604,6 +604,12 @@ test("Meeting Portal Worker access is based on member/employee identity existenc
   assert.ok(source.includes("meetingContextAccessAllowed(meeting,institutionalIdentity,explicitParticipant)"));
 });
 
+test("Meeting Portal modules bypass the first-data-entry confirmation gate", () => {
+  const source = readFileSync(new URL("../src/FieldEntryDataGate.jsx", import.meta.url), "utf8");
+  assert.ok(source.includes('const MEETING_PORTALS=new Set(["meetings","meeting centre","meeting portal","meeting room","participants","resolutions","voting","actions","decisions"]);'));
+  assert.ok(source.includes("if(MEETING_PORTALS.has(name.toLowerCase()))return false;"));
+});
+
 test("Meeting Portal frontend grants initiation and category visibility to any registered IRPA identity", () => {
   const policy = readFileSync(new URL("../src/firebase/meetingPolicy.js", import.meta.url), "utf8");
   const page = readFileSync(new URL("../src/pages/Meetings.jsx", import.meta.url), "utf8");
