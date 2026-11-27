@@ -195,6 +195,27 @@ const MEETING_APPOINTMENT_FIELDS = {
 };
 const MEETING_APPOINTMENT_KEYS = new Set(Object.keys(MEETING_APPOINTMENT_FIELDS));
 const activeInstitutionalRecord = record => !!record && ["active","activated"].includes(lower(record.status||record.registrationStatus||record.employmentStatus));
+export function meetingPortalDirectoryEntry(record={},id="") {
+ const value=record||{};
+ const safe={
+  id:clean(id||value.id),
+  title:clean(value.title),
+  meetingCategory:clean(value.meetingCategory||value.meetingPolicyId||"OTHER"),
+  meetingPolicyId:clean(value.meetingPolicyId||value.meetingCategory||"OTHER"),
+  meetingType:clean(value.meetingType),
+  meetingReference:clean(value.meetingReference),
+  meetingIdentity:clean(value.meetingIdentity),
+  date:clean(value.date),
+  startTime:clean(value.startTime),
+  endTime:clean(value.endTime),
+  status:clean(value.status),
+  registerStatus:clean(value.registerStatus),
+  initiatorUid:clean(value.initiatorUid),
+  createdAt:value.createdAt||null,
+  updatedAt:value.updatedAt||null
+ };
+ return Object.fromEntries(Object.entries(safe).filter(([,v])=>v!==null));
+}
 async function resolveActiveMeetingPerson(ctx,env,token,uid){
   const id=clean(uid); if(!id)return null;
   const [member,employee]=await Promise.all([getDoc(ctx,env,token,"members",id),getDoc(ctx,env,token,"employees",id)]);
@@ -637,6 +658,7 @@ if(incoming.leadershipElectionRequired===true){
 if(clean(incoming.initiatorUid)!==uid)return fail(ctx,request,"The meeting initiator must match the authenticated account.",403);
 const appointeeUids=["meetingChairpersonUid","meetingSecretaryUid","meetingAdministratorUid","transitionChairpersonUid","transitionSecretaryUid","transitionAdministratorUid","coOrganizerUid","coOrganiserUid"].map(key=>clean(appointmentValidation.patch[key]??incoming[key])).filter(Boolean);const id=crypto.randomUUID(),now=new Date(),year=clean(incoming.date).slice(0,4)||String(now.getUTCFullYear()),record={...incoming,...appointmentValidation.patch,initiatorUid:uid,createdByUid:uid,organizerUid:uid,organiserUid:uid,participantUids:[...new Set([uid,...appointeeUids,...(Array.isArray(incoming.coOrganizerUids)?incoming.coOrganizerUids:[]),...(Array.isArray(incoming.coOrganiserUids)?incoming.coOrganiserUids:[]),...(Array.isArray(incoming.participantUids)?incoming.participantUids:[])])],attendeeUids:[...new Set([uid,...appointeeUids,...(Array.isArray(incoming.attendeeUids)?incoming.attendeeUids:[])])],transitionCommitteeActive:incoming.leadershipElectionRequired===true,leadershipElectionStatus:incoming.leadershipElectionRequired===true?"PENDING":"NOT_REQUIRED",transitionCommitteeDeclaredAt:incoming.leadershipElectionRequired===true?now:null,environment:isAdmin&&meetingEnvironment(incoming.environment)==="TRIAL"?"TRIAL":"REAL",meetingCategory:category,meetingPolicyId:category,meetingIdentity:clean(incoming.meetingIdentity)||"IRPA-MEET-"+id.toUpperCase(),meetingReference:clean(incoming.meetingReference)||"IRPA-MTG-"+year+"-"+id.slice(0,8).toUpperCase(),registerStatus:"Registered",registeredAt:now,createdAt:now,updatedAt:now};
 await writeDoc(ctx,env,token,"meetings",id,record,false);
+await writeDoc(ctx,env,token,"meetingPortalDirectory",id,meetingPortalDirectoryEntry(record,id),false);
 await audit(ctx,env,token,claims,"MEETING_REGISTER_CREATED",{id,...record},id,{meetingCategory:category});
 return response(ctx,request,{ok:true,id});
 }
@@ -703,6 +725,7 @@ if(Object.keys(changed).some(key=>!sessionFields.has(key)&&!MEETING_APPOINTMENT_
 if(current.registerStatus!=="Registered"&&!c.isAdmin)return fail(ctx,request,"Only an administrator may update an unregistered meeting.",403);
 changed.updatedAt=new Date();
 await patchDoc(ctx,env,token,"meetings",meetingId,changed);
+await patchDoc(ctx,env,token,"meetingPortalDirectory",meetingId,meetingPortalDirectoryEntry({...current,...changed},meetingId));
 await audit(ctx,env,token,claims,"MEETING_REGISTER_UPDATED",current,meetingId,{changedFields:Object.keys(changed)});
 if(current.transitionCommitteeActive===true&&changed.transitionCommitteeActive===false)await audit(ctx,env,token,claims,"MEETING_TRANSITION_COMMITTEE_MANDATE_ENDED",current,meetingId,{mandateEndedAt:new Date().toISOString(),permanentChairpersonUid:clean(current.meetingChairpersonUid),permanentSecretaryUid:clean(current.meetingSecretaryUid),permanentAdministratorUid:clean(current.meetingAdministratorUid),leadershipElectionStatus:"LEADERSHIP_RECORDED"});
 return response(ctx,request,{ok:true,meetingId,changedFields:Object.keys(changed)});
