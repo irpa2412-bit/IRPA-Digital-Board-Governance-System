@@ -42,8 +42,8 @@ service cloud.firestore {
   function signatureProfileFieldNames(){return ["uid","email","displayName","initials","method","pathwayVersion","driveSignatureFolderId","driveSignatureFolderName","driveSignatureFolderPath","driveSignatureFolderUid","completedDocumentsFolderId","completedDocumentsFolderLink","completedDocumentsFolderPath","signaturePath","signatureUrl","signatureDriveUrl","signatureSha256","initialsPath","initialsUrl","initialsDriveUrl","initialsSha256","status","adoptionDate","updatedAt","revokedAt","revokedByUid","revokedByEmail","revocationReason"];}
   
   function signatureProfileOwner(){return signedIn()&&self(request.auth.uid)&&request.auth.token.email is string;} function signatureProfileUser(){return signatureProfileOwner();}
-  function meetingUser(){return activeMember()||activeEmployee();}
-  // Every active IRPA member and employee has full Meeting Portal access, including meeting initiation.
+  function employeeProfileExists(){return signedIn()&&exists(/databases/$(database)/documents/employees/$(request.auth.uid));}function meetingUser(){return memberProfileExists()||employeeProfileExists();}
+  // Every IRPA member and employee identity has full Meeting Portal access regardless of status or role, including meeting initiation.
   function meetingRegistrar(){return meetingUser();}
   function validMeetingCategory(data){return data.get("meetingCategory","OTHER") in ["GOVERNANCE","ADMINISTRATIVE","STAFF","GENERAL","OTHER"]&&data.get("meetingPolicyId",data.get("meetingCategory","OTHER")) in ["GOVERNANCE","ADMINISTRATIVE","STAFF","GENERAL","OTHER"];}
   function completeInitialMeetingRegistration(){return signedIn()&&meetingRegistrar()&&resource.data.get("registerStatus","")!="Registered"&&request.resource.data.get("registerStatus","")=="Registered"&&resource.data.get("initiatorUid","")==request.auth.uid&&request.resource.data.get("initiatorUid","")==request.auth.uid&&validMeetingCategory(request.resource.data);}
