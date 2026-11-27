@@ -119,8 +119,12 @@ async function verifyRealRunEvidence(record, affected) {
       const [run, jobsPayload] = await Promise.all([runResponse.json(), jobsResponse.json()]);
       const job = (jobsPayload.jobs ?? []).find(candidate => Number(candidate.id) === ref.jobId);
       const baseCommitVerified = (run.pull_requests ?? []).some(pull => pull.base?.sha === record.baseline.commit);
+      const expectedJobName = label === "baseline smoke" || label.endsWith("portal smoke")
+        ? "baseline-protection-smoke"
+        : "baseline-full-regression";
       if (run.id === ref.runId && run.event === "pull_request" && baseCommitVerified &&
-          job?.run_id === ref.runId && job.status === "completed" && job.conclusion === "success") {
+          job?.run_id === ref.runId && job.name === expectedJobName &&
+          job.status === "completed" && job.conclusion === "success") {
         verified = true;
         break;
       }
