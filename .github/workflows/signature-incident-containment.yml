@@ -1,0 +1,29 @@
+name: Signature incident containment
+
+on:
+  push:
+    branches:
+      - incident/signature-recovery-20261126
+    paths:
+      - .github/workflows/signature-incident-containment.yml
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  contain:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Disable finance reset workflow immediately
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api --method PUT "repos/$GH_REPO/actions/workflows/finance-production-reset.yml/disable"
+          gh api "repos/$GH_REPO/actions/workflows" --paginate --jq '.workflows[] | select((.name|test("reset|cleanup|clean-up";"i")) or (.path|test("reset|cleanup|clean-up";"i"))) | [.id,.name,.path,.state] | @tsv'
+          gh api "repos/$GH_REPO/actions/workflows/finance-production-reset.yml" --jq '[.id,.name,.path,.state] | @tsv'
