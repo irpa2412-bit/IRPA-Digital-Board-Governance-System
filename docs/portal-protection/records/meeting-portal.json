@@ -40,7 +40,9 @@
       "src/meeting/MeetingAccessControl.jsx",
       "src/pages/OperationalGatewaysParticipants.jsx",
       "tests/meeting-working-documents-security.test.mjs",
-      "drive-gateway/src/index.js"
+      "drive-gateway/src/index.js",
+      "src/pages/Resolutions.jsx",
+      "drive-gateway/tests/meeting-services-router.test.mjs"
     ],
     "expectedEffect": "Universal full Meeting Portal access for every IRPA identity across all categories, records, working documents and archives, with unrestricted meeting initiation/registration by an IRPA identity. No active-status, department, role, organisational-authority, invitation or participant-list gate may restrict ordinary portal access. External invitees receive only invited-meeting access. The meeting-specific Chairperson, Secretary and Administrator appointments and their distinct authorities remain in force; registration-stage appointments may be empty but all three are required before proceedings; Transition Committee authority expires at proceedings start. Board voting, quorum, resolutions, formal approvals, restricted Board records, audit protections, minimum ten-year retention and trial-only deletion remain protected.",
     "prohibitedChanges": [
@@ -53,8 +55,10 @@
     ]
   },
   "repairWindow": {
-    "openedAt": "2026-11-21T20:23:03Z",
-    "lastActivityAt": "2026-11-23T20:04:00Z",
+    "openedAt": "2026-11-27T16:49:53Z",
+    "lastActivityAt": "2026-11-27T17:30:00Z",
+    "expiresAt": "2026-11-30T16:49:53Z",
+    "durationHours": 72,
     "emergency": false
   },
   "baseline": {
@@ -143,6 +147,26 @@
         "tests/meeting-working-documents-security.test.mjs",
         "drive-gateway/src/index.js"
       ]
+    },
+    {
+      "at": "2026-11-27T16:49:53Z",
+      "action": "owner-authorised 72-hour Meeting Portal repair-window renewal for PR #1004 and combined verification with PR #995",
+      "pullRequests": [
+        1004,
+        995
+      ],
+      "files": [
+        "drive-gateway/src/meetingServices.mjs",
+        "drive-gateway/tests/meeting-services-router.test.mjs",
+        "scripts/check-meeting-media-governance.mjs",
+        "src/firebase/meetingGatewayApi.js",
+        "src/firebase/meetingPolicy.js",
+        "src/pages/Meetings.jsx",
+        "src/pages/Resolutions.jsx",
+        "src/pages/Voting.jsx",
+        "tests/meeting-category-policy.test.mjs"
+      ],
+      "productionDeployment": "NOT_AUTHORISED_BY_THIS_RENEWAL"
     }
   ],
   "attendanceCallableAudit": {
