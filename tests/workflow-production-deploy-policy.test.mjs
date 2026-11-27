@@ -37,13 +37,14 @@ test("production Firebase data mutations and Functions deployments require expli
 
 
 
-test("production Firebase Hosting workflow requires explicit yes confirmation for Firestore deployment", () => {
-  const source = readWorkflow(".github/workflows/firebase-deploy.yml");
-  assert.match(source, /confirm_production_firestore_rules_deployment:[\s\S]*?type: choice[\s\S]*?options:[\s\S]*?- "no"[\s\S]*?- "yes"[\s\S]*?default: "no"/);
-  const start = source.indexOf("- name: Deploy Firestore Rules and Indexes");
-  assert.ok(start >= 0);
-  const next = source.indexOf("\n      - name:", start + 1);
-  assert.match(source.slice(start, next < 0 ? source.length : next), /github\.event_name == 'workflow_dispatch' && inputs\.confirm_production_firestore_rules_deployment == 'yes'/);
+test("dedicated production Firestore rules workflow requires exact DEPLOY RULES confirmation", () => {
+  const source = readWorkflow(".github/workflows/firestore-production-no-billing.yml");
+  assert.match(source, /confirm_production_firestore_rules_deployment:[\\s\\S]*?type: string/);
+  assert.match(source, /CONFIRMATION/);
+  assert.match(source, /DEPLOY RULES/);
+  assert.match(source, /inputs\\.confirm_production_firestore_rules_deployment == 'DEPLOY RULES'/);
+  assert.match(source, /--only firestore:rules,firestore:indexes/);
+  assert.match(source, /environment: production/);
 });
 
 test("isolated staging Firestore rules publisher requires manual DEPLOY RULES confirmation", () => {
