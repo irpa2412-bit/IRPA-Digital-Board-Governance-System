@@ -63,10 +63,16 @@ jobs:
           --parser-options '{"ecmaVersion":"latest","sourceType":"module","ecmaFeatures":{"jsx":true}}'
           --rule 'no-shadow: error' --rule 'no-undef: error'
           "src/**/*.{js,jsx,mjs,cjs}"
-      - name: Install Playwright test runner without changing lockfile
-        run: npm install --no-save --package-lock=false @playwright/test
-      - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+      - name: Install isolated Playwright test runner without resolving application dependencies
+        run: |
+          set -euo pipefail
+          PLAYWRIGHT_PREFIX="$RUNNER_TEMP/irpa-playwright"
+          mkdir -p "$PLAYWRIGHT_PREFIX"
+          npm install --prefix "$PLAYWRIGHT_PREFIX" --no-save --package-lock=false @playwright/test@1.56.1
+          mkdir -p node_modules/@playwright
+          ln -sfn "$PLAYWRIGHT_PREFIX/node_modules/@playwright/test" node_modules/@playwright/test
+          ln -sfn "$PLAYWRIGHT_PREFIX/node_modules/playwright" node_modules/playwright
+          "$PLAYWRIGHT_PREFIX/node_modules/.bin/playwright" install --with-deps chromium
       - name: Reproduce upload pathway against unminified bundle and source maps
         env:
           VITE_DIAGNOSTIC_UNMINIFIED: "true"
