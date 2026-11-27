@@ -1,0 +1,42 @@
+name: Member account compatibility dry run (read only)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: irpa-member-account-compatibility-dry-run
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    name: Read every Auth user and member record
+    environment: production
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install Firebase Admin SDK
+        run: npm install --prefix functions --no-save --no-package-lock --ignore-scripts firebase-admin@13.5.0
+      - name: Run read-only account compatibility audit
+        env:
+          FIREBASE_SERVICE_ACCOUNT: \${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
+          GITHUB_STEP_SUMMARY: \${{ github.step_summary }}
+        run: node scripts/member-account-compatibility-audit.cjs
+      - name: Upload pseudonymous dry-run results (one-day retention)
+        if: always() && hashFiles('reports/member-account-compatibility-dry-run.json') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: irpa-member-account-compatibility-dry-run
+          path: reports/member-account-compatibility-dry-run.json
+          retention-days: 1
+          if-no-files-found: error
