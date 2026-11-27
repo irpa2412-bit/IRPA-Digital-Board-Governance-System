@@ -47,48 +47,32 @@ async function seedMeeting(id) {
   });
 }
 
-test("primary owner administrator claim remains sufficient without a job-title dependency", async () => {
+test("primary owner administrator claim grants no private Meeting Portal access or deletion rights", async () => {
   await seedMeeting("owner-claim");
   const db = env.authenticatedContext("owner-primary", { admin: true }).firestore();
-  await assertSucceeds(db.doc("meetings/owner-claim").delete());
+  await assertFails(db.doc("meetings/owner-claim").get());
+  await assertFails(db.doc("meetings/owner-claim").delete());
 });
 
-test("active admin profile remains authoritative across role-title changes", async () => {
-  const roleTitles = [
-    "Administrator",
-    "Executive Director",
-    "Director Field",
-    "Field Director",
-    "Operations Director",
-    "Research Director",
-    "Communications Officer"
-  ];
-
+test("adminProfiles plus an active Member record grant no private access without meeting participation", async () => {
+  const roleTitles = ["Administrator","Executive Director","Director Field","Field Director","Operations Director","Research Director","Communications Officer"];
   for (let index = 0; index < roleTitles.length; index += 1) {
     const uid = `profile-admin-${index}`;
     const meetingId = `profile-admin-meeting-${index}`;
     await env.withSecurityRulesDisabled(async context => {
       const db = context.firestore();
       await db.doc(`adminProfiles/${uid}`).set({ active: true });
-      await db.doc(`members/${uid}`).set({
-        uid,
-        status: "Active",
-        role: roleTitles[index]
-      });
+      await db.doc(`members/${uid}`).set({ uid, status: "Active", role: roleTitles[index] });
       await db.doc(`meetings/${meetingId}`).set({
-        title: "Administrator preservation test",
-        meetingCategory: "ADMINISTRATIVE",
-        meetingPolicyId: "ADMINISTRATIVE",
-        meetingType: "Management Meeting",
-        initiatorUid: "test-initiator",
-        initiatorEmail: "initiator@example.test",
-        registerStatus: "Draft",
-        status: "Scheduled"
+        title: "Administrator preservation test", meetingCategory: "ADMINISTRATIVE",
+        meetingPolicyId: "ADMINISTRATIVE", meetingType: "Management Meeting",
+        initiatorUid: "test-initiator", initiatorEmail: "initiator@example.test",
+        registerStatus: "Draft", status: "Scheduled"
       });
     });
-
-    const db = env.authenticatedContext(uid).firestore();
-    await assertSucceeds(db.doc(`meetings/${meetingId}`).delete());
+    const db = env.authenticatedContext(uid, { admin: true }).firestore();
+    await assertFails(db.doc(`meetings/${meetingId}`).get());
+    await assertFails(db.doc(`meetings/${meetingId}`).delete());
   }
 });
 
@@ -106,20 +90,16 @@ test("Administrator job title alone does not grant administrator authority", asy
   await assertFails(db.doc("meetings/title-is-not-authority").delete());
 });
 
-test("administrator portal navigation includes every registered app module without consulting job descriptions", () => {
-  assert.match(appSource, /const sessionAdministrator=Boolean\(admin\|\|profile\?\.authorizationType===["']administrator["']\)/);
-  assert.match(appSource, /storedAuthority!=="Administrator"/);
-  assert.match(appSource, /sessionAdministrator\|\|authority==="Administrator"/);
-  assert.match(appSource, /if\(sessionAdministrator\)return true/);
-  assert.match(appSource, /selected==="Administrator"\?\["Dashboard","Role Descriptions"\]/);
-  assert.match(appSource, /modules=sessionAdministrator\?\[\.\.\.ALL_MODULES,\.\.\.registeredPortalModules\]/);
-  assert.ok(appSource.includes("const ALL_MODULES="));
-  assert.ok(appSource.includes("RoleJobDescriptionPortal"));
+test("administrator-only identities see no portals; active administrator-members receive ordinary Meeting Portal access", () => {
+  assert.match(appSource, /const sessionAdministrator=Boolean\\(admin\\|\\|profile\\?\\.authorizationType===["']administrator["']\\)/);
+  assert.match(appSource, /meetingProfileAccess\\?\\["Dashboard","Role Descriptions",\\.\\.\\.MEETING_PORTAL_MODULES\\]:\\["Dashboard"\\]/);
+  assert.match(appSource, /registeredPortalModules=meetingProfileAccess&&!sessionAdministrator&&Boolean\\(selectedAuthority\\)/);
+  assert.doesNotMatch(appSource, /modules=sessionAdministrator\\?\\[\\.\\.\\.ALL_MODULES/);
+  assert.ok(appSource.includes('selected==="Administrator"?["Dashboard","Role Descriptions"]'));
   assert.equal(catalogue.roles.find(role => role.id === "administrator")?.accessStatus,
     "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
     "the draft job catalogue must not become administrator runtime authority");
 });
-
 
 test("explicitly registered research authority cannot read restricted records before clearance", async () => {
   await env.withSecurityRulesDisabled(async context => {
