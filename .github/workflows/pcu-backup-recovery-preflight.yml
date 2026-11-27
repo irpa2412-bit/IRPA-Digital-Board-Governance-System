@@ -1,0 +1,124 @@
+name: PCU Post-Installation Backup Recovery Preflight
+
+on:
+  workflow_dispatch:
+    inputs:
+      backup_file_id:
+        description: "Drive file ID of the encrypted IRPA account backup"
+        required: true
+        type: string
+      pcu_installation_confirmed:
+        description: "Type PCU INSTALLED after the PCU release is live"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: irpa-pcu-backup-recovery-preflight
+  cancel-in-progress: false
+
+jobs:
+  recovery-preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Require confirmed PCU installation
+        if: ${{ inputs.pcu_installation_confirmed != 'PCU INSTALLED' }}
+        run: |
+          echo "PCU installation was not confirmed. No backup data was accessed."
+          exit 1
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Firebase Admin SDK
+        run: npm --prefix functions install --omit=dev --no-audit --no-fund
+
+      - name: Retrieve and verify encrypted backup; inspect PCU restore readiness
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
+          BACKUP_ADMIN_EMAIL: ${{ secrets.IRPA_ACCOUNT_BACKUP_ADMIN_EMAIL }}
+          BACKUP_ENCRYPTION_KEY: ${{ secrets.IRPA_ACCOUNT_BACKUP_ENCRYPTION_KEY }}
+          FIREBASE_WEB_API_KEY: "AIzaSyC2aMdxHD14nMnGiRyf4mSL1ixXdzBoOtE"
+          BACKUP_GATEWAY_URL: "https://irpa-google-drive-gateway.irpa-governance.workers.dev"
+          BACKUP_FILE_ID: ${{ inputs.backup_file_id }}
+        run: |
+          NODE_PATH="$GITHUB_WORKSPACE/functions/node_modules" node <<'NODE'
+          const crypto = require("node:crypto");
+          const { initializeApp, cert } = require("firebase-admin/app");
+          const { getAuth } = require("firebase-admin/auth");
+          const { getFirestore } = require("firebase-admin/firestore");
+          const projectId = "irpa-digital-board-governance";
+          const appOrigin = "https://irpa-digital-board-governance.web.app";
+          const gateway = String(process.env.BACKUP_GATEWAY_URL || "").replace(/\\/+$/, "");
+          const fileId = String(process.env.BACKUP_FILE_ID || "").trim();
+          const adminEmail = String(process.env.BACKUP_ADMIN_EMAIL || "").trim().toLowerCase();
+          const key = Buffer.from(String(process.env.BACKUP_ENCRYPTION_KEY || ""), "base64");
+          const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT || "{}");
+          if (serviceAccount.project_id !== projectId || !gateway || !fileId || !adminEmail || key.length !== 32 ||
+              !/^[A-Za-z0-9_-]{10,200}$/.test(fileId)) {
+            throw new Error("Recovery preflight prerequisites are invalid.");
+          }
+          initializeApp({ credential:cert(serviceAccount), projectId });
+          const auth=getAuth(), db=getFirestore();
+          async function main(){
+            const operator=await auth.getUserByEmail(adminEmail);
+            if(operator.disabled || operator.customClaims?.admin!==true) throw new Error("Recovery operator is not an enabled Firebase administrator.");
+            const customToken=await auth.createCustomToken(operator.uid);
+            const signIn=await fetch("https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key="+encodeURIComponent(process.env.FIREBASE_WEB_API_KEY),{
+              method:"POST",headers:{"Content-Type":"application/json",Referer:appOrigin},
+              body:JSON.stringify({token:customToken,returnSecureToken:true})
+            });
+            const session=await signIn.json().catch(()=>({}));
+            if(!signIn.ok || !session.idToken) throw new Error("Gateway administrator session could not be established.");
+            const response=await fetch(gateway+"/api/account-backup/download",{
+              method:"POST",headers:{Authorization:"Bearer "+session.idToken,"Content-Type":"application/json",Origin:appOrigin},
+              body:JSON.stringify({fileId})
+            });
+            const result=await response.json().catch(()=>({}));
+            if(!response.ok || result.ok!==true || !result.encryptedPayload) throw new Error("Encrypted backup retrieval failed: "+String(result.error||response.status));
+            const bytes=Buffer.from(result.encryptedPayload,"base64");
+            if(bytes.length!==result.byteLength || crypto.createHash("sha256").update(bytes).digest("hex")!==result.sha256) throw new Error("Encrypted backup integrity check failed.");
+            const envelope=JSON.parse(bytes.toString("utf8"));
+            if(envelope.version!==1 || envelope.algorithm!=="AES-256-GCM") throw new Error("Unsupported backup encryption envelope.");
+            const decipher=crypto.createDecipheriv("aes-256-gcm",key,Buffer.from(envelope.iv,"base64"));
+            decipher.setAuthTag(Buffer.from(envelope.tag,"base64"));
+            const plaintext=Buffer.concat([decipher.update(Buffer.from(envelope.ciphertext,"base64")),decipher.final()]);
+            if(crypto.createHash("sha256").update(plaintext).digest("hex")!==envelope.plaintextSha256) throw new Error("Decrypted backup integrity check failed.");
+            const backup=JSON.parse(plaintext.toString("utf8"));
+            if(backup.schema!=="irpa.account-backup.v1" || backup.projectId!==projectId || !Array.isArray(backup.authUsers) || !Array.isArray(backup.members)) throw new Error("Backup schema or target project mismatch.");
+            const current=await auth.listUsers(1000);
+            const byUid=new Map(current.users.map(u=>[u.uid,u]));
+            const byEmail=new Map();
+            for(const u of current.users) if(u.email){const k=u.email.toLowerCase();if(!byEmail.has(k))byEmail.set(k,[]);byEmail.get(k).push(u);}
+            let authUidMatches=0,authMissing=0,authConflicts=0;
+            for(const u of backup.authUsers){
+              const sameUid=byUid.get(u.uid),sameEmail=u.email?(byEmail.get(u.email.toLowerCase())||[]):[];
+              if(sameUid){if(u.email && sameUid.email && u.email.toLowerCase()!==sameUid.email.toLowerCase())authConflicts++;else authUidMatches++;}
+              else if(sameEmail.length)authConflicts++;
+              else authMissing++;
+            }
+            let memberPresent=0,memberMissing=0;
+            for(const m of backup.members){const snap=await db.collection("members").doc(m.id).get();if(snap.exists)memberPresent++;else memberMissing++;}
+            const pcuCollections=["delegations","escalationPolicies","workflowDefinitions","workflowInstances","auditEvents","dutyAssignments"];
+            let pcuPresent=0;
+            for(const name of pcuCollections){const snap=await db.collection("pcuTenants/irpa/"+name).limit(1).get();if(!snap.empty)pcuPresent++;}
+            console.log("PCU_POST_INSTALLATION_RECOVERY_PREFLIGHT=PASS");
+            console.log("BACKUP_ENCRYPTION_AND_DIGEST=PASS");
+            console.log("BACKUP_PROJECT_MATCH=PASS");
+            console.log("AUTH_UID_MATCHES="+authUidMatches);
+            console.log("AUTH_IDENTITIES_MISSING="+authMissing);
+            console.log("AUTH_IDENTITY_CONFLICTS="+authConflicts);
+            console.log("MEMBER_RECORDS_PRESENT="+memberPresent);
+            console.log("MEMBER_RECORDS_MISSING="+memberMissing);
+            console.log("PCU_COLLECTIONS_WITH_RECORDS="+pcuPresent+"/"+pcuCollections.length);
+            console.log("RESTORE_WRITES=0");
+            console.log("RESULT="+(authConflicts===0?"READY_FOR_SEPARATE_RESTORE_APPROVAL":"BLOCKED_BY_IDENTITY_CONFLICTS"));
+          }
+          main().catch(e=>{console.error(e?.message||"PCU recovery preflight failed.");process.exit(1);});
+          NODE
