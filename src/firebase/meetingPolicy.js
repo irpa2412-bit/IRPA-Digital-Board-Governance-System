@@ -26,17 +26,24 @@ export function canRegisterMeeting(identity={}){
   return identity.isAdmin===true||identity.admin===true||identity.active===true;
 }
 export function canAccessMeetingCategory(meeting={},identity={},options={}){
-  if(identity.isAdmin===true||identity.admin===true)return true;
-  if(options.isInvited===true||options.isRegisteredParticipant===true||options.isInitiator===true)return true;
+  void options;
   if(identity.active!==true)return false;
-  const policy=resolveCategory(meeting.meetingCategory||meeting.meetingPolicyId||meeting.category||meeting.meetingType);
-  if(policy.id==="GENERAL"&&(identity.activeMember===true||identity.activeEmployee===true))return true;
-  const roles=identityRoles(identity);
-  return policy.accessRoles.some(role=>roles.has(NORMALIZE_ROLE(role)));
+  const uid=String(identity.uid||identity.authUid||identity.userId||"").trim();
+  const email=String(identity.email||identity.emailAddress||"").trim().toLowerCase();
+  if(!uid&&!email)return false;
+  const uidFields=["initiatorUid","createdByUid","organizerUid","organiserUid","coOrganizerUid","coOrganiserUid","meetingChairpersonUid","meetingSecretaryUid","meetingAdministratorUid","chairpersonUid","secretaryUid","transitionChairpersonUid","transitionSecretaryUid","transitionAdministratorUid"];
+  const uidLists=["participantUids","attendeeUids","memberUids","invitedUids","subscriberUids","organizerUids","organiserUids","coOrganizerUids","coOrganiserUids"];
+  const emailFields=["initiatorEmail","organizerEmail","organiserEmail","coOrganizerEmail","coOrganiserEmail"];
+  const emailLists=["participantEmails","attendeeEmails","invitedEmails","subscriberEmails","organizerEmails","organiserEmails","coOrganizerEmails","coOrganiserEmails"];
+  return (uid&&uidFields.some(field=>String(meeting?.[field]||"").trim()===uid))||
+    (uid&&uidLists.some(field=>Array.isArray(meeting?.[field])&&meeting[field].map(value=>String(value||"").trim()).includes(uid)))||
+    (email&&emailFields.some(field=>String(meeting?.[field]||"").trim().toLowerCase()===email))||
+    (email&&emailLists.some(field=>Array.isArray(meeting?.[field])&&meeting[field].map(value=>String(value||"").trim().toLowerCase()).includes(email));
 }
 export function canEditMeeting(meeting={},identity={}){
-  if(identity.isAdmin===true||identity.admin===true)return true;
-  if(identity.active!==true||!identity.uid||String(meeting.initiatorUid||"")!==String(identity.uid))return false;
+  const uid=String(identity.uid||"").trim();
+  const organisers=[meeting.initiatorUid,meeting.createdByUid,meeting.organizerUid,meeting.organiserUid,meeting.coOrganizerUid,meeting.coOrganiserUid,...(Array.isArray(meeting.organizerUids)?meeting.organizerUids:[]),...(Array.isArray(meeting.organiserUids)?meeting.organiserUids:[]),...(Array.isArray(meeting.coOrganizerUids)?meeting.coOrganizerUids:[]),...(Array.isArray(meeting.coOrganiserUids)?meeting.coOrganiserUids:[])].map(value=>String(value||"").trim());
+  if(identity.active!==true||!uid||!organisers.includes(uid))return false;
   return !["in progress","completed","cancelled","canceled"].includes(String(meeting.status||"").trim().toLowerCase())&&
     String(meeting.proceedingsStatus||"").trim().toLowerCase()!=="in progress";
 }
