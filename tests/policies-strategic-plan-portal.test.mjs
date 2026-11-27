@@ -77,12 +77,14 @@ test("shared Research Portal upload control exposes Research Archive only to Res
 
 
 test("Policies and Strategic Plans remains authority-scoped while all active IRPA identities see Meeting Portal",()=>{
+ const fieldGate=readFileSync(new URL("../src/FieldEntryDataGate.jsx",import.meta.url),"utf8");
  assert.ok(app.includes('"Documents","Policies and Strategic Plans","Signature Platform"'));
  assert.ok(app.includes('const MEETING_PORTAL_MODULES=["Meetings","Meeting Room","Participants","Resolutions","Voting","Actions","Decisions"]'));
  assert.ok(app.includes('if(!selected)return ["Dashboard","Role Descriptions"]'));
  assert.ok(app.includes('meetingProfileAccess?["Dashboard","Role Descriptions",...MEETING_PORTAL_MODULES]:["Dashboard"]'));
  assert.ok(app.includes('registeredPortalModules=meetingProfileAccess&&!sessionAdministrator&&Boolean(selectedAuthority)'));
- assert.doesNotMatch(app,/modules=sessionAdministrator\?\[\.\.\.ALL_MODULES/);
+ assert.doesNotMatch(app,/modules=sessionAdministrator\s*\?\s*\[\.\.\.ALL_MODULES/);
+ assert.ok(fieldGate.includes('if(MEETING_PORTALS.has(name.toLowerCase()))return false;'));
  assert.ok(app.includes('RESEARCH_AUTHORITY_ROLES.includes(selected)?["Dashboard","Documents","Policies and Strategic Plans"'));
  assert.ok(app.includes('Object.entries(NAV).map'));
 });
