@@ -309,7 +309,7 @@ test("meeting directory projection exposes metadata only and excludes private pr
   assert.deepEqual(Object.keys(entry).sort(), [
     "date","endTime","id","initiatorUid","meetingCategory","meetingIdentity",
     "meetingPolicyId","meetingReference","meetingType","registerStatus","startTime","status",
-    "title","updatedAt"
+    "title"
   ].sort());
   assert.equal(entry.title, "Quarterly meeting");
   assert.equal("agenda" in entry, false);
@@ -495,7 +495,7 @@ test("Meeting Worker allows universal portal initiation while retaining particip
   assert.ok(meetingServicesGovernanceSource.includes("const institutionalIdentity=!!member||!!employee"));
   assert.match(meetingServicesGovernanceSource, /const explicitParticipant=byUid/);
   assert.ok(meetingServicesGovernanceSource.includes("meetingContextAccessAllowed(meeting,institutionalIdentity,explicitParticipant)"));
-  assert.match(meetingServicesGovernanceSource, /participantUids,meeting\\.attendeeUids,meeting\\.memberUids,meeting\\.invitedUids/);
+  assert.ok(meetingServicesGovernanceSource.includes("const listedUids=values(meeting.participantUids,meeting.attendeeUids,meeting.memberUids,meeting.invitedUids"));
   assert.match(meetingServicesGovernanceSource, /canRead:true/);
   assert.match(meetingServicesGovernanceSource, /isAdmin:false/);
   assert.doesNotMatch(meetingServicesGovernanceSource, /canRead:canManage\\|\\|participant\\|\\|isAdmin/);
@@ -598,7 +598,7 @@ test("legacy invitee directory export delegates to the authenticated Cloudflare 
 
 test("Meeting Portal Worker access is based on member/employee identity existence, not status", async () => {
   const source = readFileSync(new URL("../drive-gateway/src/meetingServices.mjs", import.meta.url), "utf8");
-  assert.match(source, /if\\(!member&&!employee\\)return fail/);
+  assert.ok(source.includes("if(!member&&!employee)return fail"));
   assert.ok(source.includes("const institutionalIdentity=!!member||!!employee"));
   assert.match(source, /const explicitParticipant=byUid/);
   assert.ok(source.includes("meetingContextAccessAllowed(meeting,institutionalIdentity,explicitParticipant)"));
