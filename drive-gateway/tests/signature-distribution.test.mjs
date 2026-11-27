@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { distributeCompletedSignatureDocument, distributeCompletedPersonalCopies, retryFailedSignatureDistributions } from "../src/signatureDistribution.mjs";
+import { distributeCompletedSignatureDocument, distributeCompletedPersonalCopies, retryFailedSignatureDistributions, getSignatureDistributionSummary } from "../src/signatureDistribution.mjs";
 import { sha256Hex } from "../src/util.mjs";
 
 function context(bytes, failingEmail, failPersonalCopy=false, failuresBeforeSuccess=1) {
