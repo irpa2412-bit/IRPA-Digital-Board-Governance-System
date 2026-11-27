@@ -54,7 +54,7 @@ jobs:
   baseline-protection-smoke:
     name: baseline-protection-smoke-${{ github.event.pull_request.base.sha }}
     if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - name: Check out exact pre-change base commit
@@ -137,10 +137,16 @@ jobs:
         run: node --test tests/meeting-isolation-guard.test.mjs
       - name: Test meeting policy and invitation removal
         run: node --test tests/invitation-removal-policy.test.mjs tests/meeting-category-policy.test.mjs tests/meeting-quorum-reconciliation.test.mjs
-      - name: Install isolated browser runner
+      - name: Install isolated Playwright runner without resolving application dependencies
         run: |
-          npm install --no-save --package-lock=false playwright
-          npx playwright install --with-deps chromium
+          set -euo pipefail
+          PLAYWRIGHT_PREFIX="$RUNNER_TEMP/irpa-playwright"
+          mkdir -p "$PLAYWRIGHT_PREFIX"
+          npm install --prefix "$PLAYWRIGHT_PREFIX" --no-save --package-lock=false playwright@1.56.1
+          mkdir -p node_modules node_modules/.bin
+          ln -sfn "$PLAYWRIGHT_PREFIX/node_modules/playwright" node_modules/playwright
+          ln -sfn "$PLAYWRIGHT_PREFIX/node_modules/.bin/playwright" node_modules/.bin/playwright
+          "$PLAYWRIGHT_PREFIX/node_modules/.bin/playwright" install --with-deps chromium
       - name: Assert runtime source isolation from unrelated portals
         env:
           EVENT_NAME: ${{ github.event_name }}
