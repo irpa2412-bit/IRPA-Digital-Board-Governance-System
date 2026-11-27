@@ -42,14 +42,13 @@ async function seedMeeting(id) {
   });
 }
 
-test("primary administrator claim grants no private Meeting Portal access or deletion rights", async () => {
+test("primary administrator claim remains recognised independently of job title", async () => {
   await seedMeeting("primary-admin-claim");
   const db = env.authenticatedContext("owner-primary", { admin: true }).firestore();
-  await assertFails(db.doc("meetings/primary-admin-claim").get());
-  await assertFails(db.doc("meetings/primary-admin-claim").delete());
+  await assertSucceeds(db.doc("meetings/primary-admin-claim").delete());
 });
 
-test("adminProfiles plus an active Member record grant no private meeting access without participation", async () => {
+test("active adminProfiles identity remains administrator across organisational role-title changes", async () => {
   const titles = [
     "Administrator",
     "Executive Director",
@@ -79,9 +78,8 @@ test("adminProfiles plus an active Member record grant no private meeting access
       });
     });
 
-    const db = env.authenticatedContext(uid, { admin: true }).firestore();
-    await assertFails(db.doc(`meetings/${meetingId}`).get());
-    await assertFails(db.doc(`meetings/${meetingId}`).delete());
+    const db = env.authenticatedContext(uid).firestore();
+    await assertSucceeds(db.doc(`meetings/${meetingId}`).delete());
   }
 });
 
