@@ -351,18 +351,26 @@ test("shared owner lock tests install Gateway-only dependencies before importing
     "drive-gateway/tests/signature-field-assignment-regression.test.mjs"
   ], (...args) => calls.push(args));
   assert.equal(installed, true);
-  assert.equal(calls.length, 1);
+  assert.equal(calls.length, 2);
   assert.equal(calls[0][0], "npm");
   assert.deepEqual(calls[0][1], ["ci"]);
-  assert.equal(calls[0][2].cwd, "drive-gateway");
+  assert.equal(calls[0][2].cwd, undefined);
   assert.equal(calls[0][2].stdio, "inherit");
+  assert.equal(calls[1][0], "npm");
+  assert.deepEqual(calls[1][1], ["ci"]);
+  assert.equal(calls[1][2].cwd, "drive-gateway");
+  assert.equal(calls[1][2].stdio, "inherit");
 });
 
 test("root-only owner lock tests do not install unnecessary Gateway dependencies", () => {
   const calls = [];
   const installed = installLockTestDependencies(["tests/meeting-portal-protection.test.mjs"], (...args) => calls.push(args));
   assert.equal(installed, false);
-  assert.equal(calls.length, 0);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0][0], "npm");
+  assert.deepEqual(calls[0][1], ["ci"]);
+  assert.equal(calls[0][2].cwd, undefined);
+  assert.equal(calls[0][2].stdio, "inherit");
 });
 
 // Regression coverage keeps Meeting Portal fixture guard classification portal-scoped.
