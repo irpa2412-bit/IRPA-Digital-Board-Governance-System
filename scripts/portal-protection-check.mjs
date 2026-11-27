@@ -82,6 +82,7 @@ export function newPortalWarningUntil(entry) {
   return Number.isFinite(registeredAt) ? registeredAt + 7 * 24 * 60 * 60 * 1000 : null;
 }
 
+// Baseline job names include the event's exact base SHA; validate run metadata and the matching successful job without relying on log-download API access.
 async function verifyRealRunEvidence(record, affected) {
   const token = process.env.GH_TOKEN || process.env.GITHUB_TOKEN;
   const repository = process.env.GITHUB_REPOSITORY;
