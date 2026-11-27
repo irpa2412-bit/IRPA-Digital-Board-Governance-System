@@ -27,28 +27,35 @@ beforeEach(async () => {
   });
 });
 
-test("staging members cannot self-edit institutional profile fields", async () => {
+test("staging members can update ordinary profile fields but cannot self-assign authority", async () => {
   const uid = "member-profile-with-invitation";
   const email = "member-profile-with-invitation@example.test";
   await env.withSecurityRulesDisabled(async context => {
     await context.firestore().doc(`members/${uid}`).set({
-      uid, email, status: "Active", role: "Member",
+      uid, email, status: "Active", role: "Member", roles: ["Member"],
+      assignedRoles: ["Member"], selectedRoles: ["Member"],
+      roleAssignments: [], permissions: [], grantedClaims: [],
       memberType: "Governance Member", invitationId: "TEST-INVITATION-ID"
     });
   });
 
   const member = env.authenticatedContext(uid, { email }).firestore();
   const memberProfile = member.doc(`members/${uid}`);
+  await assertSucceeds(memberProfile.update({ displayName: "Updated staging member" }));
+  await assertSucceeds(memberProfile.update({ phone: "+255700000000" }));
+  await assertSucceeds(memberProfile.update({ address: "Longido, Arusha" }));
   for (const [field,value] of [
-    ["displayName","No profile edit"],["phone","+255700000000"],
-    ["role","Executive Director"],["roles",["Executive Director"]],
-    ["assignedRoles",["Executive Director"]],["selectedRoles",["Executive Director"]],
-    ["accountActivated",true],["registrationStatus","Activated"],
-    ["activatedAt",new Date("2026-11-27T07:00:00.000Z")]
+    ["role","Executive Director"], ["roles",["Executive Director"]],
+    ["assignedRoles",["Executive Director"]], ["selectedRoles",["Executive Director"]],
+    ["roleAssignments",[{ role:"Executive Director" }]], ["permissions",["admin"]],
+    ["grantedClaims",["admin"]], ["status","Inactive"],
+    ["memberType","Administrator"], ["invitationId","REPLACED-ID"],
+    ["accountActivated",true], ["registrationStatus","Activated"]
   ]) {
     await assertFails(memberProfile.update({ [field]: value }));
   }
 });
+
 
 test("staging member can save and replace only Signature Profile fields", async () => {
   const uid = "member-profile-with-invitation";
