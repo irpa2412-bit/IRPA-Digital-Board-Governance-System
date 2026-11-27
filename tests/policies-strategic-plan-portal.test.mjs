@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {readFile} from "node:fs/promises";
+import {readFileSync} from "node:fs";
 
 const app=await readFile(new URL("../src/App.jsx",import.meta.url),"utf8");
 const portal=await readFile(new URL("../src/pages/PoliciesStrategicPlanPortal.jsx",import.meta.url),"utf8");
@@ -76,10 +77,18 @@ test("shared Research Portal upload control exposes Research Archive only to Res
 });
 
 
-test("Policies and Strategic Plans is a static top-level Portals entry for Administrator, Research and ordinary member authorities",()=>{
+test("Policies and Strategic Plans remains authority-scoped while every IRPA member and employee identity sees Meeting Portal",()=>{
  assert.ok(app.includes('"Documents","Policies and Strategic Plans","Signature Platform"'));
- assert.ok(app.includes('const BASE_MEMBER_MODULES=["Dashboard","Role Descriptions","Meetings","Meeting Room","Participants","Resolutions","Voting","Actions","Documents","Policies and Strategic Plans"'));
- assert.ok(app.includes('modules=sessionAdministrator?[...ALL_MODULES,...registeredPortalModules]'));
+ assert.ok(app.includes('const MEETING_PORTAL_MODULES=["Meetings","Meeting Room","Participants","Resolutions","Voting","Actions","Decisions"]'));
+ assert.ok(app.includes('if(!selected)return ["Dashboard","Role Descriptions"]'));
+ assert.ok(app.includes('meetingProfileAccess?["Dashboard","Role Descriptions",...MEETING_PORTAL_MODULES]:["Dashboard"]'));
+ assert.ok(app.includes("const meetingProfileAccess=Boolean(profile?.uid||employee?.uid);"));
+ assert.ok(app.includes("const portalAccessFrozen=!sessionAdministrator&&!selectedAuthority&&!meetingInviteSession&&!meetingProfileAccess;"));
+ assert.ok(app.includes("!selectedAuthority&&!meetingProfileAccess;"));
+ assert.ok(app.includes("meetingProfileAccess?ALL_MODULES:ALL_MODULES.filter(module=>!MEETING_PORTAL_MODULES.includes(module))"));
+ assert.ok(!app.includes("meetingProfileAccess=!sessionAdministrator&&(profile?.meetingIdentityAvailable===true||profile?.status===\"Active\""));
+ assert.ok(app.includes('registeredPortalModules=meetingProfileAccess&&!sessionAdministrator&&Boolean(selectedAuthority)'));
+ assert.ok(!app.includes("modules=sessionAdministrator?[...ALL_MODULES"));
  assert.ok(app.includes('RESEARCH_AUTHORITY_ROLES.includes(selected)?["Dashboard","Documents","Policies and Strategic Plans"'));
  assert.ok(app.includes('Object.entries(NAV).map'));
 });

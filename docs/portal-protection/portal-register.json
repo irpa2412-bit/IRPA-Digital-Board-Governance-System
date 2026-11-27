@@ -129,6 +129,10 @@
         "drive-gateway/src/meetingDeletion.mjs",
         "drive-gateway/src/meetingEnvironment.mjs",
         "drive-gateway/tests/meeting-environment.test.mjs",
+        "src/FieldEntryDataGate.jsx",
+        "src/pages/Resolutions.jsx",
+        "src/pages/Voting.jsx",
+        "tests/meeting-isolation-guard.test.mjs",
         "scripts/meeting-portal-fixture-isolation-guard.sh"
       ],
       "sharedDependencies": [
@@ -177,12 +181,14 @@
         ]
       },
       "tests": [
-        "tests/meeting-portal-protection.test.mjs"
+        "tests/meeting-portal-protection.test.mjs",
+        "tests/meeting-isolation-guard.test.mjs"
       ],
       "registeredAt": "2026-11-21T00:00:00Z",
       "guardMode": "protected",
       "lockTests": [
-        "tests/meeting-portal-protection.test.mjs"
+        "tests/meeting-portal-protection.test.mjs",
+        "tests/meeting-isolation-guard.test.mjs"
       ],
       "pendingPaths": [
         "drive-gateway/src/meetingDeletion.mjs",

@@ -324,7 +324,7 @@ test("meeting governance Firestore rules restrict live voting control to the act
   assert.match(rules, /function meetingVotingController\(meetingId,leadershipElection\).*transitionCommitteeActive.*leadershipElectionRequired.*leadershipElection==true/);
   assert.match(rules, /meetingLeadershipElectionVoter/);
   assert.match(rules, /meetingAllowsVoting/);
-  assert.match(rules, /match \/meetings\/\{id\}\{allow read:if meetingCategoryReadAllowed\(resource\.data\)/);
+  assert.match(rules, /match \/meetings\/\{id\}\{allow read:if meetingReadAllowed\(resource\.data\)/);
 });
 
 
@@ -402,6 +402,7 @@ test("legacy invitee directory export delegates to the authenticated Cloudflare 
   assert.match(source,/employees:Array\.isArray\(directory\?\.employees\)/);
   assert.match(meetingGatewayApiSource,/\/api\/meeting-invitee-directory\/list/);
 });
+
 
 
 

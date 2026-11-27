@@ -42,46 +42,132 @@ async function seedMeeting(id) {
   });
 }
 
-test("primary administrator claim remains recognised independently of job title", async () => {
+test("primary administrator claim grants no private Meeting Portal access or deletion rights", async () => {
   await seedMeeting("primary-admin-claim");
   const db = env.authenticatedContext("owner-primary", { admin: true }).firestore();
-  await assertSucceeds(db.doc("meetings/primary-admin-claim").delete());
+  await assertFails(db.doc("meetings/primary-admin-claim").get());
+  await assertFails(db.doc("meetings/primary-admin-claim").delete());
 });
 
-test("active adminProfiles identity remains administrator across organisational role-title changes", async () => {
-  const titles = [
-    "Administrator",
-    "Executive Director",
-    "Director Field",
-    "Field Director",
-    "Operations Director",
-    "Research Director",
-    "Communications Officer"
-  ];
-
-  for (let index = 0; index < titles.length; index += 1) {
-    const uid = `staging-admin-${index}`;
-    const meetingId = `staging-admin-meeting-${index}`;
-    await env.withSecurityRulesDisabled(async context => {
-      const db = context.firestore();
-      await db.doc(`adminProfiles/${uid}`).set({ active: true });
-      await db.doc(`members/${uid}`).set({ uid, status: "Active", role: titles[index] });
-      await db.doc(`meetings/${meetingId}`).set({
-        title: "Staging administrator access preservation test",
-        meetingCategory: "ADMINISTRATIVE",
-        meetingPolicyId: "ADMINISTRATIVE",
-        meetingType: "Management Meeting",
-        initiatorUid: "test-initiator",
-        initiatorEmail: "initiator@example.test",
-        registerStatus: "Draft",
-        status: "Scheduled"
-      });
+test("every Member identity receives non-ongoing Meeting Portal access regardless of status or title", async () => {
+  const titles = ["Administrator","Executive Director","Director Field","Field Director","Operations Director","Research Director","Communications Officer"];
+  for (let index=0; index<titles.length; index+=1) {
+    const uid=`staging-member-${index}`, meetingId=`staging-member-meeting-${index}`;
+    await env.withSecurityRulesDisabled(async context=>{
+      const db=context.firestore();
+      await db.doc(`members/${uid}`).set({uid,status:index===0?"Suspended":"Active",role:titles[index]});
+      await db.doc(`meetings/${meetingId}`).set({title:"Meeting Portal universal access test",meetingCategory:"ADMINISTRATIVE",meetingPolicyId:"ADMINISTRATIVE",meetingType:"Management Meeting",initiatorUid:"other-user",registerStatus:"Draft",status:"Scheduled"});
+      await db.doc(`meetings/${meetingId}-live`).set({title:"Ongoing meeting",meetingCategory:"ADMINISTRATIVE",meetingPolicyId:"ADMINISTRATIVE",meetingType:"Management Meeting",initiatorUid:"other-user",participantUids:["invited-user"],registerStatus:"Registered",status:"In Progress"});
     });
-
-    const db = env.authenticatedContext(uid).firestore();
-    await assertSucceeds(db.doc(`meetings/${meetingId}`).delete());
+    const db=env.authenticatedContext(uid,{email:`member-${index}@example.test`}).firestore();
+    await assertSucceeds(db.doc(`meetings/${meetingId}`).get());
+    await assertFails(db.doc(`meetings/${meetingId}-live`).get());
+    await assertFails(db.doc(`meetings/${meetingId}`).delete());
   }
 });
+
+test("administrator-only identity without a Member or Employee record has no general Meeting Portal access", async () => {
+  await env.withSecurityRulesDisabled(async context=>{
+    const db=context.firestore();
+    await db.doc("adminProfiles/admin-only").set({active:true});
+    await db.doc("meetings/admin-only-meeting").set({title:"Meeting Portal access test",meetingCategory:"ADMINISTRATIVE",meetingPolicyId:"ADMINISTRATIVE",meetingType:"Management Meeting",initiatorUid:"other-user",status:"Scheduled"});
+  });
+  const admin=env.authenticatedContext("admin-only",{admin:true,email:"admin-only@example.test"}).firestore();
+  await assertFails(admin.doc("meetings/admin-only-meeting").get());
+  await assertFails(admin.doc("meetings/admin-only-meeting").delete());
+});
+
+test("staging members can update ordinary profile fields but cannot self-assign authority", async () => {
+  const uid = "member-profile-with-invitation";
+  const email = "member-profile-with-invitation@example.test";
+  await env.withSecurityRulesDisabled(async context => {
+    await context.firestore().doc(`members/${uid}`).set({
+      uid, email, status: "Active", role: "Member", roles: ["Member"],
+      assignedRoles: ["Member"], selectedRoles: ["Member"],
+      roleAssignments: [], permissions: [], grantedClaims: [],
+      memberType: "Governance Member", invitationId: "TEST-INVITATION-ID"
+    });
+  });
+
+  const member = env.authenticatedContext(uid, { email }).firestore();
+  const memberProfile = member.doc(`members/${uid}`);
+  await assertSucceeds(memberProfile.update({ name: "Updated staging member" }));
+  await assertSucceeds(memberProfile.update({ phone: "+255700000000" }));
+  await assertSucceeds(memberProfile.update({ address: "Longido, Arusha" }));
+  await assertSucceeds(memberProfile.update({ biography: "Updated staging biography" }));
+  for (const [field,value] of [
+    ["role","Executive Director"], ["roles",["Executive Director"]],
+    ["assignedRoles",["Executive Director"]], ["selectedRoles",["Executive Director"]],
+    ["roleAssignments",[{ role:"Executive Director" }]], ["permissions",["admin"]],
+    ["grantedClaims",["admin"]], ["status","Inactive"],
+    ["memberType","Administrator"], ["invitationId","REPLACED-ID"],
+    ["accountActivated",true], ["registrationStatus","Activated"]
+  ]) {
+    try { await assertFails(memberProfile.update({ [field]: value })); }
+    catch (error) { throw new Error(`Staging member self-update unexpectedly allowed protected field ${field}: ${error.message}`); }
+  }
+});
+
+
+test("staging employees can maintain name and phone but cannot self-change employment authority", async () => {
+  const uid="staging-employee-editor",email="staging-employee-editor@example.test";
+  await env.withSecurityRulesDisabled(async context=>{
+    await context.firestore().doc(`employees/${uid}`).set({
+      uid,email,status:"Active",role:"Programme Officer",department:"Programmes",unit:"Rangeland",
+      employmentType:"Full-time",startDate:"2025-01-01",invitationId:"EMP-INV-1"
+    });
+  });
+  const db=env.authenticatedContext(uid,{email}).firestore();
+  const profile=db.doc(`employees/${uid}`);
+  await assertSucceeds(profile.update({name:"Updated staging employee"}));
+  await assertSucceeds(profile.update({phone:"+255700000001"}));
+  for(const [field,value] of [
+    ["role","Executive Director"],["department","Finance"],["unit","Board Office"],
+    ["employmentType","Contract"],["status","Inactive"],["startDate","2026-01-01"],
+    ["invitationId","REPLACED"],["email","attacker@example.test"],["uid","attacker"]
+  ]) await assertFails(profile.update({[field]:value}));
+});
+
+test("staging member can save and replace only Signature Profile fields", async () => {
+  const uid = "member-profile-with-invitation";
+  const email = "member-profile-with-invitation@example.test";
+  const member = env.authenticatedContext(uid, { email }).firestore();
+  const profileRef = member.doc(`signatureProfiles/${uid}`);
+  const profile = {
+    uid, email, displayName: "Staging Test Signer", initials: "STS",
+    method: "Upload", pathwayVersion: "IRPA-SIGNATURE-PATHWAY-V3",
+    driveSignatureFolderId: "staging-folder", driveSignatureFolderName: "IRPA Signature Profile",
+    driveSignatureFolderPath: "IRPA/Signature Profiles/staging", driveSignatureFolderUid: uid,
+    completedDocumentsFolderId: "staging-completed-folder",
+    completedDocumentsFolderLink: "https://drive.example.test/staging-completed",
+    completedDocumentsFolderPath: "IRPA/Completed Documents/staging",
+    signaturePath: "signatureProfiles/staging/signature.png",
+    signatureUrl: "data:image/png;base64,aGVsbG8=",
+    signatureDriveUrl: "https://drive.example.test/staging-signature",
+    signatureSha256: "c".repeat(64),
+    initialsPath: null, initialsUrl: null, initialsDriveUrl: null, initialsSha256: null,
+    status: "Active", adoptionDate: new Date("2026-11-27T07:00:00.000Z"),
+    updatedAt: new Date("2026-11-27T07:00:00.000Z")
+  };
+  await assertSucceeds(profileRef.set(profile, { merge: true }));
+  await assertSucceeds(profileRef.set({
+    ...profile, signatureSha256: "d".repeat(64),
+    signatureUrl: "data:image/png;base64,dXBkYXRlZA=="
+  }, { merge: true }));
+  await assertSucceeds(profileRef.update({
+    status: "Revoked",
+    revokedAt: new Date("2026-11-27T07:02:00.000Z"),
+    revokedByUid: uid,
+    revokedByEmail: email,
+    revocationReason: "User-initiated signature application revocation"
+  }));
+  for (const field of ["role","roles","assignedRoles","selectedRoles"]) {
+    await assertFails(profileRef.update({
+      [field]: field === "role" ? "Executive Director" : ["Executive Director"]
+    }));
+  }
+});
+
 
 test("a role title of Administrator without an active adminProfiles record does not grant administrator access", async () => {
   await seedMeeting("role-title-only");

@@ -9,6 +9,7 @@ test("meeting fixture isolation guard is classified only as Meeting Portal sourc
   const guard = "scripts/meeting-portal-fixture-isolation-guard.sh";
   assert.equal(isProtectionFile(guard), false);
   assert.ok(registry.portals["Meeting Portal"].paths.includes(guard));
+  assert.equal(registry.shared.some(entry => entry.path === guard), false);
   const meetingRecord = {
     status: "complete",
     declaration: {
@@ -137,6 +138,35 @@ test("shared-file change fails when one owner's window or baseline evidence is m
   const evidenceResult = evaluatePolicy({ changedFiles: [sharedPath], registry, ownerPolicies: missingEvidence, now });
   assert.equal(evidenceResult.ok, false);
   assert.match(evidenceResult.reason, /Meeting Portal/);
+});
+
+test("shared-file cycle may include independent windows and Change Records for each exact owner", () => {
+  const result = evaluatePolicy({
+    changedFiles: [
+      sharedPath,
+      "docs/portal-protection/windows/meeting-portal.json",
+      "docs/portal-protection/records/meeting-portal.json",
+      "docs/portal-protection/windows/signature-portal.json",
+      "docs/portal-protection/records/signature-portal.json"
+    ],
+    registry,
+    ownerPolicies: sharedOwnerPolicies(),
+    now
+  });
+  assert.equal(result.ok, true, result.reason);
+  assert.deepEqual(result.affected, sharedOwners);
+  assert.deepEqual(result.sharedFiles, [sharedPath]);
+});
+
+test("shared-file cycle rejects Change Records for a portal outside the shared dependency owner set", () => {
+  const result = evaluatePolicy({
+    changedFiles: [sharedPath, "docs/portal-protection/records/invitation-portal.json"],
+    registry,
+    ownerPolicies: sharedOwnerPolicies(),
+    now
+  });
+  assert.equal(result.ok, false);
+  assert.match(result.reason, /unrelated portal owners/);
 });
 
 test("shared-file change cannot include portal-specific source from another owner", () => {
@@ -322,18 +352,26 @@ test("shared owner lock tests install Gateway-only dependencies before importing
     "drive-gateway/tests/signature-field-assignment-regression.test.mjs"
   ], (...args) => calls.push(args));
   assert.equal(installed, true);
-  assert.equal(calls.length, 1);
+  assert.equal(calls.length, 2);
   assert.equal(calls[0][0], "npm");
   assert.deepEqual(calls[0][1], ["ci"]);
-  assert.equal(calls[0][2].cwd, "drive-gateway");
+  assert.equal(calls[0][2].cwd, undefined);
   assert.equal(calls[0][2].stdio, "inherit");
+  assert.equal(calls[1][0], "npm");
+  assert.deepEqual(calls[1][1], ["ci"]);
+  assert.equal(calls[1][2].cwd, "drive-gateway");
+  assert.equal(calls[1][2].stdio, "inherit");
 });
 
 test("root-only owner lock tests do not install unnecessary Gateway dependencies", () => {
   const calls = [];
   const installed = installLockTestDependencies(["tests/meeting-portal-protection.test.mjs"], (...args) => calls.push(args));
   assert.equal(installed, false);
-  assert.equal(calls.length, 0);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0][0], "npm");
+  assert.deepEqual(calls[0][1], ["ci"]);
+  assert.equal(calls[0][2].cwd, undefined);
+  assert.equal(calls[0][2].stdio, "inherit");
 });
 
 // Regression coverage keeps Meeting Portal fixture guard classification portal-scoped.

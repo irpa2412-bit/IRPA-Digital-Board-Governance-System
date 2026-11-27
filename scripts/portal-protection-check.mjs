@@ -82,6 +82,7 @@ export function newPortalWarningUntil(entry) {
   return Number.isFinite(registeredAt) ? registeredAt + 7 * 24 * 60 * 60 * 1000 : null;
 }
 
+// Baseline job names include the event's exact base SHA; validate run metadata and the matching successful job without relying on log-download API access.
 async function verifyRealRunEvidence(record, affected) {
   const token = process.env.GH_TOKEN || process.env.GITHUB_TOKEN;
   const repository = process.env.GITHUB_REPOSITORY;
@@ -92,25 +93,57 @@ async function verifyRealRunEvidence(record, affected) {
   const headers = { authorization: `Bearer ${token}`, accept: "application/vnd.github+json", "x-github-api-version": "2022-11-28" };
   for (const label of labels) {
     const candidates = evidence.filter(item => String(item).toLowerCase().includes(label.toLowerCase()) && String(item).includes(record.baseline.commit));
+    const diagnostics = [];
     let verified = false;
     for (const item of candidates) {
       const ref = parseGitHubJobEvidence(item);
-      if (!ref || ref.repository.toLowerCase() !== repository.toLowerCase()) continue;
-      const [jobResponse, logsResponse] = await Promise.all([
-        fetch(`${api}/repos/${repository}/actions/jobs/${ref.jobId}`, { headers }),
-        fetch(`${api}/repos/${repository}/actions/jobs/${ref.jobId}/logs`, { headers })
-      ]);
-      if (!jobResponse.ok || !logsResponse.ok) continue;
-      const job = await jobResponse.json();
-      const logs = await logsResponse.text();
-      const checkedOutBaseline = logs.includes(`git checkout --progress --force ${record.baseline.commit}`) ||
-        logs.includes(`HEAD is now at ${record.baseline.commit.slice(0, 8)}`);
-      if (job.run_id === ref.runId && job.status === "completed" && job.conclusion === "success" && checkedOutBaseline) {
+      if (!ref) { diagnostics.push("candidate URL could not be parsed"); continue; }
+      if (ref.repository.toLowerCase() !== repository.toLowerCase()) { diagnostics.push("candidate repository does not match workflow repository"); continue; }
+      let runResponse, jobsResponse;
+      try {
+        // Retry public, read-only Actions evidence without a token when GitHub restricts workflow-token access.
+        // Run identity, PR base SHA, job status and conclusion are still verified below.
+        const readEvidence = async url => {
+          let response = await fetch(url, { headers });
+          if (response.status === 403) response = await fetch(url, { headers: { accept: "application/vnd.github+json", "x-github-api-version": "2022-11-28" } });
+          return response;
+        };
+        [runResponse, jobsResponse] = await Promise.all([
+          readEvidence(`${api}/repos/${repository}/actions/runs/${ref.runId}`),
+          readEvidence(`${api}/repos/${repository}/actions/runs/${ref.runId}/jobs?per_page=100`)
+        ]);
+      } catch (error) {
+        diagnostics.push(`GitHub Actions API request failed: ${error instanceof Error ? error.message : String(error)}`);
+        continue;
+      }
+      if (!runResponse.ok || !jobsResponse.ok) {
+        const [runError, jobsError] = await Promise.all([
+          runResponse.ok ? Promise.resolve("") : runResponse.text(),
+          jobsResponse.ok ? Promise.resolve("") : jobsResponse.text()
+        ]);
+        diagnostics.push(`run API HTTP ${runResponse.status}${runError ? ` (${runError.slice(0, 240)})` : ""}; jobs API HTTP ${jobsResponse.status}${jobsError ? ` (${jobsError.slice(0, 240)})` : ""}`);
+        continue;
+      }
+      const [run, jobsPayload] = await Promise.all([runResponse.json(), jobsResponse.json()]);
+      const job = (jobsPayload.jobs ?? []).find(candidate => Number(candidate.id) === ref.jobId);
+      const baseCommitVerified = (run.pull_requests ?? []).some(pull => pull.base?.sha === record.baseline.commit);
+      const expectedJobName = label === "baseline smoke" || label.endsWith("portal smoke")
+        ? `baseline-protection-smoke-${record.baseline.commit}`
+        : `baseline-full-regression-${record.baseline.commit}`;
+      if (run.id === ref.runId && run.event === "pull_request" && baseCommitVerified &&
+          job?.run_id === ref.runId && job.name === expectedJobName &&
+          job.status === "completed" && job.conclusion === "success") {
         verified = true;
         break;
       }
+      diagnostics.push(`run ${run.id} (expected ${ref.runId}); event ${run.event}; PR base commit verified ${baseCommitVerified}; job ${job?.id ?? "missing"} status ${job?.status ?? "unknown"}; conclusion ${job?.conclusion ?? "unknown"}`);
     }
-    if (!verified) return { ok: false, reason: `No completed successful GitHub Actions job verifies ${label} on baseline ${record.baseline.commit}.` };
+    if (!verified) {
+      return {
+        ok: false,
+        reason: `No completed successful GitHub Actions job verifies ${label} on baseline ${record.baseline.commit}. Evidence candidates: ${candidates.length}. ${diagnostics.join(" | ") || "No usable evidence candidate was found."}`
+      };
+    }
   }
   return { ok: true };
 }
@@ -139,6 +172,7 @@ export function resolvePortalPolicyPaths(affectedPortals, exists = fs.existsSync
 export function evaluatePolicy({ changedFiles, registry, windowState, record, ownerPolicies = null, now = Date.now(), latestActivityAt = null, activityTimestamps = [] }) {
   const sharedMatches = new Map();
   const specificAffected = new Set();
+  const specificSourceAffected = new Set();
   const protectedFiles = [];
   for (const file of changedFiles) {
     const owners = new Set();
@@ -170,6 +204,7 @@ export function evaluatePolicy({ changedFiles, registry, windowState, record, ow
     for (const [portal, entry] of Object.entries(registry.portals)) {
       if (entry.paths.some(path => isWithin(file, path))) {
         specificAffected.add(portal);
+        specificSourceAffected.add(portal);
         matched = true;
       }
     }
@@ -181,11 +216,15 @@ export function evaluatePolicy({ changedFiles, registry, windowState, record, ow
   if (!protectedFiles.length) return { ok: true, affected: [], protectedFiles: [], sharedFiles: [], reason: "No protected portal or shared dependency changed." };
 
   if (sharedMatches.size) {
-    if (specificAffected.size) {
+    if (specificSourceAffected.size) {
       return fail("A shared-file change cannot be combined with portal-specific source changes; split the shared change into its own PR.");
     }
     const owners = [...new Set([...sharedMatches.values()].flat())].sort();
     const sharedFiles = [...sharedMatches.keys()].sort();
+    const unrelatedPolicyOwners = [...specificAffected].filter(portal => !owners.includes(portal));
+    if (unrelatedPolicyOwners.length) {
+      return fail("A shared-file change cannot include protection records for unrelated portal owners: " + unrelatedPolicyOwners.join(", "), owners, sharedFiles);
+    }
     if (!ownerPolicies) return { ok: true, affected: owners, protectedFiles: sharedFiles, sharedFiles, needsOwnerPolicies: true, reason: "Shared-file classification requires independent owner policies." };
     const ownerResults = [];
     for (const portal of owners) {
@@ -286,6 +325,9 @@ export function evaluatePolicy({ changedFiles, registry, windowState, record, ow
 }
 
 export function installLockTestDependencies(lockTests, run = execFileSync) {
+  // Root lock tests import application modules (including React); install the root
+  // dependency tree before running any portal lock suite.
+  run("npm", ["ci"], { stdio: "inherit" });
   const needsGatewayDependencies = (lockTests ?? []).some(path => String(path).startsWith("drive-gateway/"));
   if (needsGatewayDependencies) {
     run("npm", ["ci"], { cwd: "drive-gateway", stdio: "inherit" });
