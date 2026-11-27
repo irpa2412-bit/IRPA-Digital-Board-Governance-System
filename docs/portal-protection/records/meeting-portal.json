@@ -53,9 +53,11 @@
     ]
   },
   "repairWindow": {
-    "openedAt": "2026-11-21T20:23:03Z",
-    "lastActivityAt": "2026-11-23T20:04:00Z",
-    "emergency": false
+    "openedAt": "2026-11-27T16:49:53Z",
+    "lastActivityAt": "2026-11-27T17:14:05Z",
+    "expiresAt": "2026-11-30T16:49:53Z",
+    "durationHours": 72,
+    "renewedBy": "repository owner instruction in conversation on 2026-11-27"
   },
   "baseline": {
     "commit": "331201cb3c626cc96cd006fe8263bf69bafea9b1",
@@ -143,6 +145,25 @@
         "tests/meeting-working-documents-security.test.mjs",
         "drive-gateway/src/index.js"
       ]
+    },
+    {
+      "at": "2026-11-27T16:49:53Z",
+      "action": "owner-authorised repair-window renewal and PR reconciliation",
+      "pullRequests": [
+        1004,
+        995
+      ],
+      "scope": [
+        "drive-gateway/src/meetingServices.mjs",
+        "src/firebase/data.js",
+        "src/firebase/meetingPolicy.js",
+        "src/pages/Meetings.jsx",
+        "firestore.rules",
+        "firestore.staging.rules",
+        "tests/meeting-category-policy.test.mjs",
+        "tests/meeting-category-firestore-rules.test.cjs"
+      ],
+      "productionDeployment": "NOT_AUTHORISED_BY_THIS_RENEWAL"
     }
   ],
   "attendanceCallableAudit": {
