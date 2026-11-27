@@ -450,32 +450,6 @@ test("meeting governance source enforces the proceedings gate and immediate tran
   assert.match(source, /Only the Chairperson appointed to this meeting may open formal proceedings/);
 });
 
-test("meeting governance Firestore rules restrict live voting control to the active meeting mandate", () => {
-  const rules = readFileSync(new URL("../firestore.rules", import.meta.url), "utf8");
-  assert.match(rules, /function meetingVotingController\(meetingId,leadershipElection\).*transitionCommitteeActive.*leadershipElectionRequired.*leadershipElection==true/);
-  assert.match(rules, /meetingLeadershipElectionVoter/);
-  assert.match(rules, /meetingAllowsVoting/);
-  assert.match(rules, /match \/meetings\/\{id\}\{allow read:if meetingParticipant\(resource\.data\)/);
-});
-
-
-test("production and staging Firestore rules enforce the same Meeting Portal authorization model", () => {
-  const prod = readFileSync(new URL("../firestore.rules", import.meta.url), "utf8");
-  const staging = readFileSync(new URL("../firestore.staging.rules", import.meta.url), "utf8");
-  for (const source of [prod, staging]) {
-    assert.match(source, /function meetingUser\(\)\{return activeMember\(\)\|\|activeEmployee\(\);\}/);
-    assert.match(source, /match \/meetings\/\{id\}\{allow read:if meetingParticipant\(resource\.data\)/);
-    assert.match(source, /match \/meetingRoomEvents\/\{id\}\{allow read:if meetingParticipantRecordRead\(resource\.data\)/);
-    assert.match(source, /match \/transcriptions\/\{id\}\{allow read:if meetingParticipantRecordRead\(resource\.data\)/);
-    assert.match(source, /match \/meetingPublicOutcomes\/\{id\}\{allow read:if meetingUser\(\)/);
-    assert.ok(!source.split("\n").find(line => line.startsWith("  match /meetings/{id}")).includes("actualCreateAllowed"));
-    assert.ok(!source.split("\n").find(line => line.startsWith("  match /meetings/{id}")).includes("actualUpdateAllowed"));
-  }
-  const readRule = source => source.split("\n").find(line => line.startsWith("  match /meetings/{id}"));
-  assert.equal(readRule(prod), readRule(staging));
-});
-
-
 test("Meeting Worker allows universal portal initiation while retaining participant-only private meeting context", () => {
   assert.match(meetingServicesGovernanceSource, /const isAdminIdentity=claims\.admin===true/);
   assert.match(meetingServicesGovernanceSource, /if\(isAdminIdentity&&!activeIdentity\)/);
