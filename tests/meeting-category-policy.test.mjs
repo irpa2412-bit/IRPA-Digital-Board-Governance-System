@@ -163,6 +163,89 @@ const postMeetingGateway = (router, path, body = {}) => router(new Request("http
   body: JSON.stringify(body)
 }), { FIREBASE_PROJECT_ID: "test-project" }, path);
 
+async function requestMeetingDirectory({ uid, email, identityCollection, status }) {
+  const originalFetch = globalThis.fetch;
+  let listRead = false;
+  globalThis.fetch = async (input, init = {}) => {
+    const url = new URL(String(input));
+    const match = url.pathname.match(/\\/documents\\/(members|employees)\\/([^/]+)$/);
+    if (match) {
+      const [, collection, recordUid] = match;
+      if (collection !== identityCollection || recordUid !== uid) return new Response("{}", { status: 404 });
+      return new Response(JSON.stringify({
+        name: url.pathname,
+        fields: { uid: { stringValue: uid }, email: { stringValue: email }, status: { stringValue: status } }
+      }), { status: 200 });
+    }
+    if (url.pathname.endsWith("/documents:runQuery")) {
+      listRead = true;
+      return new Response(JSON.stringify([{
+        document: {
+          name: "projects/test-project/databases/(default)/documents/meetings/private-meeting",
+          fields: {
+            title: { stringValue: "Board meeting" },
+            meetingCategory: { stringValue: "GOVERNANCE" },
+            meetingType: { stringValue: "Board Meeting" },
+            meetingReference: { stringValue: "IRPA-MTG-2026-001" },
+            date: { stringValue: "2026-11-27" },
+            status: { stringValue: "Scheduled" },
+            initiatorUid: { stringValue: "another-user" },
+            agenda: { stringValue: "Private agenda" },
+            minutes: { stringValue: "Private minutes" },
+            platformPasscode: { stringValue: "secret-passcode" }
+          }
+        }
+      }]), { status: 200 });
+    }
+    return new Response("{}", { status: 404 });
+  };
+  try {
+    const context = {
+      ...meetingGatewayContext,
+      authenticateFirebaseRequest: async () => ({ user_id: uid, email })
+    };
+    const response = await postMeetingGateway(createMeetingServicesRouter(context), "/api/meeting-register/list");
+    return { response, body: await response.json(), listRead };
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+}
+
+test("active members can retrieve the Meeting Portal directory without receiving private meeting content", async () => {
+  const result = await requestMeetingDirectory({
+    uid: "directory-member", email: "member@example.test",
+    identityCollection: "members", status: "Active"
+  });
+  assert.equal(result.response.status, 200);
+  assert.equal(result.body.ok, true);
+  assert.equal(result.body.meetings.length, 1);
+  assert.equal(result.body.meetings[0].title, "Board meeting");
+  for (const field of ["agenda", "minutes", "platformPasscode", "participantUids"]) {
+    assert.equal(field in result.body.meetings[0], false, field);
+  }
+  assert.equal(result.listRead, true);
+});
+
+test("active employees can retrieve the Meeting Portal directory", async () => {
+  const result = await requestMeetingDirectory({
+    uid: "directory-employee", email: "employee@example.test",
+    identityCollection: "employees", status: "Active"
+  });
+  assert.equal(result.response.status, 200);
+  assert.equal(result.body.meetings.length, 1);
+});
+
+test("inactive members and employees are denied the Meeting Portal directory", async () => {
+  const result = await requestMeetingDirectory({
+    uid: "inactive-directory-user", email: "inactive@example.test",
+    identityCollection: "members", status: "Suspended"
+  });
+  assert.equal(result.response.status, 403);
+  assert.equal(result.body.ok, false);
+  assert.equal(result.listRead, false);
+});
+
+
 async function createMeetingAsInstitutionalIdentity({ uid, email, member = null, employee = null, otherMembers = {}, otherEmployees = {}, category = "GENERAL", meetingData = {} }) {
   const originalFetch = globalThis.fetch;
   let meetingWrites = 0;
