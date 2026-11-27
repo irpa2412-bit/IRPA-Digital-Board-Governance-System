@@ -91,10 +91,10 @@ test("Administrator job title alone does not grant administrator authority", asy
 });
 
 test("administrator-only identities see no portals; active administrator-members receive ordinary Meeting Portal access", () => {
-  assert.match(appSource, /const sessionAdministrator=Boolean\\(admin\\|\\|profile\\?\\.authorizationType===["']administrator["']\\)/);
-  assert.match(appSource, /meetingProfileAccess\\?\\["Dashboard","Role Descriptions",\\.\\.\\.MEETING_PORTAL_MODULES\\]:\\["Dashboard"\\]/);
-  assert.match(appSource, /registeredPortalModules=meetingProfileAccess&&!sessionAdministrator&&Boolean\\(selectedAuthority\\)/);
-  assert.doesNotMatch(appSource, /modules=sessionAdministrator\\?\\[\\.\\.\\.ALL_MODULES/);
+  assert.ok(appSource.includes('const sessionAdministrator=Boolean(admin||profile?.authorizationType==="administrator")'));
+  assert.ok(appSource.includes('meetingProfileAccess?["Dashboard","Role Descriptions",...MEETING_PORTAL_MODULES]:["Dashboard"]'));
+  assert.ok(appSource.includes('registeredPortalModules=meetingProfileAccess&&!sessionAdministrator&&Boolean(selectedAuthority)'));
+  assert.ok(!appSource.includes('modules=sessionAdministrator?[...ALL_MODULES'));
   assert.ok(appSource.includes('selected==="Administrator"?["Dashboard","Role Descriptions"]'));
   assert.equal(catalogue.roles.find(role => role.id === "administrator")?.accessStatus,
     "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
