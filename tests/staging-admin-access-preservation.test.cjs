@@ -52,7 +52,8 @@ test("staging members can update ordinary profile fields but cannot self-assign 
     ["memberType","Administrator"], ["invitationId","REPLACED-ID"],
     ["accountActivated",true], ["registrationStatus","Activated"]
   ]) {
-    await assertFails(memberProfile.update({ [field]: value }));
+    try { await assertFails(memberProfile.update({ [field]: value })); }
+    catch (error) { throw new Error(`Staging member self-update unexpectedly allowed protected field ${field}: ${error.message}`); }
   }
 });
 
