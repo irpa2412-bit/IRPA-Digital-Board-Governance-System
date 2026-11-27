@@ -111,7 +111,7 @@ test("meeting creation rejects missing or invalid category metadata", async () =
 });
 
 
-test("private meeting register reads require explicit participation regardless of category", async () => {
+test("active members and employees can read non-ongoing meetings; ongoing meetings require explicit participation", async () => {
   await testEnv.withSecurityRulesDisabled(async context => {
     const db = context.firestore();
     await db.doc("meetings/governance-record").set(meeting({
@@ -125,36 +125,46 @@ test("private meeting register reads require explicit participation regardless o
     await db.doc("meetings/unlisted-record").set(meeting({
       meetingCategory: "GENERAL", meetingPolicyId: "GENERAL"
     }));
+    await db.doc("meetings/live-record").set(meeting({
+      meetingCategory: "GOVERNANCE", meetingPolicyId: "GOVERNANCE", status: "In Progress",
+      proceedingsStatus: "In Progress", participantUids: ["board-member"]
+    }));
   });
   const staffDb = testEnv.authenticatedContext("staff-user", { email: "staff@example.test" }).firestore();
   const boardDb = testEnv.authenticatedContext("board-member", { email: "board@example.test" }).firestore();
-  await assertFails(staffDb.doc("meetings/governance-record").get());
+  await assertSucceeds(staffDb.doc("meetings/governance-record").get());
   await assertSucceeds(boardDb.doc("meetings/governance-record").get());
   await assertSucceeds(staffDb.doc("meetings/staff-record").get());
-  await assertFails(boardDb.doc("meetings/unlisted-record").get());
-  await assertFails(staffDb.doc("meetings/unlisted-record").get());
+  await assertSucceeds(boardDb.doc("meetings/unlisted-record").get());
+  await assertSucceeds(staffDb.doc("meetings/unlisted-record").get());
+  await assertSucceeds(boardDb.doc("meetings/live-record").get());
+  await assertFails(staffDb.doc("meetings/live-record").get());
 });
 
 test("meeting register queries must prove participant membership rather than category", async () => {
   await testEnv.withSecurityRulesDisabled(async context => {
     await context.firestore().doc("meetings/query-private").set(meeting({
-      meetingCategory: "GOVERNANCE", participantUids: ["staff-user"]
+      meetingCategory: "GOVERNANCE", participantUids: ["staff-user"], status: "Scheduled", proceedingsStatus: "Scheduled"
+    }));
+    await context.firestore().doc("meetings/query-live").set(meeting({
+      meetingCategory: "GOVERNANCE", status: "In Progress", proceedingsStatus: "In Progress"
     }));
   });
   const staffDb = testEnv.authenticatedContext("staff-user", { email: "staff@example.test" }).firestore();
   const boardDb = testEnv.authenticatedContext("board-member", { email: "board@example.test" }).firestore();
   await assertSucceeds(staffDb.collection("meetings").where("participantUids", "array-contains", "staff-user").get());
   await assertFails(staffDb.collection("meetings").where("meetingCategory", "==", "GOVERNANCE").get());
+  await assertSucceeds(staffDb.collection("meetings").where("status", "==", "Scheduled").where("proceedingsStatus", "==", "Scheduled").get());
   await assertFails(boardDb.collection("meetings").where("meetingCategory", "==", "GOVERNANCE").get());
 });
 
 
-test("category metadata never overrides participant-only private visibility", async () => {
+test("category metadata never overrides ongoing meeting participation restrictions", async () => {
   await testEnv.withSecurityRulesDisabled(async context => {
     await context.firestore().doc("meetings/category-mismatch").set(meeting({
       meetingCategory: "STAFF",
       meetingPolicyId: "STAFF",
-      meetingType: "Board Meeting"
+      meetingType: "Board Meeting", status: "In Progress", proceedingsStatus: "In Progress"
     }));
   });
   const boardDb = testEnv.authenticatedContext("board-member", {
