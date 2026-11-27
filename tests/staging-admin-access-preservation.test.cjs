@@ -91,9 +91,10 @@ test("staging members can update ordinary profile fields but cannot self-assign 
 
   const member = env.authenticatedContext(uid, { email }).firestore();
   const memberProfile = member.doc(`members/${uid}`);
-  await assertSucceeds(memberProfile.update({ displayName: "Updated staging member" }));
+  await assertSucceeds(memberProfile.update({ name: "Updated staging member" }));
   await assertSucceeds(memberProfile.update({ phone: "+255700000000" }));
   await assertSucceeds(memberProfile.update({ address: "Longido, Arusha" }));
+  await assertSucceeds(memberProfile.update({ biography: "Updated staging biography" }));
   for (const [field,value] of [
     ["role","Executive Director"], ["roles",["Executive Director"]],
     ["assignedRoles",["Executive Director"]], ["selectedRoles",["Executive Director"]],
@@ -107,6 +108,25 @@ test("staging members can update ordinary profile fields but cannot self-assign 
   }
 });
 
+
+test("staging employees can maintain name and phone but cannot self-change employment authority", async () => {
+  const uid="staging-employee-editor",email="staging-employee-editor@example.test";
+  await env.withSecurityRulesDisabled(async context=>{
+    await context.firestore().doc(`employees/${uid}`).set({
+      uid,email,status:"Active",role:"Programme Officer",department:"Programmes",unit:"Rangeland",
+      employmentType:"Full-time",startDate:"2025-01-01",invitationId:"EMP-INV-1"
+    });
+  });
+  const db=env.authenticatedContext(uid,{email}).firestore();
+  const profile=db.doc(`employees/${uid}`);
+  await assertSucceeds(profile.update({name:"Updated staging employee"}));
+  await assertSucceeds(profile.update({phone:"+255700000001"}));
+  for(const [field,value] of [
+    ["role","Executive Director"],["department","Finance"],["unit","Board Office"],
+    ["employmentType","Contract"],["status","Inactive"],["startDate","2026-01-01"],
+    ["invitationId","REPLACED"],["email","attacker@example.test"],["uid","attacker"]
+  ]) await assertFails(profile.update({[field]:value}));
+});
 
 test("staging member can save and replace only Signature Profile fields", async () => {
   const uid = "member-profile-with-invitation";
