@@ -54,7 +54,7 @@ test("primary owner administrator claim grants no private Meeting Portal access 
   await assertFails(db.doc("meetings/owner-claim").delete());
 });
 
-test("adminProfiles plus an active Member record grant no private access without meeting participation", async () => {
+test("active Member records grant ordinary Meeting Portal access but not ongoing meeting access or deletion rights", async () => {
   const roleTitles = ["Administrator","Executive Director","Director Field","Field Director","Operations Director","Research Director","Communications Officer"];
   for (let index = 0; index < roleTitles.length; index += 1) {
     const uid = `profile-admin-${index}`;
@@ -64,15 +64,23 @@ test("adminProfiles plus an active Member record grant no private access without
       await db.doc(`adminProfiles/${uid}`).set({ active: true });
       await db.doc(`members/${uid}`).set({ uid, status: "Active", role: roleTitles[index] });
       await db.doc(`meetings/${meetingId}`).set({
-        title: "Administrator preservation test", meetingCategory: "ADMINISTRATIVE",
+        title: "Ordinary Meeting Portal access test", meetingCategory: "ADMINISTRATIVE",
         meetingPolicyId: "ADMINISTRATIVE", meetingType: "Management Meeting",
         initiatorUid: "test-initiator", initiatorEmail: "initiator@example.test",
         registerStatus: "Draft", status: "Scheduled"
       });
+      await db.doc(`meetings/${meetingId}-live`).set({
+        title: "Ongoing meeting access test", meetingCategory: "ADMINISTRATIVE",
+        meetingPolicyId: "ADMINISTRATIVE", meetingType: "Management Meeting",
+        initiatorUid: "test-initiator", participantUids: ["invited-user"],
+        registerStatus: "Registered", status: "In Progress"
+      });
     });
     const db = env.authenticatedContext(uid, { admin: true }).firestore();
-    await assertFails(db.doc(`meetings/${meetingId}`).get());
+    await assertSucceeds(db.doc(`meetings/${meetingId}`).get());
+    await assertFails(db.doc(`meetings/${meetingId}-live`).get());
     await assertFails(db.doc(`meetings/${meetingId}`).delete());
+    await assertFails(db.doc(`meetings/${meetingId}-live`).delete());
   }
 });
 
