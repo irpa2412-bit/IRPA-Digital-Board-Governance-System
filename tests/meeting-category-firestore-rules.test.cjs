@@ -288,26 +288,37 @@ test("meeting creation is independent of the global actual-data switch", async (
   })));
 });
 
-test("meeting-room events and transcripts remain private to listed meeting participants", async () => {
+test("non-ongoing meeting room records are visible to active IRPA identities; ongoing records require invitation", async () => {
   await testEnv.withSecurityRulesDisabled(async context => {
     const db = context.firestore();
-    await db.doc("meetings/private-logs").set(meeting({ participantUids: ["board-member"] }));
+    await db.doc("meetings/private-logs").set(meeting({
+      participantUids: ["board-member"], status: "Scheduled", proceedingsStatus: "Scheduled"
+    }));
     await db.doc("meetingRoomEvents/private-event").set({ meetingId: "private-logs", eventType: "JOIN" });
     await db.doc("transcriptions/private-transcript").set({ meetingId: "private-logs", content: "private transcript" });
+    await db.doc("meetings/live-logs").set(meeting({
+      participantUids: ["board-member"], status: "In Progress", proceedingsStatus: "In Progress"
+    }));
+    await db.doc("meetingRoomEvents/live-event").set({ meetingId: "live-logs", eventType: "JOIN" });
+    await db.doc("transcriptions/live-transcript").set({ meetingId: "live-logs", content: "live transcript" });
   });
   const participant = testEnv.authenticatedContext("board-member", { email: "board@example.test" }).firestore();
   const nonparticipant = testEnv.authenticatedContext("staff-user", { email: "staff@example.test" }).firestore();
   await assertSucceeds(participant.doc("meetingRoomEvents/private-event").get());
   await assertSucceeds(participant.doc("transcriptions/private-transcript").get());
-  await assertFails(nonparticipant.doc("meetingRoomEvents/private-event").get());
-  await assertFails(nonparticipant.doc("transcriptions/private-transcript").get());
+  await assertSucceeds(nonparticipant.doc("meetingRoomEvents/private-event").get());
+  await assertSucceeds(nonparticipant.doc("transcriptions/private-transcript").get());
+  await assertSucceeds(participant.doc("meetingRoomEvents/live-event").get());
+  await assertSucceeds(participant.doc("transcriptions/live-transcript").get());
+  await assertFails(nonparticipant.doc("meetingRoomEvents/live-event").get());
+  await assertFails(nonparticipant.doc("transcriptions/live-transcript").get());
 });
 
-test("voting participant self-read also requires participation in the parent meeting", async () => {
+test("voting participant self-read follows the parent meeting's live access window", async () => {
   await testEnv.withSecurityRulesDisabled(async context => {
     const db = context.firestore();
     await db.doc("meetings/vote-parent").set(meeting({
-      meetingCategory: "GENERAL", participantUids: ["board-member"]
+      meetingCategory: "GENERAL", participantUids: ["board-member"], status: "Scheduled", proceedingsStatus: "Scheduled"
     }));
     await db.doc("votingIssues/issue-parent").set({
       meetingId: "vote-parent", status: "Open", votingReference: "Test motion"
@@ -318,6 +329,15 @@ test("voting participant self-read also requires participation in the parent mee
     await db.doc("votingIssues/issue-parent/participants/staff-user").set({
       uid: "staff-user", issueId: "issue-parent", status: "VOTED"
     });
+    await db.doc("meetings/live-vote-parent").set(meeting({
+      meetingCategory: "GENERAL", participantUids: ["board-member"], status: "In Progress", proceedingsStatus: "In Progress"
+    }));
+    await db.doc("votingIssues/live-issue-parent").set({
+      meetingId: "live-vote-parent", status: "Open", votingReference: "Live motion"
+    });
+    await db.doc("votingIssues/live-issue-parent/participants/staff-user").set({
+      uid: "staff-user", issueId: "live-issue-parent", status: "VOTED"
+    });
   });
   const participantDb = testEnv.authenticatedContext("board-member", {
     email: "board@example.test"
@@ -326,8 +346,9 @@ test("voting participant self-read also requires participation in the parent mee
     email: "staff@example.test"
   }).firestore();
   await assertSucceeds(participantDb.doc("votingIssues/issue-parent/participants/board-member").get());
-  await assertFails(nonparticipantDb.doc("votingIssues/issue-parent/participants/staff-user").get());
+  await assertSucceeds(nonparticipantDb.doc("votingIssues/issue-parent/participants/staff-user").get());
   await assertFails(nonparticipantDb.doc("votingIssues/issue-parent/participants/board-member").get());
+  await assertFails(nonparticipantDb.doc("votingIssues/live-issue-parent/participants/staff-user").get());
 });
 
 test("public meeting outcomes are readable by active members and employees, not admin-only or external identities", async () => {
