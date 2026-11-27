@@ -6,46 +6,24 @@
     "affectedPortals": [
       "Meeting Portal"
     ],
-    "reason": "Owner-authorised coordinated shared-file protection cycle for src/App.jsx. This portal independently verifies the shared navigation-shell change while preserving its own authorization, data, workflow and governance boundaries.",
+    "reason": "Owner-authorised Meeting Portal universal-access and meeting-scoped authority repair. The shared application shell and seven-owner protection cycle are handled separately in PR #995; this record covers only Meeting Portal implementation, its isolation guard, and its regression tests.",
     "files": [
-      "drive-gateway/src/meetingServices.mjs",
-      "drive-gateway/src/meetingDeletion.mjs",
-      "src/pages/Meetings.jsx",
-      "drive-gateway/src/meetingEnvironment.mjs",
-      "drive-gateway/tests/meeting-environment.test.mjs",
       "docs/portal-protection/records/meeting-portal.json",
-      "tests/meeting-category-policy.test.mjs",
       "docs/portal-protection/windows/meeting-portal.json",
-      "drive-gateway/src/router.mjs",
-      "src/firebase/meetingGatewayApi.js",
-      "src/pages/MeetingRoom.jsx",
-      "src/firebase/meetingPolicy.js",
-      "firestore.rules",
-      "tests/meeting-room-authorization-boundary.test.mjs",
-      "tests/meeting-invitation-resend-quorum.test.mjs",
-      "tests/meeting-quorum-reconciliation.test.mjs",
-      "functions/liveMeeting.js",
-      "scripts/check-meeting-media-governance.mjs",
-      "src/pages/Voting.jsx",
-      "tests/meeting-category-firestore-rules.test.cjs",
-      "src/firebase/data.js",
-      "scripts/meeting-portal-fixture-isolation-guard.sh",
-      "tests/fixtures/mocks.js",
-      "tests/meeting-portal-browser.test.mjs",
-      "firestore.staging.rules",
-      "functions/meetingAttendanceRegister.js",
-      "functions/meetingRecords.js",
-      "src/App.jsx",
-      "src/meeting/IRPADGBSMeetingRoomMedia.jsx",
-      "src/meeting/MeetingAccessControl.jsx",
-      "src/pages/OperationalGatewaysParticipants.jsx",
-      "tests/meeting-working-documents-security.test.mjs",
-      "drive-gateway/src/index.js",
-      "src/FieldEntryDataGate.jsx",
+      "drive-gateway/src/meetingServices.mjs",
       "drive-gateway/tests/meeting-services-router.test.mjs",
-      "src/pages/Resolutions.jsx"
+      "scripts/check-meeting-media-governance.mjs",
+      "scripts/meeting-portal-fixture-isolation-guard.sh",
+      "src/FieldEntryDataGate.jsx",
+      "src/firebase/meetingGatewayApi.js",
+      "src/firebase/meetingPolicy.js",
+      "src/pages/Meetings.jsx",
+      "src/pages/Resolutions.jsx",
+      "src/pages/Voting.jsx",
+      "tests/meeting-category-policy.test.mjs",
+      "tests/meeting-isolation-guard.test.mjs"
     ],
-    "expectedEffect": "The shared application shell makes the complete Meeting Portal module set available to every identity with a Members or Employees register record, regardless of active status or selected authority. It does not change this portal's own data, workflows, permissions or role controls.",
+    "expectedEffect": "Every IRPA member or employee identity can access the complete Meeting Portal and initiate/register meetings regardless of status, title, department, membership/employment category, invitation or participant listing. Access to an ongoing meeting, meeting-specific leadership, live-room admission, voting, quorum, resolutions, formal approvals and Board-restricted records remain governed by their existing meeting-specific controls.",
     "prohibitedChanges": [
       "Do not create portal-wide meeting leadership roles.",
       "Do not allow Meeting Administrator to chair, vote, establish quorum, approve resolutions or approve minutes by virtue of that role.",
@@ -59,7 +37,8 @@
       "Do not modify another portal's internals or use this shared-file record as a substitute for its independent lock tests."
     ],
     "lockTests": [
-      "tests/meeting-portal-protection.test.mjs"
+      "tests/meeting-portal-protection.test.mjs",
+      "tests/meeting-isolation-guard.test.mjs"
     ]
   },
   "repairWindow": {
