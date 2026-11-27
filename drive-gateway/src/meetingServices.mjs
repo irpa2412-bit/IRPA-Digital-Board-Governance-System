@@ -177,7 +177,7 @@ async function context(ctx,env,token,claims,meetingId){
   (meetingRoleAssigned(meeting,uid,"transitionChair")||meetingRoleAssigned(meeting,uid,"transitionSecretary")||meetingRoleAssigned(meeting,uid,"transitionAdministrator"));
  const organiser=organiserUids.map(clean).includes(uid);
  const canManage=activeIdentity&&(organiser||chair||secretary||meetingAdministrator||transitionOfficer);
- const canManageParticipants=activeIdentity&&(organiser||chair||secretary||meetingAdministrator||transitionOfficer);
+ const canManageParticipants=activeIdentity&&(transitionCommitteeActive(meeting)?transitionOfficer:(chair||secretary||meetingAdministrator));
  return {
   uid,email,meeting,participant:explicitParticipant,canManage,canManageParticipants,canRead:true,
   isAdmin:false,category:categoryOf(meeting),
