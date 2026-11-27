@@ -2,11 +2,11 @@
   "schemaVersion": 1,
   "portal": "Meeting Portal",
   "status": "open",
-  "openedAt": "2026-11-27T16:49:53Z",
-  "lastActivityAt": "2026-11-27T17:14:05Z",
+  "openedAt": "2026-11-22T18:10:00Z",
+  "lastActivityAt": "2026-11-25T07:20:00Z",
   "inactivityCloseHours": 72,
   "emergency": false,
-  "reason": "Owner-authorised renewal on 27 November 2026 to reconcile PR #1004 and PR #995: preserve profile-role security while restoring legitimate profile maintenance; give every IRPA member and employee identity full Meeting Portal access regardless of status, role, department, invitation or participant listing for ordinary portal use and non-live records; preserve invitation-only live proceedings, meeting-specific leadership, Board-restricted records, voting/quorum, retention, audit and deletion controls. No unrelated portal or signature behavior changes.",
+  "reason": "Owner-authorised completion of universal full Meeting Portal access for everyone in IRPA and open meeting initiation, while preserving meeting-specific Chairperson, Secretary and Administrator responsibilities, optional registration-stage appointments, mandatory validation before proceedings, temporary Transition Committee handover, invitation-based live-room admission, Board governance safeguards and a minimum ten-year meeting-record retention period. Portal access must not be restricted by organisational role, department, membership/employment status, invitation or participant listing. No unrelated portal, collection or signature behavior is changed.",
   "scope": [
     "drive-gateway/src/index.js",
     "drive-gateway/src/meetingServices.mjs",
@@ -30,8 +30,7 @@
     "tests/meeting-working-documents-security.test.mjs",
     "tests/org-structure-access-preservation.test.cjs",
     "tests/policies-strategic-plan-portal.test.mjs",
-    "tests/staging-admin-access-preservation.test.cjs",
-    "src/firebase/meetingGatewayApi.js"
+    "tests/staging-admin-access-preservation.test.cjs"
   ],
   "activityLog": [
     {
@@ -119,11 +118,6 @@
       "at": "2026-11-25T07:10:00Z",
       "action": "extended universal access to category archives",
       "description": "The Google Drive meeting archive authorization now allows every IRPA member/employee identity to access non-Board-restricted meeting category archives regardless of active status or participant listing. Board-restricted archives remain limited to authorised governance readers; external invitees retain only their invited meeting access."
-    },
-    {
-      "at": "2026-11-27T16:49:53Z",
-      "action": "owner-authorised 72-hour repair-window renewal and scope confirmation",
-      "description": "The owner expressly authorised reconciliation of PR #1004 and PR #995, including universal Meeting Portal access, positive/negative access tests, preservation of profile authority protections, and combined verification before production deployment. This renewal authorises code and test repair only; production deployment remains separately gated."
     }
   ],
   "baseline": {
@@ -132,5 +126,5 @@
   },
   "durationHours": 72,
   "warningHours": 12,
-  "expiresAt": "2026-11-30T16:49:53Z"
+  "expiresAt": "2026-11-25T18:10:00Z"
 }
