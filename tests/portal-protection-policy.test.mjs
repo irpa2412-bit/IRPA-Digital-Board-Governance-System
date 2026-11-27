@@ -139,6 +139,35 @@ test("shared-file change fails when one owner's window or baseline evidence is m
   assert.match(evidenceResult.reason, /Meeting Portal/);
 });
 
+test("shared-file cycle may include independent windows and Change Records for each exact owner", () => {
+  const result = evaluatePolicy({
+    changedFiles: [
+      sharedPath,
+      "docs/portal-protection/windows/meeting-portal.json",
+      "docs/portal-protection/records/meeting-portal.json",
+      "docs/portal-protection/windows/signature-portal.json",
+      "docs/portal-protection/records/signature-portal.json"
+    ],
+    registry,
+    ownerPolicies: sharedOwnerPolicies(),
+    now
+  });
+  assert.equal(result.ok, true, result.reason);
+  assert.deepEqual(result.affected, sharedOwners);
+  assert.deepEqual(result.sharedFiles, [sharedPath]);
+});
+
+test("shared-file cycle rejects Change Records for a portal outside the shared dependency owner set", () => {
+  const result = evaluatePolicy({
+    changedFiles: [sharedPath, "docs/portal-protection/records/invitation-portal.json"],
+    registry,
+    ownerPolicies: sharedOwnerPolicies(),
+    now
+  });
+  assert.equal(result.ok, false);
+  assert.match(result.reason, /unrelated portal owners/);
+});
+
 test("shared-file change cannot include portal-specific source from another owner", () => {
   const result = evaluatePolicy({
     changedFiles: [sharedPath, "src/pages/Meetings.jsx"],
