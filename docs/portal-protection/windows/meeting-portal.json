@@ -30,7 +30,8 @@
     "tests/meeting-working-documents-security.test.mjs",
     "tests/org-structure-access-preservation.test.cjs",
     "tests/policies-strategic-plan-portal.test.mjs",
-    "tests/staging-admin-access-preservation.test.cjs"
+    "tests/staging-admin-access-preservation.test.cjs",
+    "src/FieldEntryDataGate.jsx"
   ],
   "activityLog": [
     {
