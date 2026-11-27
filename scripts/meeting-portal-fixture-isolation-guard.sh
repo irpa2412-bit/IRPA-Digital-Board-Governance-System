@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-BASE_REF="${GITHUB_BASE_REF:-main}"
-git fetch origin "${BASE_REF}:refs/remotes/origin/${BASE_REF}"
+git fetch origin main:refs/remotes/origin/main
 EVENT_NAME="${EVENT_NAME:-}" node --input-type=module <<'NODE'
 import { execFileSync } from "node:child_process";
 import { evaluateSignatureWindowAmendment, evaluateSignatureWindowRepair, evaluateSignatureWindowClosure, evaluateSignatureWindowReopen } from "./scripts/portal-repair-window-guard-policy.mjs";
@@ -11,8 +10,7 @@ import { classifyProtectionOnlyChange } from "./scripts/portal-protection-check.
 // this feature branch diverged; no portal source or workflow is exempted.
 const eventName = process.env.EVENT_NAME?.trim();
 const isMainPush = eventName === "push" && process.env.GITHUB_REF === "refs/heads/main";
-const baseRef = process.env.GITHUB_BASE_REF?.trim() || "main";
-const base = `origin/${baseRef}`;
+const base = "origin/main";
 execFileSync("git", ["cat-file", "-e", `${base}^{commit}`]);
 const changed = execFileSync("git", ["diff", "--name-only", `${base}...HEAD`], { encoding: "utf8" })
   .trim().split("\n").filter(Boolean).sort();
@@ -27,26 +25,6 @@ if (protectionOnlyClassification.eligible) {
 }
 const allowed = new Set([
   ".github/workflows/meeting-portal-fixture-browser.yml",
-  // Shared src/App.jsx protection-cycle metadata and the paired member/employee security tests.
-  ".github/workflows/member-profile-role-audit.yml",
-  "docs/portal-protection/portal-register.json",
-  "docs/portal-protection/records/board-members-portal.json",
-  "docs/portal-protection/records/communication-and-media-portal.json",
-  "docs/portal-protection/records/grants-intelligence-and-funding-opportunities-portal.json",
-  "docs/portal-protection/records/invitation-portal.json",
-  "docs/portal-protection/records/members-and-employees-portal.json",
-  "docs/portal-protection/records/signature-portal.json",
-  "docs/portal-protection/windows/board-members-portal.json",
-  "docs/portal-protection/windows/communication-and-media-portal.json",
-  "docs/portal-protection/windows/grants-intelligence-and-funding-opportunities-portal.json",
-  "docs/portal-protection/windows/invitation-portal.json",
-  "docs/portal-protection/windows/members-and-employees-portal.json",
-  "docs/portal-protection/windows/signature-portal.json",
-  "firestore.staging.rules",
-  "reports/member-profile-role-audit.json",
-  "tests/org-structure-access-preservation.test.cjs",
-  "tests/policies-strategic-plan-portal.test.mjs",
-  "tests/staging-admin-access-preservation.test.cjs",
   "docs/portal-protection/repair-window.json",
   "docs/portal-protection/records/meeting-portal.json",
   "docs/portal-protection/windows/meeting-portal.json",
@@ -137,8 +115,6 @@ const allowed = new Set([
   "src/pages/MeetingRoom.jsx",
   "src/pages/OperationalGatewaysParticipants.jsx",
   "src/pages/Meetings.jsx",
-  "src/pages/Resolutions.jsx",
-  "drive-gateway/tests/meeting-services-router.test.mjs",
   "src/firebase/data.js",
   "firestore.rules",
   "tests/meeting-category-firestore-rules.test.cjs",
