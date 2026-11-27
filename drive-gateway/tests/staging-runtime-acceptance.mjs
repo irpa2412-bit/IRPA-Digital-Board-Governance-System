@@ -8,9 +8,8 @@ const email=process.env.STAGING_CRYPTO_TEST_EMAIL||"";
 const password=process.env.STAGING_CRYPTO_TEST_PASSWORD||"";
 const authority=process.env.STAGING_CRYPTO_TEST_AUTHORITY||"";
 const expectedUid=process.env.STAGING_CRYPTO_TEST_SIGNER_UID||"";
-const expectedKeyId=process.env.STAGING_CRYPTO_TEST_KEY_ID||"";
 const base=String(process.env.STAGING_GATEWAY_URL||"").replace(/\/+$/,"");
-for(const [name,value] of Object.entries({STAGING_FIREBASE_WEB_API_KEY:apiKey,STAGING_FIREBASE_PROJECT_ID:project,STAGING_CRYPTO_TEST_EMAIL:email,STAGING_CRYPTO_TEST_PASSWORD:password,STAGING_CRYPTO_TEST_SIGNER_UID:expectedUid,STAGING_CRYPTO_TEST_KEY_ID:expectedKeyId,STAGING_GATEWAY_URL:base}))assert.ok(value,name+" is required.");
+for(const [name,value] of Object.entries({STAGING_FIREBASE_WEB_API_KEY:apiKey,STAGING_FIREBASE_PROJECT_ID:project,STAGING_CRYPTO_TEST_EMAIL:email,STAGING_CRYPTO_TEST_PASSWORD:password,STAGING_CRYPTO_TEST_SIGNER_UID:expectedUid,STAGING_GATEWAY_URL:base}))assert.ok(value,name+" is required.");
 assert.notEqual(project,"irpa-digital-board-governance","Production Firebase project is forbidden in staging acceptance.");
 
 const loginResponse=await fetch("https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key="+encodeURIComponent(apiKey),{
@@ -92,10 +91,10 @@ const envelopePayload={
   classification:"Restricted",
   archives:["board-governance"],
   signingMode:"Sequential",
-  signers:[{uid:expectedUid,email,name:"IRPA Staging Crypto Test Signer",order:1}],
+  signers:[{identityType:"email-link",email,name:"IRPA Staging Crypto Test Signer",order:1}],
   fields:[
-    {fieldId:"staging-name",type:"Name",page:1,x:8,y:18,width:45,height:8,signerUid:expectedUid,required:true},
-    {fieldId:"staging-signature",type:"Signature",page:1,x:8,y:30,width:45,height:10,signerUid:expectedUid,required:true}
+    {fieldId:"staging-name",type:"Name",page:1,x:8,y:18,width:45,height:8,signerId:"S1",required:true},
+    {fieldId:"staging-signature",type:"Signature",page:1,x:8,y:30,width:45,height:10,signerId:"S1",required:true}
   ]
 };
 const envelopeResponse=await fetch(base+"/api/envelopes",{method:"POST",headers:{...authHeaders,"content-type":"application/json"},body:JSON.stringify(envelopePayload)});
@@ -120,20 +119,34 @@ if (envelope.invitations?.[0]?.status !== "Sent") {
 }
 assert.equal(envelope.invitations?.[0]?.status,"Sent","Staging invitation transport did not confirm delivery.");
 assert.ok(Array.isArray(envelope.tokens)&&envelope.tokens.length===1,"Staging-only acceptance token was not returned.");
-const signingToken=envelope.tokens[0];
-const opened=await signingJson("/api/sign/open",signingToken,"Authenticated signing open");
-assert.equal(opened.signer.authenticated,true);
-assert.equal(opened.signer.uid,undefined,"Signer UID must not be exposed by the open endpoint.");
+const invitationToken=envelope.tokens[0];
+const preview=await signingJson("/api/sign/email/open",invitationToken,"Email-link invitation preview");
+assert.equal(preview.signer.identityType,"email-link");
+assert.equal(preview.signer.authenticated,false);
+assert.equal(preview.signer.uid,undefined,"Email-link signer UID must not be exposed.");
+assert.equal(preview.canSign,true);
+assert.equal(preview.fields.length,2);
+const sessionResponse=await fetch(base+"/api/sign/email/session",{method:"POST",headers:{...authHeaders,"x-signing-token":invitationToken}});
+const opened=await readJson(sessionResponse,"Email-link signing session creation");
+assert.equal(opened.signer.identityType,"email-link");
+assert.equal(opened.sessionExpiresAt,null,"Email-link session must not expire by elapsed time.");
 assert.equal(opened.canSign,true);
-assert.equal(opened.fields.length,2);
-assert.equal(opened.fields.every(field=>field.signerUid===expectedUid),true);
+const signingToken=opened.sessionToken;
+assert.ok(signingToken,"Email-link session token was not created.");
+const signatureField=opened.fields.find(field=>field.fieldId==="staging-signature");
+assert.ok(signatureField,"Email-link signer did not receive the assigned signature field.");
+const signaturePng="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+const fieldApplications=[{fieldId:signatureField.fieldId,value:signaturePng,confirmed:true,page:signatureField.page,x:signatureField.x,y:signatureField.y,width:signatureField.width,height:signatureField.height}];
 
 const signedResponse=await fetch(base+"/api/sign/submit",{
   method:"POST",headers:{...authHeaders,"content-type":"application/json"},
   body:JSON.stringify({
     token:signingToken,
-    signature:{type:"typed",value:"IRPA Staging Crypto Test Signer"},
-    fieldValues:{"staging-name":"IRPA Staging Crypto Test Signer","staging-signature":"IRPA Staging Crypto Test Signer"},
+    signature:{type:"field-applications"},
+    fieldValues:{"staging-name":"IRPA Staging Crypto Test Signer"},
+    fieldApplications,
+    signatureConfirmed:true,
+    declarations:{name:"IRPA Staging Crypto Test Signer",title:effectiveAuthority,capacity:"Staging email-link signer"},
     manualAuthorityIdentification:effectiveAuthority,
     consent:true
   })
@@ -147,7 +160,8 @@ assert.equal(status.status,"Completed");
 assert.equal(status.externalReference,externalReference);
 assert.equal(status.auditChainValid,true);
 assert.equal(status.completion.cryptographicEvidenceIds.length,1);
-assert.equal(status.signers[0].uid,expectedUid);
+assert.equal(status.signers[0].identityType,"email-link");
+assert.equal(status.signers[0].uid,undefined);
 assert.equal(status.completion.finalHash,await sha256(new Uint8Array(await (await fetch(base+"/api/sign/pdf",{headers:{...authHeaders,"x-signing-token":signingToken}})).arrayBuffer())));
 
 const pdfResponse=await fetch(base+"/api/sign/pdf",{headers:{...authHeaders,"x-signing-token":signingToken}});
@@ -170,8 +184,12 @@ assert.equal(evidenceResult.documentHash,completedHash);
 assert.equal(evidenceResult.evidence.length,1);
 const evidence=evidenceResult.evidence[0];
 assert.equal(evidence.envelopeId,envelope.envelopeId);
-assert.equal(evidence.signerUid,expectedUid);
-assert.equal(evidence.keyId,expectedKeyId,"Gateway did not use the exact ephemeral key injected for this staging signer.");
+assert.equal(evidence.signerUid,null);
+assert.equal(evidence.signerIdentityType,"email-link");
+const expectedEmailHash=await sha256(email.trim().toLowerCase());
+assert.equal(evidence.signerIdentityHash,expectedEmailHash);
+const expectedEmailKeyId="EMAIL-"+await sha256(envelope.envelopeId+"|S1|"+expectedEmailHash);
+assert.equal(evidence.keyId,expectedEmailKeyId,"Gateway did not use the envelope- and signer-scoped Durable Object email-link key.");
 assert.equal(evidence.documentHash,completedHash);
 assert.equal(evidence.status,"SEALED");
 assert.equal("privateKey" in evidence,false);
@@ -182,7 +200,8 @@ const evidenceSignatureValid=await webcrypto.subtle.verify({name:"ECDSA",hash:"S
 assert.equal(evidenceSignatureValid,true,"Persisted evidence signature did not independently verify.");
 assert.equal(JSON.parse(evidence.canonicalPayload).documentHash,completedHash);
 assert.equal(JSON.parse(evidence.canonicalPayload).envelopeId,envelope.envelopeId);
-assert.equal(JSON.parse(evidence.canonicalPayload).signerUid,expectedUid);
+assert.equal(JSON.parse(evidence.canonicalPayload).signerIdentityType,"email-link");
+assert.equal(JSON.parse(evidence.canonicalPayload).signerIdentityHash,expectedEmailHash);
 
 const tamperedBytes=new Uint8Array(completedBytes);
 tamperedBytes[tamperedBytes.length-1]^=1;
@@ -195,7 +214,7 @@ assert.equal(tamperedResponse.status,409,"Gateway did not reject a tampered comp
 const beforeRetry=status.eventCount;
 const retryResponse=await fetch(base+"/api/sign/submit",{
   method:"POST",headers:{...authHeaders,"content-type":"application/json"},
-  body:JSON.stringify({token:signingToken,signature:{type:"typed",value:"IRPA Staging Crypto Test Signer"},fieldValues:{"staging-name":"IRPA Staging Crypto Test Signer","staging-signature":"IRPA Staging Crypto Test Signer"},manualAuthorityIdentification:effectiveAuthority,consent:true})
+  body:JSON.stringify({token:signingToken,signature:{type:"field-applications"},fieldValues:{"staging-name":"IRPA Staging Crypto Test Signer"},fieldApplications,signatureConfirmed:true,declarations:{name:"IRPA Staging Crypto Test Signer",title:effectiveAuthority,capacity:"Staging email-link signer"},manualAuthorityIdentification:effectiveAuthority,consent:true})
 });
 const retry=await readJson(retryResponse,"Idempotent signing retry");
 assert.equal(retry.idempotent,true);
