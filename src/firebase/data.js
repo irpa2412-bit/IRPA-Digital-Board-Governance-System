@@ -3,7 +3,7 @@ import { auth, db, applicantAuth, applicantDb, applicantApp } from "./config";
 import { getGoogleDriveGatewayUrl } from "./gatewayUrl";
 import { sendEmployeeRegistrationEmail } from "./employeeRegistrationEmail";
 import { getFunctions, httpsCallable } from "firebase/functions";
-import { canAccessMeetingCategory } from "./meetingPolicy.js";
+import { canAccessMeetingCategory, MEETING_CATEGORIES } from "./meetingPolicy.js";
 import { listLifecycleDocuments } from "./documentLifecycle.js";
 import { reconcileRegisteredIdentityUidsViaGateway } from "./registeredIdentityReconciliation";
 import { listMeetingInviteeDirectory as listMeetingInviteeDirectoryViaGateway } from "./meetingGatewayApi";
@@ -86,18 +86,51 @@ export async function getFinanceTrialRecords(collectionName){const ref=collectio
 export async function getAccessibleMeetingRecords(){
   const user=auth.currentUser;
   if(!user?.uid)throw new Error("Sign in to view the meeting register.");
-  const uid=String(user.uid);
   const email=String(user.email||"").trim().toLowerCase();
+  const [member,employee,token,adminProfile]=await Promise.all([
+    getCurrentMemberProfile().catch(()=>null),
+    getCurrentEmployeeProfile().catch(()=>null),
+    user.getIdTokenResult().catch(()=>null),
+    getRecord(COLLECTIONS.adminProfiles,user.uid).catch(()=>null)
+  ]);
+  const activeStatus=record=>["active","activated"].includes(String(record?.status||record?.employmentStatus||record?.registrationStatus||"").trim().toLowerCase());
+  const activeMember=!!member&&activeStatus(member);
+  const activeEmployee=!!employee&&activeStatus(employee);
+  const isAdmin=email==="irpa2412@gmail.com"||token?.claims?.admin===true||adminProfile?.active===true;
+  const profiles=[member||{},employee||{}];
+  const roles=[...new Set(profiles.flatMap(p=>[
+    p.role,p.title,p.position,p.departmentalRole,p.boardPosition,
+    ...(Array.isArray(p.roles)?p.roles:[]),
+    ...(Array.isArray(p.assignedRoles)?p.assignedRoles:[]),
+    ...(Array.isArray(p.selectedRoles)?p.selectedRoles:[]),
+    ...(Array.isArray(p.roleAssignments)?p.roleAssignments:[]),
+    ...(Array.isArray(token?.claims?.irpaRoles)?token.claims.irpaRoles:[])
+  ]).map(v=>String(v||"").trim()).filter(Boolean))];
+  const identity={...(member||employee||{}),uid:user.uid,email,active:activeMember||activeEmployee,isAdmin,activeMember,activeEmployee,roles};
+  // Never issue an unscoped collection read: Firestore rules cannot safely prove access
+  // to every meeting in a collection. Use category-authorized and explicit-invitation
+  // queries, then apply the same policy filter to the merged records.
   const ref=collection(db,COLLECTIONS.meetings);
   const jobs=[];
-  for(const field of ["initiatorUid","createdByUid","organizerUid","organiserUid","coOrganizerUid","coOrganiserUid"])jobs.push(query(ref,where(field,"==",uid)));
-  for(const field of ["participantUids","attendeeUids","invitedUids","coOrganizerUids","coOrganiserUids"])jobs.push(query(ref,where(field,"array-contains",uid)));
-  if(email)for(const field of ["participantEmails","attendeeEmails","invitedEmails"])jobs.push(query(ref,where(field,"array-contains",email)));
+  for(const policy of Object.values(MEETING_CATEGORIES)){
+    if(!canAccessMeetingCategory({meetingCategory:policy.id,meetingPolicyId:policy.id},identity))continue;
+    jobs.push(query(ref,where("meetingCategory","==",policy.id)));
+    jobs.push(query(ref,where("meetingPolicyId","==",policy.id)));
+    for(const type of policy.meetingTypes)jobs.push(query(ref,where("meetingType","==",type)));
+  }
+  const uid=user.uid;
+  jobs.push(query(ref,where("initiatorUid","==",uid)));
+  for(const field of ["participantUids","attendeeUids","memberUids","invitedUids","subscriberUids"])jobs.push(query(ref,where(field,"array-contains",uid)));
+  if(email)for(const field of ["participantEmails","attendeeEmails","invitedEmails","subscriberEmails"])jobs.push(query(ref,where(field,"array-contains",email)));
   const results=await Promise.all(jobs.map(q=>getDocs(q).catch(()=>null)));
   const records=new Map();
-  results.forEach(snapshot=>snapshot?.docs?.forEach(item=>records.set(item.id,{id:item.id,...item.data()})));
-  const identity={uid,email};
-  return [...records.values()].filter(meeting=>canAccessMeetingCategory(meeting,identity)).sort((a,b)=>meetingCreatedAt(b)-meetingCreatedAt(a));
+  results.forEach(s=>s?.docs?.forEach(d=>records.set(d.id,{id:d.id,...d.data()})));
+  return [...records.values()].filter(m=>canAccessMeetingCategory(m,identity,{
+    isInitiator:String(m.initiatorUid||"")===uid,
+    isInvited:["participantUids","attendeeUids","memberUids","invitedUids","subscriberUids"].some(k=>Array.isArray(m[k])&&m[k].includes(uid))||
+      (email&&["participantEmails","attendeeEmails","invitedEmails","subscriberEmails"].some(k=>Array.isArray(m[k])&&m[k].map(v=>String(v||"").toLowerCase()).includes(email))),
+    isRegisteredParticipant:["participantUids","attendeeUids","memberUids","subscriberUids"].some(k=>Array.isArray(m[k])&&m[k].includes(uid))
+  })).sort((a,b)=>meetingCreatedAt(b)-meetingCreatedAt(a));
 }
 function meetingCreatedAt(record={}){const value=record.createdAt;return typeof value?.toMillis==="function"?value.toMillis():typeof value==="number"?value:Date.parse(value||"")||0;}
 
