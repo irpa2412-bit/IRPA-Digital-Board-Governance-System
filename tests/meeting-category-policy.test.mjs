@@ -492,14 +492,14 @@ test("meeting governance source enforces the proceedings gate and immediate tran
 });
 
 test("Meeting Worker allows universal portal initiation while retaining participant-only private meeting context", () => {
-  assert.match(meetingServicesGovernanceSource, /const institutionalIdentity=!!member\\|\\|!!employee/);
+  assert.ok(meetingServicesGovernanceSource.includes("const institutionalIdentity=!!member||!!employee"));
   assert.match(meetingServicesGovernanceSource, /const explicitParticipant=byUid/);
-  assert.match(meetingServicesGovernanceSource, /meetingContextAccessAllowed\\(meeting,institutionalIdentity,explicitParticipant\\)/);
+  assert.ok(meetingServicesGovernanceSource.includes("meetingContextAccessAllowed(meeting,institutionalIdentity,explicitParticipant)"));
   assert.match(meetingServicesGovernanceSource, /participantUids,meeting\\.attendeeUids,meeting\\.memberUids,meeting\\.invitedUids/);
   assert.match(meetingServicesGovernanceSource, /canRead:true/);
   assert.match(meetingServicesGovernanceSource, /isAdmin:false/);
   assert.doesNotMatch(meetingServicesGovernanceSource, /canRead:canManage\\|\\|participant\\|\\|isAdmin/);
-  assert.match(meetingServicesGovernanceSource, /if\\(!member&&!employee\\)return fail/);
+  assert.ok(meetingServicesGovernanceSource.includes("if(!member&&!employee)return fail"));
 });
 
 test("Meeting Worker exposes public outcomes separately and never publishes raw ballots from room activity", () => {
@@ -574,7 +574,7 @@ test("leadership election ballots are operable by the Transition Committee throu
 });
 
 test("leadership-election invitation management cannot be bypassed by the initiator or global administrator", () => {
-  assert.match(meetingServicesGovernanceSource, /const canManageParticipants=meeting\.leadershipElectionRequired===true\?\(chair\|\|secretary\|\|meetingAdministrator\)/);
+  assert.ok(meetingServicesGovernanceSource.includes("const canManageParticipants=activeIdentity&&(transitionCommitteeActive(meeting)?transitionOfficer:(chair||secretary||meetingAdministrator));"));
   assert.match(meetingServicesGovernanceSource, /if\(!c\.canManageParticipants\)return fail/);
   assert.match(meetingServicesGovernanceSource, /function meetingTransitionElectionAuthority\(meeting,uid\)/);
 });
@@ -599,9 +599,9 @@ test("legacy invitee directory export delegates to the authenticated Cloudflare 
 test("Meeting Portal Worker access is based on member/employee identity existence, not status", async () => {
   const source = readFileSync(new URL("../drive-gateway/src/meetingServices.mjs", import.meta.url), "utf8");
   assert.match(source, /if\\(!member&&!employee\\)return fail/);
-  assert.match(source, /const institutionalIdentity=!!member\\|\\|!!employee/);
+  assert.ok(source.includes("const institutionalIdentity=!!member||!!employee"));
   assert.match(source, /const explicitParticipant=byUid/);
-  assert.match(source, /meetingContextAccessAllowed\\(meeting,institutionalIdentity,explicitParticipant\\)/);
+  assert.ok(source.includes("meetingContextAccessAllowed(meeting,institutionalIdentity,explicitParticipant)"));
 });
 
 test("Meeting Portal frontend grants initiation and category visibility to any registered IRPA identity", () => {
