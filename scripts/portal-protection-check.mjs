@@ -292,6 +292,9 @@ export function evaluatePolicy({ changedFiles, registry, windowState, record, ow
 }
 
 export function installLockTestDependencies(lockTests, run = execFileSync) {
+  // Root lock tests import application modules (including React); install the root
+  // dependency tree before running any portal lock suite.
+  run("npm", ["ci"], { stdio: "inherit" });
   const needsGatewayDependencies = (lockTests ?? []).some(path => String(path).startsWith("drive-gateway/"));
   if (needsGatewayDependencies) {
     run("npm", ["ci"], { cwd: "drive-gateway", stdio: "inherit" });
