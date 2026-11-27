@@ -10,7 +10,7 @@
   "lastActivityAt": "2026-11-27T17:41:34.000Z",
   "emergency": false,
   "emergencyLimitHours": 24,
-  "reason": "Owner-authorised coordinated shared-file protection cycle for src/App.jsx. Independently verify this portal's navigation and security invariants while the common application shell exposes the Meeting Portal to every IRPA member/employee identity. Preserve all portal-specific controls.",
+  "reason": "Owner-authorised coordinated shared-file protection cycle for src/App.jsx. Independently verify this portal's navigation and security invariants while the common application shell exposes the Meeting Portal to every IRPA member/employee identity. Preserve all portal-specific controls. The cross-portal browser fixture isolation guard is also included as a shared validation dependency.",
   "scope": [
     "src/pages/SignaturePlatform.jsx",
     "src/pages/SignaturePlatformWithUpload.jsx",
@@ -40,7 +40,8 @@
     "drive-gateway/src/index.js",
     "drive-gateway/tests/signature-distribution.test.mjs",
     "docs/signature-recovery/signature-email-link-distribution-change-record-2026-11-24.md",
-    "src/App.jsx"
+    "src/App.jsx",
+    "scripts/meeting-portal-fixture-isolation-guard.sh"
   ],
   "activityLog": [
     {
