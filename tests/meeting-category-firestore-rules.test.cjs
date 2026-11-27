@@ -156,7 +156,7 @@ test("active members and employees can read non-ongoing meetings; ongoing meetin
   await assertFails(staffDb.doc("meetings/live-record").get());
 });
 
-test("meeting register queries must prove participant membership rather than category", async () => {
+test("meeting register queries expose non-live records to all IRPA identities while live records remain participant-only", async () => {
   await testEnv.withSecurityRulesDisabled(async context => {
     await context.firestore().doc("meetings/query-private").set(meeting({
       meetingCategory: "GOVERNANCE", participantUids: ["staff-user"], status: "Scheduled", proceedingsStatus: "Scheduled"
@@ -168,9 +168,10 @@ test("meeting register queries must prove participant membership rather than cat
   const staffDb = testEnv.authenticatedContext("staff-user", { email: "staff@example.test" }).firestore();
   const boardDb = testEnv.authenticatedContext("board-member", { email: "board@example.test" }).firestore();
   await assertSucceeds(staffDb.collection("meetings").where("participantUids", "array-contains", "staff-user").get());
-  await assertFails(staffDb.collection("meetings").where("meetingCategory", "==", "GOVERNANCE").get());
-  await assertSucceeds(staffDb.collection("meetings").where("status", "==", "Scheduled").where("proceedingsStatus", "==", "Scheduled").get());
-  await assertFails(boardDb.collection("meetings").where("meetingCategory", "==", "GOVERNANCE").get());
+  await assertSucceeds(staffDb.collection("meetings").where("meetingCategory", "==", "GOVERNANCE").where("status", "==", "Scheduled").where("proceedingsStatus", "==", "Scheduled").get());
+  await assertSucceeds(boardDb.collection("meetings").where("meetingCategory", "==", "GOVERNANCE").where("status", "==", "Scheduled").where("proceedingsStatus", "==", "Scheduled").get());
+  await assertFails(staffDb.doc("meetings/query-live").get());
+  await assertFails(boardDb.doc("meetings/query-live").get());
 });
 
 
@@ -242,7 +243,7 @@ test("meeting initiator can register an invitee and create the linked invitation
 });
 
 
-test("participant and invitation registers follow the linked meeting category policy", async () => {
+test("participant and invitation registers remain visible to all IRPA identities outside live proceedings", async () => {
   await testEnv.withSecurityRulesDisabled(async context => {
     const db = context.firestore();
     await db.doc("meetings/governance-record").set(meeting({
@@ -272,8 +273,8 @@ test("participant and invitation registers follow the linked meeting category po
   }).firestore();
   await assertSucceeds(boardDb.doc("participants/governance-participant").get());
   await assertSucceeds(boardDb.doc("invitations/governance-invitation").get());
-  await assertFails(staffDb.doc("participants/governance-participant").get());
-  await assertFails(staffDb.doc("invitations/governance-invitation").get());
+  await assertSucceeds(staffDb.doc("participants/governance-participant").get());
+  await assertSucceeds(staffDb.doc("invitations/governance-invitation").get());
 });
 
 
