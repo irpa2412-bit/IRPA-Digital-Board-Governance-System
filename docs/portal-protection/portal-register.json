@@ -129,10 +129,10 @@
         "drive-gateway/src/meetingDeletion.mjs",
         "drive-gateway/src/meetingEnvironment.mjs",
         "drive-gateway/tests/meeting-environment.test.mjs",
-        "scripts/meeting-portal-fixture-isolation-guard.sh",
         "src/FieldEntryDataGate.jsx",
         "src/pages/Resolutions.jsx",
-        "src/pages/Voting.jsx"
+        "src/pages/Voting.jsx",
+        "tests/meeting-isolation-guard.test.mjs"
       ],
       "sharedDependencies": [
         "src/App.jsx",
@@ -180,12 +180,14 @@
         ]
       },
       "tests": [
-        "tests/meeting-portal-protection.test.mjs"
+        "tests/meeting-portal-protection.test.mjs",
+        "tests/meeting-isolation-guard.test.mjs"
       ],
       "registeredAt": "2026-11-21T00:00:00Z",
       "guardMode": "protected",
       "lockTests": [
-        "tests/meeting-portal-protection.test.mjs"
+        "tests/meeting-portal-protection.test.mjs",
+        "tests/meeting-isolation-guard.test.mjs"
       ],
       "pendingPaths": [
         "drive-gateway/src/meetingDeletion.mjs",
@@ -304,6 +306,19 @@
       "path": "src/firebase/meetingAttendanceSigning.js",
       "portals": [
         "Signature Portal",
+        "Meeting Portal"
+      ],
+      "class": "shared"
+    },
+    {
+      "path": "scripts/meeting-portal-fixture-isolation-guard.sh",
+      "portals": [
+        "Invitation Portal",
+        "Grants Intelligence and Funding Opportunities Portal",
+        "Signature Portal",
+        "Board Members Portal",
+        "Members and Employees Portal",
+        "Communication and Media Portal",
         "Meeting Portal"
       ],
       "class": "shared"
