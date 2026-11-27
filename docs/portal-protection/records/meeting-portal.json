@@ -56,7 +56,8 @@
       "Do not modify another portal's internals or use this shared-file record as a substitute for its independent lock tests."
     ],
     "lockTests": [
-      "tests/meeting-portal-protection.test.mjs"
+      "tests/meeting-portal-protection.test.mjs",
+      "tests/meeting-isolation-guard.test.mjs"
     ]
   },
   "repairWindow": {
