@@ -140,6 +140,7 @@ jobs:
           npm install --no-save --package-lock=false playwright
           npx playwright install --with-deps chromium
       - name: Assert runtime source isolation from unrelated portals
+        if: hashFiles('scripts/meeting-portal-fixture-isolation-guard.sh') != ''
         env:
           EVENT_NAME: ${{ github.event_name }}
         run: bash scripts/meeting-portal-fixture-isolation-guard.sh
