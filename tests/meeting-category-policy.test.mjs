@@ -104,17 +104,15 @@ test("category capabilities keep voting and resolutions disabled outside governa
 
 const meetingDataSource = readFileSync(new URL("../src/firebase/data.js", import.meta.url), "utf8");
 const meetingGatewayApiSource = readFileSync(new URL("../src/firebase/meetingGatewayApi.js", import.meta.url), "utf8");
-test("meeting register retrieval avoids an unscoped collection read", () => {
-  const start = meetingDataSource.indexOf("export async function getAccessibleMeetingRecords");
-  const end = meetingDataSource.indexOf("function meetingCreatedAt", start);
-  assert.ok(start >= 0 && end > start, "meeting retrieval function must be present");
-  const source = meetingDataSource.slice(start, end);
-  assert.doesNotMatch(source, /if\s*\(user\.uid\)\s*\{\s*const all\s*=\s*await getDocs\(ref\)/);
-  assert.doesNotMatch(source, /MEETING_CATEGORIES|meetingCategory|meetingPolicyId/);
-  assert.match(source, /collection\(db,"meetingPortalDirectory"\)/);
-  assert.match(source, /orderBy\("createdAt","desc"\)/);
-  assert.doesNotMatch(source, /collection\(db,COLLECTIONS\.meetings\)/);
-  assert.match(source, /meetingPortalDirectory/);
+test("meeting register retrieval uses the authenticated Worker safe-directory endpoint", () => {
+  const pageSource = readFileSync(new URL("../src/pages/Meetings.jsx", import.meta.url), "utf8");
+  const apiSource = readFileSync(new URL("../src/firebase/meetingGatewayApi.js", import.meta.url), "utf8");
+  const workerSource = readFileSync(new URL("../drive-gateway/src/meetingServices.mjs", import.meta.url), "utf8");
+  assert.match(pageSource, /getAccessibleMeetingRecords,getMyMeetingSubscriptions/);
+  assert.match(apiSource, /callMeetingService\("\/api\/meeting-register\/list"\)/);
+  assert.match(workerSource, /if\(pathname==="\/api\/meeting-register\/list"\)/);
+  assert.match(workerSource, /meetingPortalDirectoryEntry\(record,record\.id\)/);
+  assert.match(workerSource, /activeInstitutionalRecord\(member\)\|\|activeInstitutionalRecord\(employee\)/);
 });
 
 test("active Meeting Portal attendance screens never call undeployed Firebase attendance callables",()=>{
@@ -225,6 +223,21 @@ test("meeting directory projection exposes metadata only and excludes private pr
   assert.equal("transcript" in entry, false);
   assert.equal("platformPasscode" in entry, false);
   assert.equal("participantUids" in entry, false);
+});
+
+test("meeting directory projection exposes metadata only and excludes private proceedings and credentials", async () => {
+  const { meetingPortalDirectoryEntry } = await import("../drive-gateway/src/meetingServices.mjs");
+  const entry = meetingPortalDirectoryEntry({
+    title: "Quarterly meeting", meetingCategory: "GOVERNANCE", meetingType: "Board Meeting",
+    meetingReference: "IRPA-MTG-2026-001", date: "2026-11-27", startTime: "10:00",
+    status: "Scheduled", initiatorUid: "member-1", agenda: "Confidential agenda",
+    minutes: "Private minutes", transcript: "Private transcript",
+    platformPasscode: "secret", participantUids: ["member-1","member-2"]
+  }, "meeting-1");
+  assert.equal(entry.title, "Quarterly meeting");
+  for (const field of ["agenda","minutes","transcript","platformPasscode","participantUids","participantEmails","venue"]) {
+    assert.equal(field in entry, false, field);
+  }
 });
 
 test("active staff can initiate a Governance-level meeting through the authenticated Worker", async () => {
@@ -377,7 +390,6 @@ test("production and staging Firestore rules enforce the same Meeting Portal aut
   const staging = readFileSync(new URL("../firestore.staging.rules", import.meta.url), "utf8");
   for (const source of [prod, staging]) {
     assert.match(source, /function meetingUser\(\)\{return activeMember\(\)\|\|activeEmployee\(\);\}/);
-    assert.match(source, /match \/meetingPortalDirectory\/\{id\}\{allow read:if meetingUser\(\);allow create,update,delete:if false;\}/);
     assert.match(source, /match \/meetings\/\{id\}\{allow read:if meetingParticipant\(resource\.data\)/);
     assert.match(source, /match \/meetingRoomEvents\/\{id\}\{allow read:if meetingParticipantRecordRead\(resource\.data\)/);
     assert.match(source, /match \/transcriptions\/\{id\}\{allow read:if meetingParticipantRecordRead\(resource\.data\)/);
