@@ -139,6 +139,7 @@ export function resolvePortalPolicyPaths(affectedPortals, exists = fs.existsSync
 export function evaluatePolicy({ changedFiles, registry, windowState, record, ownerPolicies = null, now = Date.now(), latestActivityAt = null, activityTimestamps = [] }) {
   const sharedMatches = new Map();
   const specificAffected = new Set();
+  const specificSourceAffected = new Set();
   const protectedFiles = [];
   for (const file of changedFiles) {
     const owners = new Set();
@@ -170,6 +171,7 @@ export function evaluatePolicy({ changedFiles, registry, windowState, record, ow
     for (const [portal, entry] of Object.entries(registry.portals)) {
       if (entry.paths.some(path => isWithin(file, path))) {
         specificAffected.add(portal);
+        specificSourceAffected.add(portal);
         matched = true;
       }
     }
@@ -181,11 +183,15 @@ export function evaluatePolicy({ changedFiles, registry, windowState, record, ow
   if (!protectedFiles.length) return { ok: true, affected: [], protectedFiles: [], sharedFiles: [], reason: "No protected portal or shared dependency changed." };
 
   if (sharedMatches.size) {
-    if (specificAffected.size) {
+    if (specificSourceAffected.size) {
       return fail("A shared-file change cannot be combined with portal-specific source changes; split the shared change into its own PR.");
     }
     const owners = [...new Set([...sharedMatches.values()].flat())].sort();
     const sharedFiles = [...sharedMatches.keys()].sort();
+    const unrelatedPolicyOwners = [...specificAffected].filter(portal => !owners.includes(portal));
+    if (unrelatedPolicyOwners.length) {
+      return fail("A shared-file change cannot include protection records for unrelated portal owners: " + unrelatedPolicyOwners.join(", "), owners, sharedFiles);
+    }
     if (!ownerPolicies) return { ok: true, affected: owners, protectedFiles: sharedFiles, sharedFiles, needsOwnerPolicies: true, reason: "Shared-file classification requires independent owner policies." };
     const ownerResults = [];
     for (const portal of owners) {
