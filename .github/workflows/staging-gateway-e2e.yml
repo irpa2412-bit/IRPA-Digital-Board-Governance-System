@@ -114,7 +114,7 @@ jobs:
       staging_url: ${{ steps.staging-health.outputs.staging_url }}
     # Archive acceptance uses the full deploy-staging runtime job, avoiding a competing partial Worker deployment.
 # dispatch isolated runtime acceptance is an explicit staging-only opt-in; production is not targeted.
-    if: (github.event_name == 'workflow_dispatch' && inputs.deploy_staging == true) || (github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'fix/actual-data-gate-read-for-operational-users-20261120')
+    if: (github.event_name == 'workflow_dispatch' && inputs.deploy_staging == true && github.ref != 'refs/heads/fix/signature-pathway-20261025' && github.ref != 'refs/heads/fix/signature-trail-20261024') || (github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'fix/actual-data-gate-read-for-operational-users-20261120')
     runs-on: ubuntu-latest
     # Configure staging-repair Environment with required independent reviewers before use.
     environment: staging-repair
@@ -2269,7 +2269,6 @@ jobs:
   other-portals-report:
     needs: [local-e2e, preflight-staging, deploy-staging-frontend, deploy-staging, signature-acceptance]
     if: always() && needs.local-e2e.result == 'success' && needs.preflight-staging.result == 'success' && needs.deploy-staging-frontend.result == 'success' && needs.deploy-staging.result == 'success'
-    continue-on-error: true
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -2432,6 +2431,11 @@ jobs:
             if [ -f drive-gateway/runtime-acceptance.log ]; then echo ""; echo "### Runtime cryptographic acceptance redacted log"; tail -n 30 drive-gateway/runtime-acceptance.log | redact; fi
           } >> "$GITHUB_STEP_SUMMARY"
           cat "$table"
+          if [ "${MEDIA_RESULT:-}" != "success" ] || [ "$media_error" -ne 0 ] || [ "${CRYPTO_RESULT:-}" != "success" ] || [ "$crypto_error" -ne 0 ]; then
+            echo "STAGING_ACCEPTANCE_GATE=FAIL"
+            exit 1
+          fi
+          echo "STAGING_ACCEPTANCE_GATE=PASS"
 
   deploy-staging-frontend:
     needs: [local-e2e, preflight-staging]
