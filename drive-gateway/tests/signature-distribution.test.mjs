@@ -239,7 +239,8 @@ test("summary counts every expected recipient even when an earlier failure leave
   const summary=await getSignatureDistributionSummary(ctx,envelope.id,envelope);
   assert.equal(summary.total,3,"owner and both signer positions are expected recipients");
   assert.equal(summary.sent,1);
-  assert.equal(summary.pending,2,"missing distribution rows must remain pending");
+  assert.equal(summary.notAttempted,2,"missing distribution rows must remain not attempted");
+  assert.equal(summary.pending,0);
   assert.equal(summary.complete,false,"partial record persistence must never look complete");
   assert.equal(summary.status,"PartiallyDelivered");
   assert.deepEqual(summary.deliveries.map(row=>row.status),["Sent","Not Attempted","Not Attempted"]);
@@ -254,4 +255,17 @@ test("summary preserves an ambiguous SMTP result as Unknown rather than NotStart
   assert.equal(summary.unknown,1);
   assert.equal(summary.complete,false);
   assert.equal(summary.status,"Unknown");
+});
+
+test("summary stays NotStarted when no expected recipient has an attempt record",async()=>{
+  const ctx=context(new TextEncoder().encode("%PDF-1.7\\nnot started fixture"),null);
+  const envelope={id:"ENV-NOT-STARTED",createdBy:"owner-uid",ownerEmail:"owner@example.test",ownerName:"Owner",status:"Completed",title:"Resolution",documentId:"DOC-NOT-STARTED",signers:[
+    {id:"S1",email:"first@example.test",name:"First",uid:null,status:"Pending",identityType:"email-link"}
+  ]};
+  const summary=await getSignatureDistributionSummary(ctx,envelope.id,envelope);
+  assert.equal(summary.total,2);
+  assert.equal(summary.notAttempted,2);
+  assert.equal(summary.pending,0);
+  assert.equal(summary.status,"NotStarted");
+  assert.equal(summary.complete,false);
 });
