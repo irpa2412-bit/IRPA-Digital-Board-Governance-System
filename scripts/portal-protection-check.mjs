@@ -100,9 +100,16 @@ async function verifyRealRunEvidence(record, affected) {
       if (ref.repository.toLowerCase() !== repository.toLowerCase()) { diagnostics.push("candidate repository does not match workflow repository"); continue; }
       let runResponse, jobsResponse;
       try {
+        // Retry public, read-only Actions evidence without a token when GitHub restricts workflow-token access.
+        // Run identity, PR base SHA, job status and conclusion are still verified below.
+        const readEvidence = async url => {
+          let response = await fetch(url, { headers });
+          if (response.status === 403) response = await fetch(url, { headers: { accept: "application/vnd.github+json", "x-github-api-version": "2022-11-28" } });
+          return response;
+        };
         [runResponse, jobsResponse] = await Promise.all([
-          fetch(`${api}/repos/${repository}/actions/runs/${ref.runId}`, { headers }),
-          fetch(`${api}/repos/${repository}/actions/runs/${ref.runId}/jobs?per_page=100`, { headers })
+          readEvidence(`${api}/repos/${repository}/actions/runs/${ref.runId}`),
+          readEvidence(`${api}/repos/${repository}/actions/runs/${ref.runId}/jobs?per_page=100`)
         ]);
       } catch (error) {
         diagnostics.push(`GitHub Actions API request failed: ${error instanceof Error ? error.message : String(error)}`);

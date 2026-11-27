@@ -67,8 +67,8 @@
     "emergency": false
   },
   "baseline": {
-    "commit": "84c26f3e500323a175332689d535e417247b7b78",
-    "rollbackCommit": "84c26f3e500323a175332689d535e417247b7b78"
+    "commit": "c8234bdd7921756e812fa5ab98a20706e4c55d90",
+    "rollbackCommit": "c8234bdd7921756e812fa5ab98a20706e4c55d90"
   },
   "validation": {
     "baselineSmoke": "PASS",
@@ -99,7 +99,10 @@
       "Meeting Portal portal smoke PASS on exact PR #955 base 331201cb3c626cc96cd006fe8263bf69bafea9b1: run 45385986460 job 138416884257 checked out the exact baseline and executed npm run test:protected-portals, which reported PASS for all seven registered portals including Meeting Portal. https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/45385986460/job/138416884257",
       "baseline smoke for Meeting Portal on exact baseline 84c26f3e500323a175332689d535e417247b7b78: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/46045884745/job/140664929338",
       "full regression for Meeting Portal on exact baseline 84c26f3e500323a175332689d535e417247b7b78: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/46045884745/job/140664928992",
-      "Meeting Portal portal smoke on exact baseline 84c26f3e500323a175332689d535e417247b7b78: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/46045884745/job/140664929338"
+      "Meeting Portal portal smoke on exact baseline 84c26f3e500323a175332689d535e417247b7b78: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/46045884745/job/140664929338",
+      "baseline smoke for Meeting Portal on exact baseline c8234bdd7921756e812fa5ab98a20706e4c55d90: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/46057862889/job/140704635578",
+      "full regression for Meeting Portal on exact baseline c8234bdd7921756e812fa5ab98a20706e4c55d90: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/46057862889/job/140704635848",
+      "Meeting Portal portal smoke on exact baseline c8234bdd7921756e812fa5ab98a20706e4c55d90: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/46057862889/job/140704635578"
     ]
   },
   "renewals": [

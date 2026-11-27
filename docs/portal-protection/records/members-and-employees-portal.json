@@ -27,8 +27,8 @@
     ]
   },
   "baseline": {
-    "commit": "84c26f3e500323a175332689d535e417247b7b78",
-    "rollbackCommit": "84c26f3e500323a175332689d535e417247b7b78"
+    "commit": "c8234bdd7921756e812fa5ab98a20706e4c55d90",
+    "rollbackCommit": "c8234bdd7921756e812fa5ab98a20706e4c55d90"
   },
   "validation": {
     "baselineSmoke": "PASS",
@@ -39,7 +39,10 @@
     "evidence": [
       "baseline smoke for Members and Employees Portal on exact baseline 84c26f3e500323a175332689d535e417247b7b78: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/46045884745/job/140664929338",
       "full regression for Members and Employees Portal on exact baseline 84c26f3e500323a175332689d535e417247b7b78: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/46045884745/job/140664928992",
-      "Members and Employees Portal portal smoke on exact baseline 84c26f3e500323a175332689d535e417247b7b78: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/46045884745/job/140664929338"
+      "Members and Employees Portal portal smoke on exact baseline 84c26f3e500323a175332689d535e417247b7b78: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/46045884745/job/140664929338",
+      "baseline smoke for Members and Employees Portal on exact baseline c8234bdd7921756e812fa5ab98a20706e4c55d90: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/46057862889/job/140704635578",
+      "full regression for Members and Employees Portal on exact baseline c8234bdd7921756e812fa5ab98a20706e4c55d90: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/46057862889/job/140704635848",
+      "Members and Employees Portal portal smoke on exact baseline c8234bdd7921756e812fa5ab98a20706e4c55d90: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/46057862889/job/140704635578"
     ],
     "behaviourDifferences": [
       "The shared application shell exposes Meeting Portal navigation to all Members/Employees register identities independent of status or selected authority; no internal portal workflow or authorization boundary is changed.",

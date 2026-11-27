@@ -122,8 +122,8 @@
     ]
   },
   "baseline": {
-    "commit": "84c26f3e500323a175332689d535e417247b7b78",
-    "rollbackCommit": "84c26f3e500323a175332689d535e417247b7b78"
+    "commit": "c8234bdd7921756e812fa5ab98a20706e4c55d90",
+    "rollbackCommit": "c8234bdd7921756e812fa5ab98a20706e4c55d90"
   },
   "validation": {
     "baselineSmoke": "PASS",
@@ -141,7 +141,10 @@
       "Earlier uncorrected attempt run 45038527520: baseline smoke PASS (job 137257570878); Signature Portal smoke PASS (job 137257570841); full regression FAIL (job 137257570674). This failed attempt is retained for transparency.",
       "baseline smoke for Signature Portal on exact baseline 84c26f3e500323a175332689d535e417247b7b78: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/46045884745/job/140664929338",
       "full regression for Signature Portal on exact baseline 84c26f3e500323a175332689d535e417247b7b78: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/46045884745/job/140664928992",
-      "Signature Portal portal smoke on exact baseline 84c26f3e500323a175332689d535e417247b7b78: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/46045884745/job/140664929338"
+      "Signature Portal portal smoke on exact baseline 84c26f3e500323a175332689d535e417247b7b78: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/46045884745/job/140664929338",
+      "baseline smoke for Signature Portal on exact baseline c8234bdd7921756e812fa5ab98a20706e4c55d90: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/46057862889/job/140704635578",
+      "full regression for Signature Portal on exact baseline c8234bdd7921756e812fa5ab98a20706e4c55d90: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/46057862889/job/140704635848",
+      "Signature Portal portal smoke on exact baseline c8234bdd7921756e812fa5ab98a20706e4c55d90: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/46057862889/job/140704635578"
     ],
     "behaviourDifferences": [
       "Owner-facing, read-only recovery assessment panel is mounted in Signature Portal.",
