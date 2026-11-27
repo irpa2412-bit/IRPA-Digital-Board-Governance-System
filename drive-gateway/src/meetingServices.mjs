@@ -152,27 +152,23 @@ async function context(ctx,env,token,claims,meetingId){
  if(!meetingId)throw Object.assign(new Error("Meeting ID is required."),{status:400});
  const meeting=await getDoc(ctx,env,token,"meetings",meetingId);
  if(!meeting)throw Object.assign(new Error("Meeting record not found."),{status:404});
- const [adminProfile,member,employee,subscriptions,participants]=await Promise.all([
+ const [adminProfile,member,employee,participants]=await Promise.all([
   getDoc(ctx,env,token,"adminProfiles",uid),getDoc(ctx,env,token,"members",uid),getDoc(ctx,env,token,"employees",uid),
-  listByField(ctx,env,token,"meetingSubscriptions","meetingId",meetingId),
   listByField(ctx,env,token,"participants","meetingId",meetingId)
  ]);
  const isAdminIdentity=claims.admin===true||email==="irpa2412@gmail.com"||adminProfile?.active===true;
  const activeRecord=r=>!!r&&["active","activated"].includes(lower(r.status||r.registrationStatus||r.employmentStatus));
  const activeIdentity=activeRecord(member)||activeRecord(employee);
  const values=(...items)=>items.flatMap(item=>Array.isArray(item)?item:[]);
- const listedUids=values(meeting.participantUids,meeting.attendeeUids,meeting.memberUids,meeting.invitedUids,meeting.subscriberUids,meeting.coOrganizerUids,meeting.coOrganiserUids);
+ const listedUids=values(meeting.participantUids,meeting.attendeeUids,meeting.memberUids,meeting.invitedUids,meeting.coOrganizerUids,meeting.coOrganiserUids);
  const organiserUids=[meeting.initiatorUid,meeting.createdByUid,meeting.organizerUid,meeting.organiserUid,meeting.coOrganizerUid,meeting.coOrganiserUid];
- const listedEmails=values(meeting.participantEmails,meeting.attendeeEmails,meeting.invitedEmails,meeting.subscriberEmails).map(lower);
+ const listedEmails=values(meeting.participantEmails,meeting.attendeeEmails,meeting.invitedEmails).map(lower);
  const byUid=items=>items.map(clean).filter(Boolean).includes(uid);
  const byEmail=items=>Boolean(email&&items.map(lower).filter(Boolean).includes(email));
- const subscription=subscriptions.some(row=>!denied.has(lower(row.status))&&
-  ([row.uid,row.subscriberUid,row.userId,row.memberUid,row.participantUid].map(clean).includes(uid)||
-   Boolean(email&&[row.email,row.subscriberEmail,row.participantEmail].some(value=>lower(value)===email))));
  const participantRecord=participants.some(row=>!denied.has(lower(row.status||row.registrationStatus))&&
   ([row.uid,row.userId,row.participantUid,row.memberUid,row.invitedUid].map(clean).includes(uid)||
    Boolean(email&&[row.email,row.participantEmail,row.invitedEmail].some(value=>lower(value)===email))));
- const explicitParticipant=byUid([...listedUids,...organiserUids])||byEmail(listedEmails)||subscription||participantRecord;
+ const explicitParticipant=byUid([...listedUids,...organiserUids])||byEmail(listedEmails)||participantRecord;
  if(isAdminIdentity&&!activeIdentity)throw Object.assign(new Error("An active IRPA member or employee identity is required for Meeting Portal access."),{status:403});
  if(!activeIdentity&&!explicitParticipant)throw Object.assign(new Error("An active IRPA identity or an invitation to this specific meeting is required."),{status:403});
  if(!explicitParticipant)throw Object.assign(new Error("You are not listed as a participant in this meeting."),{status:403});

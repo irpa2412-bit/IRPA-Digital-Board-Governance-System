@@ -32,13 +32,12 @@ export function canAccessMeetingCategory(meeting={},identity={},options={}){
     ...(Array.isArray(meeting.attendeeUids)?meeting.attendeeUids:[]),
     ...(Array.isArray(meeting.memberUids)?meeting.memberUids:[]),
     ...(Array.isArray(meeting.invitedUids)?meeting.invitedUids:[]),
-    ...(Array.isArray(meeting.subscriberUids)?meeting.subscriberUids:[]),
     ...(Array.isArray(meeting.coOrganizerUids)?meeting.coOrganizerUids:[]),
     ...(Array.isArray(meeting.coOrganiserUids)?meeting.coOrganiserUids:[])].map(value=>String(value||"").trim());
   const listedEmails=[...(Array.isArray(meeting.participantEmails)?meeting.participantEmails:[]),
     ...(Array.isArray(meeting.attendeeEmails)?meeting.attendeeEmails:[]),
     ...(Array.isArray(meeting.invitedEmails)?meeting.invitedEmails:[]),
-    ...(Array.isArray(meeting.subscriberEmails)?meeting.subscriberEmails:[])].map(value=>String(value||"").trim().toLowerCase());
+].map(value=>String(value||"").trim().toLowerCase());
   const personRows=[...(Array.isArray(meeting.participants)?meeting.participants:[]),
     ...(Array.isArray(meeting.attendees)?meeting.attendees:[])];
   const personMatch=personRows.some(person=>
