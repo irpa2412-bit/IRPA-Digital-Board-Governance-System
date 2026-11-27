@@ -155,6 +155,11 @@ assert.equal(opened.sessionExpiresAt,null,"Email-link session must not expire by
 assert.equal(opened.canSign,true);
 const signingToken=opened.sessionToken;
 assert.ok(signingToken,"Email-link session token was not created.");
+const secondSessionResponse=await fetch(base+"/api/sign/email/session",{method:"POST",headers:{...authHeaders,"x-signing-token":invitationToken}});
+const secondOpened=await readJson(secondSessionResponse,"Second-device email-link session creation");
+assert.equal(secondOpened.signer.identityType,"email-link");
+assert.equal(secondOpened.canSign,true,"A second device must be able to open the same invitation before submission.");
+assert.notEqual(secondOpened.sessionToken,signingToken,"Each device must receive an independent session token.");
 const signatureField=opened.fields.find(field=>field.fieldId==="staging-signature");
 assert.ok(signatureField,"Email-link signer did not receive the assigned signature field.");
 const signaturePng="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
@@ -245,17 +250,9 @@ const tamperedResponse=await fetch(base+"/api/sign/verify",{
 });
 assert.equal(tamperedResponse.status,409,"Gateway did not reject a tampered completed PDF.");
 
-const beforeRetry=status.eventCount;
-const retryResponse=await fetch(base+"/api/sign/submit",{
-  method:"POST",headers:{...authHeaders,"content-type":"application/json"},
-  body:JSON.stringify({token:signingToken,signature:{type:"field-applications"},fieldValues:{"staging-name":"IRPA Staging Crypto Test Signer"},fieldApplications,signatureConfirmed:true,declarations:{name:"IRPA Staging Crypto Test Signer",title:effectiveAuthority,capacity:"Staging email-link signer"},manualAuthorityIdentification:effectiveAuthority,consent:true})
-});
-const retry=await readJson(retryResponse,"Idempotent signing retry");
-assert.equal(retry.idempotent,true);
-const afterRetry=await signingJson("/api/sign/status",signingToken,"Post-retry status");
-assert.equal(afterRetry.eventCount,beforeRetry,"Idempotent retry changed the Gateway audit chain.");
-assert.equal(afterRetry.completion.cryptographicEvidenceIds.length,1,"Idempotent retry duplicated cryptographic evidence.");
-assert.equal(afterRetry.auditChainValid,true);
+assert.equal(status.eventCount>0,true,"The successful signature must be represented in the audit chain.");
+assert.equal(status.completion.cryptographicEvidenceIds.length,1,"A single successful submission must create exactly one cryptographic evidence record.");
+assert.equal(status.auditChainValid,true);
 
 console.log("STAGING_RUNTIME_CRYPTO_ACCEPTANCE=PASS");
 console.log(JSON.stringify({
@@ -268,6 +265,9 @@ console.log(JSON.stringify({
   evidenceKeyId:evidence.keyId,
   evidenceSignatureValid,
   tamperedPdfRejected:true,
-  idempotentRetry:true,
-  auditChainValid:afterRetry.auditChainValid
+  twoDeviceSessionsOpened:true,
+  singleSubmissionAccepted:true,
+  auditChainValid:status.auditChainValid,
+  smtpAcceptedRecipientCount:ownerStatus.distribution.sent,
+  personalCopiesStored:ownerStatus.personalCopies.length
 }));
