@@ -6,44 +6,49 @@
     "affectedPortals": [
       "Meeting Portal"
     ],
-    "reason": "Owner-authorised coordinated shared-file protection cycle for src/App.jsx. This portal independently verifies the shared navigation-shell change while preserving its own authorization, data, workflow and governance boundaries.",
+    "reason": "Owner-authorised Meeting Portal universal-access and meeting-scoped authority repair. The shared application shell and seven-owner protection cycle are handled in the merged security base; this record covers the Meeting Portal implementation, its isolation guard, and regression tests.",
     "files": [
-      "drive-gateway/src/meetingServices.mjs",
-      "drive-gateway/src/meetingDeletion.mjs",
-      "src/pages/Meetings.jsx",
-      "drive-gateway/src/meetingEnvironment.mjs",
-      "drive-gateway/tests/meeting-environment.test.mjs",
+      ".github/workflows/meeting-portal-fixture-browser.yml",
       "docs/portal-protection/records/meeting-portal.json",
-      "tests/meeting-category-policy.test.mjs",
       "docs/portal-protection/windows/meeting-portal.json",
+      "drive-gateway/src/index.js",
+      "drive-gateway/src/meetingDeletion.mjs",
+      "drive-gateway/src/meetingEnvironment.mjs",
+      "drive-gateway/src/meetingServices.mjs",
       "drive-gateway/src/router.mjs",
-      "src/firebase/meetingGatewayApi.js",
-      "src/pages/MeetingRoom.jsx",
-      "src/firebase/meetingPolicy.js",
+      "drive-gateway/tests/meeting-environment.test.mjs",
+      "drive-gateway/tests/meeting-services-router.test.mjs",
       "firestore.rules",
-      "tests/meeting-room-authorization-boundary.test.mjs",
-      "tests/meeting-invitation-resend-quorum.test.mjs",
-      "tests/meeting-quorum-reconciliation.test.mjs",
-      "functions/liveMeeting.js",
-      "scripts/check-meeting-media-governance.mjs",
-      "src/pages/Voting.jsx",
-      "tests/meeting-category-firestore-rules.test.cjs",
-      "src/firebase/data.js",
-      "scripts/meeting-portal-fixture-isolation-guard.sh",
-      "tests/fixtures/mocks.js",
-      "tests/meeting-portal-browser.test.mjs",
       "firestore.staging.rules",
+      "functions/liveMeeting.js",
       "functions/meetingAttendanceRegister.js",
       "functions/meetingRecords.js",
+      "scripts/check-meeting-media-governance.mjs",
+      "scripts/meeting-portal-fixture-isolation-guard.sh",
+      "scripts/portal-protection-smoke.mjs",
       "src/App.jsx",
+      "src/FieldEntryDataGate.jsx",
+      "src/firebase/data.js",
+      "src/firebase/meetingGatewayApi.js",
+      "src/firebase/meetingPolicy.js",
       "src/meeting/IRPADGBSMeetingRoomMedia.jsx",
       "src/meeting/MeetingAccessControl.jsx",
+      "src/pages/MeetingRoom.jsx",
+      "src/pages/Meetings.jsx",
       "src/pages/OperationalGatewaysParticipants.jsx",
-      "tests/meeting-working-documents-security.test.mjs",
-      "drive-gateway/src/index.js",
-      "scripts/portal-protection-smoke.mjs"
+      "src/pages/Resolutions.jsx",
+      "src/pages/Voting.jsx",
+      "tests/fixtures/mocks.js",
+      "tests/meeting-category-firestore-rules.test.cjs",
+      "tests/meeting-category-policy.test.mjs",
+      "tests/meeting-invitation-resend-quorum.test.mjs",
+      "tests/meeting-isolation-guard.test.mjs",
+      "tests/meeting-portal-browser.test.mjs",
+      "tests/meeting-quorum-reconciliation.test.mjs",
+      "tests/meeting-room-authorization-boundary.test.mjs",
+      "tests/meeting-working-documents-security.test.mjs"
     ],
-    "expectedEffect": "The shared application shell makes the complete Meeting Portal module set available to every identity with a Members or Employees register record, regardless of active status or selected authority. It does not change this portal's own data, workflows, permissions or role controls.",
+    "expectedEffect": "Every IRPA member or employee identity can access the complete Meeting Portal and initiate/register meetings regardless of status, title, department, membership/employment category, invitation or participant listing. Access to an ongoing meeting, meeting-specific leadership, live-room admission, voting, quorum, resolutions, formal approvals and Board-restricted records remain governed by their existing meeting-specific controls.",
     "prohibitedChanges": [
       "Do not create portal-wide meeting leadership roles.",
       "Do not allow Meeting Administrator to chair, vote, establish quorum, approve resolutions or approve minutes by virtue of that role.",
@@ -67,8 +72,8 @@
     "emergency": false
   },
   "baseline": {
-    "commit": "c8234bdd7921756e812fa5ab98a20706e4c55d90",
-    "rollbackCommit": "c8234bdd7921756e812fa5ab98a20706e4c55d90"
+    "commit": "494812a1339afcacfa6b47807c1b7e7b0503563a",
+    "rollbackCommit": "494812a1339afcacfa6b47807c1b7e7b0503563a"
   },
   "validation": {
     "baselineSmoke": "PASS",
@@ -77,10 +82,11 @@
     },
     "fullRegression": "PASS",
     "behaviourDifferences": [
-      "Environment is immutable after creation.",
-      "Only the exact TRIAL marker at creation qualifies; REAL, missing, invalid, lowercase or whitespace-padded values are non-deletable.",
-      "The shared application shell exposes Meeting Portal navigation to all Members/Employees register identities independent of status or selected authority; no internal portal workflow or authorization boundary is changed.",
-      "The cross-portal browser fixture isolation guard is a shared validation dependency and changes no runtime portal behavior."
+      "Every IRPA member or employee with an existing Members or Employees register record receives full Meeting Portal access and may initiate meetings regardless of status, title, department, invitation or participant listing.",
+      "Access to ongoing meetings, live-room admission, meeting-specific leadership, voting, quorum, resolutions, formal approvals and Board-restricted records remain governed by their existing meeting-specific controls; external invitees remain limited to their invited meeting.",
+      "The shared application shell exposes the complete Meeting Portal module set to all Members and Employees register identities without selected-authority gating.",
+      "Meeting environment is immutable after creation; only the exact TRIAL marker at creation qualifies for safeguarded deletion.",
+      "The cross-portal browser fixture isolation guard remains mandatory and does not weaken unrelated portal protections."
     ],
     "evidence": [
       "Owner's exact conditional approval is recorded in PR #845 issue comment 7068716176.",
@@ -105,7 +111,10 @@
       "Meeting Portal portal smoke on exact baseline c8234bdd7921756e812fa5ab98a20706e4c55d90: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/46057862889/job/140704635578",
       "baseline smoke for Meeting Portal on exact baseline c8234bdd7921756e812fa5ab98a20706e4c55d90: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/46060508563/job/140713488550",
       "full regression for Meeting Portal on exact baseline c8234bdd7921756e812fa5ab98a20706e4c55d90: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/46060508563/job/140713488952",
-      "Meeting Portal portal smoke on exact baseline c8234bdd7921756e812fa5ab98a20706e4c55d90: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/46060508563/job/140713488550"
+      "Meeting Portal portal smoke on exact baseline c8234bdd7921756e812fa5ab98a20706e4c55d90: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/46060508563/job/140713488550",
+      "Baseline smoke PASS on exact PR #1009 pre-change base 494812a1339afcacfa6b47807c1b7e7b0503563a: run 46065345848, job 140729546651 checked out the exact baseline and completed the registered protected-portal smoke successfully. https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/46065345848/job/140729546651",
+      "Full regression PASS on exact PR #1009 pre-change base 494812a1339afcacfa6b47807c1b7e7b0503563a: run 46065345848, job 140729546755 checked out the exact baseline and completed the full root regression suite in the Firestore emulator successfully. https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/46065345848/job/140729546755",
+      "Meeting Portal portal smoke PASS on exact PR #1009 pre-change base 494812a1339afcacfa6b47807c1b7e7b0503563a: run 46065345848, job 140729546651 completed the registered protected-portal smoke successfully. https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/46065345848/job/140729546651"
     ]
   },
   "renewals": [

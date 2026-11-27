@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
-git fetch origin main:refs/remotes/origin/main
+BASE_REF="${GITHUB_BASE_REF:-main}"
+git fetch origin "${BASE_REF}:refs/remotes/origin/${BASE_REF}"
 EVENT_NAME="${EVENT_NAME:-}" node --input-type=module <<'NODE'
 import { execFileSync } from "node:child_process";
 import { evaluateSignatureWindowAmendment, evaluateSignatureWindowRepair, evaluateSignatureWindowClosure, evaluateSignatureWindowReopen } from "./scripts/portal-repair-window-guard-policy.mjs";
@@ -10,7 +11,8 @@ import { classifyProtectionOnlyChange } from "./scripts/portal-protection-check.
 // this feature branch diverged; no portal source or workflow is exempted.
 const eventName = process.env.EVENT_NAME?.trim();
 const isMainPush = eventName === "push" && process.env.GITHUB_REF === "refs/heads/main";
-const base = "origin/main";
+const baseRef = process.env.GITHUB_BASE_REF?.trim() || "main";
+const base = `origin/${baseRef}`;
 execFileSync("git", ["cat-file", "-e", `${base}^{commit}`]);
 const changed = execFileSync("git", ["diff", "--name-only", `${base}...HEAD`], { encoding: "utf8" })
   .trim().split("\n").filter(Boolean).sort();
@@ -71,6 +73,7 @@ const allowed = new Set([
   "drive-gateway/src/index.js",
   "drive-gateway/src/meetingPortal.mjs",
   "drive-gateway/src/meetingServices.mjs",
+  "drive-gateway/tests/meeting-services-router.test.mjs",
   "drive-gateway/src/meetingEnvironment.mjs",
   "drive-gateway/src/meetingDeletion.mjs",
   "drive-gateway/tests/meeting-environment.test.mjs",
@@ -141,6 +144,7 @@ const allowed = new Set([
   "functions/liveMeeting.js",
   "scripts/check-meeting-media-governance.mjs",
   "src/firebase/meetingPolicy.js",
+  "src/pages/Resolutions.jsx",
   "src/pages/Voting.jsx",
   "tests/meeting-room-authorization-boundary.test.mjs",
   // Explicitly permit the separate authenticated cross-portal mobile navigation race regression.
