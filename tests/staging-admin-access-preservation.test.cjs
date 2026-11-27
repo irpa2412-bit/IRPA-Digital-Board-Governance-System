@@ -27,6 +27,64 @@ beforeEach(async () => {
   });
 });
 
+async function seedMeeting(id) {
+  await env.withSecurityRulesDisabled(async context => {
+    await context.firestore().doc(`meetings/${id}`).set({
+      title: "Staging administrator access preservation test",
+      meetingCategory: "ADMINISTRATIVE",
+      meetingPolicyId: "ADMINISTRATIVE",
+      meetingType: "Management Meeting",
+      initiatorUid: "test-initiator",
+      initiatorEmail: "initiator@example.test",
+      registerStatus: "Draft",
+      status: "Scheduled"
+    });
+  });
+}
+
+test("primary administrator claim grants no private Meeting Portal access or deletion rights", async () => {
+  await seedMeeting("primary-admin-claim");
+  const db = env.authenticatedContext("owner-primary", { admin: true }).firestore();
+  await assertFails(db.doc("meetings/primary-admin-claim").get());
+  await assertFails(db.doc("meetings/primary-admin-claim").delete());
+});
+
+test("adminProfiles plus an active Member record grant no private meeting access without participation", async () => {
+  const titles = [
+    "Administrator",
+    "Executive Director",
+    "Director Field",
+    "Field Director",
+    "Operations Director",
+    "Research Director",
+    "Communications Officer"
+  ];
+
+  for (let index = 0; index < titles.length; index += 1) {
+    const uid = `staging-admin-${index}`;
+    const meetingId = `staging-admin-meeting-${index}`;
+    await env.withSecurityRulesDisabled(async context => {
+      const db = context.firestore();
+      await db.doc(`adminProfiles/${uid}`).set({ active: true });
+      await db.doc(`members/${uid}`).set({ uid, status: "Active", role: titles[index] });
+      await db.doc(`meetings/${meetingId}`).set({
+        title: "Staging administrator access preservation test",
+        meetingCategory: "ADMINISTRATIVE",
+        meetingPolicyId: "ADMINISTRATIVE",
+        meetingType: "Management Meeting",
+        initiatorUid: "test-initiator",
+        initiatorEmail: "initiator@example.test",
+        registerStatus: "Draft",
+        status: "Scheduled"
+      });
+    });
+
+    const db = env.authenticatedContext(uid, { admin: true }).firestore();
+    await assertFails(db.doc(`meetings/${meetingId}`).get());
+    await assertFails(db.doc(`meetings/${meetingId}`).delete());
+  }
+});
+
 test("staging members can update ordinary profile fields but cannot self-assign authority", async () => {
   const uid = "member-profile-with-invitation";
   const email = "member-profile-with-invitation@example.test";
@@ -98,62 +156,6 @@ test("staging member can save and replace only Signature Profile fields", async 
   }
 });
 
-
-async function seedMeeting(id) {
-  await env.withSecurityRulesDisabled(async context => {
-    await context.firestore().doc(`meetings/${id}`).set({
-      title: "Staging administrator access preservation test",
-      meetingCategory: "ADMINISTRATIVE",
-      meetingPolicyId: "ADMINISTRATIVE",
-      meetingType: "Management Meeting",
-      initiatorUid: "test-initiator",
-      initiatorEmail: "initiator@example.test",
-      registerStatus: "Draft",
-      status: "Scheduled"
-    });
-  });
-}
-
-test("primary administrator claim remains recognised independently of job title", async () => {
-  await seedMeeting("primary-admin-claim");
-  const db = env.authenticatedContext("owner-primary", { admin: true }).firestore();
-  await assertSucceeds(db.doc("meetings/primary-admin-claim").delete());
-});
-
-test("active adminProfiles identity remains administrator across organisational role-title changes", async () => {
-  const titles = [
-    "Administrator",
-    "Executive Director",
-    "Director Field",
-    "Field Director",
-    "Operations Director",
-    "Research Director",
-    "Communications Officer"
-  ];
-
-  for (let index = 0; index < titles.length; index += 1) {
-    const uid = `staging-admin-${index}`;
-    const meetingId = `staging-admin-meeting-${index}`;
-    await env.withSecurityRulesDisabled(async context => {
-      const db = context.firestore();
-      await db.doc(`adminProfiles/${uid}`).set({ active: true });
-      await db.doc(`members/${uid}`).set({ uid, status: "Active", role: titles[index] });
-      await db.doc(`meetings/${meetingId}`).set({
-        title: "Staging administrator access preservation test",
-        meetingCategory: "ADMINISTRATIVE",
-        meetingPolicyId: "ADMINISTRATIVE",
-        meetingType: "Management Meeting",
-        initiatorUid: "test-initiator",
-        initiatorEmail: "initiator@example.test",
-        registerStatus: "Draft",
-        status: "Scheduled"
-      });
-    });
-
-    const db = env.authenticatedContext(uid).firestore();
-    await assertSucceeds(db.doc(`meetings/${meetingId}`).delete());
-  }
-});
 
 test("a role title of Administrator without an active adminProfiles record does not grant administrator access", async () => {
   await seedMeeting("role-title-only");
