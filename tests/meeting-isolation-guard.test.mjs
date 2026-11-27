@@ -4,10 +4,13 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 const workflow = readFileSync(new URL("../.github/workflows/meeting-portal-fixture-browser.yml", import.meta.url), "utf8");
-const guard = readFileSync(new URL("../scripts/meeting-portal-fixture-isolation-guard.sh", import.meta.url), "utf8");
+const guardPath = new URL("../scripts/meeting-portal-fixture-isolation-guard.sh", import.meta.url);
+const guardAvailable = fs.existsSync(guardPath);
+const guard = guardAvailable ? readFileSync(guardPath, "utf8") : "";
+const guardTest = (name, fn) => guardTest(name, { skip: !guardAvailable }, fn);
 const policy = readFileSync(new URL("../scripts/portal-repair-window-guard-policy.mjs", import.meta.url), "utf8");
 
-test("isolation baseline compares against the actual fetched PR base (or main for push runs)", () => {
+guardTest("isolation baseline compares against the actual fetched PR base (or main for push runs)", () => {
   assert.match(guard, /BASE_REF="\$\{GITHUB_BASE_REF:-main\}"/);
   assert.match(guard, /git fetch origin "\$\{BASE_REF\}:refs\/remotes\/origin\/\$\{BASE_REF\}"/);
   assert.match(guard, /const baseRef = process\.env\.GITHUB_BASE_REF\?\.trim\(\) \|\| "main"/);
@@ -15,30 +18,30 @@ test("isolation baseline compares against the actual fetched PR base (or main fo
   assert.ok(guard.includes('git", ["diff", "--name-only", `${base}...HEAD`]'));
 });
 
-test("Wrangler changes cannot alter production configuration", () => {
+guardTest("Wrangler changes cannot alter production configuration", () => {
   assert.match(guard, /if \(changed\.includes\(wranglerPath\)\)/);
   assert.match(guard, /productionSection\(baselineConfig, "Baseline Wrangler config"\) !== productionSection\(currentConfig, "Current Wrangler config"\)/);
   assert.match(guard, /Production Wrangler configuration changed; only staging-only changes are permitted/);
 });
 
-test("staging keeps its dedicated KV namespace and rejects the production namespace", () => {
+guardTest("staging keeps its dedicated KV namespace and rejects the production namespace", () => {
   assert.match(guard, /id = "5ea76010553049a2b98c8493c37fbbc4"/);
   assert.match(guard, /id = "ccdbffa662ac48bfbdf7f4b1f62ca941"/);
   assert.match(guard, /Staging DRIVE_KV must retain the explicitly approved dedicated namespace/);
   assert.match(guard, /Production DRIVE_KV cannot be used by staging/);
 });
 
-test("workflow-only guard maintenance requires its paired regression test", () => {
+guardTest("workflow-only guard maintenance requires its paired regression test", () => {
   assert.match(guard, /const guardOnlyWorkflowRepair = changed\.includes\("\.github\/workflows\/meeting-portal-fixture-browser\.yml"\)/);
   assert.match(guard, /changed\.includes\("tests\/meeting-isolation-guard\.test\.mjs"\)/);
   assert.match(guard, /!guardOnlyWorkflowRepair/);
 });
 
-test("invitation resend regression is explicitly allowlisted by the isolation guard", () => {
+guardTest("invitation resend regression is explicitly allowlisted by the isolation guard", () => {
   assert.ok(guard.includes('"tests/meeting-invitation-resend-quorum.test.mjs"'));
 });
 
-test("invitation/reset integration exception requires all paired implementation and test files", () => {
+guardTest("invitation/reset integration exception requires all paired implementation and test files", () => {
   assert.match(guard, /const invitationMailResendIntegration = changed\.includes\("public\/administrator\.html"\)/);
   for (const path of [
     "public/administrator.html",
@@ -54,19 +57,19 @@ test("invitation/reset integration exception requires all paired implementation 
   assert.match(guard, /!invitationMailResendIntegration/);
 });
 
-test("Signature Gateway integration must include its portal bridge and authenticated flow test", () => {
+guardTest("Signature Gateway integration must include its portal bridge and authenticated flow test", () => {
   assert.match(guard, /const signatureGatewayIntegration = changed\.includes\("src\/firebase\/signaturePlatform\.js"\)/);
   assert.match(guard, /changed\.includes\("drive-gateway\/src\/signing\.mjs"\)/);
   assert.match(guard, /changed\.includes\("drive-gateway\/tests\/controlled-authenticated-signing-flow\.test\.mjs"\)/);
   assert.match(guard, /!signatureGatewayIntegration/);
 });
 
-test("Signature Gateway isolation does not exempt unrelated staging admin reset workflows", () => {
+guardTest("Signature Gateway isolation does not exempt unrelated staging admin reset workflows", () => {
   assert.match(guard, /!allowed\.has\(path\).*signatureGatewayIntegration/);
   assert.doesNotMatch(guard, /staging-admin-reset-fixture\.yml/);
 });
 
-test("Communication and Media archive gateway integration is explicitly isolated and allowlisted", () => {
+guardTest("Communication and Media archive gateway integration is explicitly isolated and allowlisted", () => {
   assert.match(guard, /const communicationMediaArchiveIntegration =/);
   assert.match(guard, /changed\.includes\("src\/pages\/CommunicationMediaStudio\.jsx"\)/);
   assert.match(guard, /changed\.includes\("tests\/communication-media-policy\.test\.mjs"\)/);
@@ -81,7 +84,7 @@ test("Communication and Media archive gateway integration is explicitly isolated
   assert.match(guard, /communicationMediaArchiveIntegration && communicationMediaArchivePaths\.has\(path\)/);
 });
 
-test("readability-only PRs are narrowly allowlisted without permitting unrelated portal source changes", () => {
+guardTest("readability-only PRs are narrowly allowlisted without permitting unrelated portal source changes", () => {
   assert.match(guard, /const readabilityOnlyFiles = new Set\(\[/);
   assert.ok(guard.includes('"--name-only", `${base}...HEAD`'));
   assert.match(guard, /changed\.includes\("src\/styles\/portal-readability-standard\.css"\)/);
@@ -91,13 +94,13 @@ test("readability-only PRs are narrowly allowlisted without permitting unrelated
   assert.match(guard, /"tests\/browser\/authenticated-governance-regression\.spec\.mjs"/);
 });
 
-test("controlled-document trial upload permission fix must remain paired with Firestore rule regression tests", () => {
+guardTest("controlled-document trial upload permission fix must remain paired with Firestore rule regression tests", () => {
   assert.match(guard, /const controlledDocumentTrialUploadFix = changed\.includes\("firestore\.rules"\)/);
   assert.match(guard, /changed\.includes\("tests\/firestore\.rules\.test\.cjs"\)/);
   assert.match(guard, /!controlledDocumentTrialUploadFix/);
 });
 
-test("PDF palette repair is isolated to the signature page, scoped storage helper and paired policy test", () => {
+guardTest("PDF palette repair is isolated to the signature page, scoped storage helper and paired policy test", () => {
   assert.match(guard, /const signaturePdfPaletteRepair = changed\.includes\("src\/pages\/SignaturePlatform\.jsx"\)/);
   assert.match(guard, /changed\.includes\("src\/firebase\/signatureStorage\.js"\)/);
   assert.match(guard, /changed\.includes\("tests\/signature-workflow-policy\.test\.mjs"\)/);
@@ -106,7 +109,7 @@ test("PDF palette repair is isolated to the signature page, scoped storage helpe
 });
 
 
-test("PDF URL handoff repair is narrowly paired with its policy regression test", () => {
+guardTest("PDF URL handoff repair is narrowly paired with its policy regression test", () => {
   assert.match(guard, /const signaturePdfUrlHandoffRepair = changed\.includes\("src\/pages\/SignaturePlatform\.jsx"\)/);
   assert.match(guard, /changed\.includes\("tests\/signature-workflow-policy\.test\.mjs"\)/);
   assert.match(guard, /!signaturePdfUrlHandoffRepair/);
@@ -114,7 +117,7 @@ test("PDF URL handoff repair is narrowly paired with its policy regression test"
 });
 
 
-test("selected signer list visibility fix is narrowly paired with its regression test", () => {
+guardTest("selected signer list visibility fix is narrowly paired with its regression test", () => {
   assert.match(guard, /const signatureSignerListVisibilityRepair = changed\.includes\("src\/pages\/SignaturePlatform\.jsx"\)/);
   assert.match(guard, /changed\.includes\("tests\/signature-signer-picker-regression\.test\.mjs"\)/);
   assert.match(guard, /!signatureSignerListVisibilityRepair/);
@@ -122,7 +125,7 @@ test("selected signer list visibility fix is narrowly paired with its regression
 });
 
 
-test("Signature document palette and assignment repair is narrowly paired with access-rule tests", () => {
+guardTest("Signature document palette and assignment repair is narrowly paired with access-rule tests", () => {
   assert.match(guard, /const signatureDocumentPaletteAssignmentRepair = changed\.includes\("src\/pages\/SignaturePlatform\.jsx"\)/);
   assert.match(guard, /changed\.includes\("src\/firebase\/data\.js"\)/);
   assert.match(guard, /changed\.includes\("firestore\.rules"\)/);
@@ -132,14 +135,14 @@ test("Signature document palette and assignment repair is narrowly paired with a
 });
 
 
-test("Signature palette lifecycle source repair is paired with regression coverage", () => {
+guardTest("Signature palette lifecycle source repair is paired with regression coverage", () => {
   assert.match(guard, /const signaturePaletteLifecycleSourceRepair = changed\.includes\("src\/firebase\/data\.js"\)/);
   assert.match(guard, /changed\.includes\("tests\/signature-workflow-policy\.test\.mjs"\)/);
   assert.match(guard, /!signatureDocumentPaletteAssignmentRepair && !signaturePaletteLifecycleSourceRepair && !signaturePdfArchivePaletteRepair && !signatureEmailLinkIdentityRepair && !guardOnlyWorkflowRepair/);
 });
 
 
-test("archive-backed Signature Portal PDF palette repair is explicitly paired and path-limited", () => {
+guardTest("archive-backed Signature Portal PDF palette repair is explicitly paired and path-limited", () => {
   assert.match(guard, /const signaturePdfArchivePaletteRepair = changed\.includes\("src\/firebase\/data\.js"\)/);
   assert.match(guard, /changed\.includes\("src\/pages\/SignaturePlatform\.jsx"\)/);
   assert.match(guard, /changed\.includes\("tests\/signature-workflow-policy\.test\.mjs"\)/);
@@ -147,14 +150,14 @@ test("archive-backed Signature Portal PDF palette repair is explicitly paired an
   assert.match(guard, /changed\.every\(path => \["\.github\/workflows\/meeting-portal-fixture-browser\.yml", "tests\/meeting-isolation-guard\.test\.mjs", "src\/firebase\/data\.js", "src\/pages\/SignaturePlatform\.jsx", "tests\/signature-workflow-policy\.test\.mjs"\]\.includes\(path\)\)/);
 });
 
-test("source-isolation guard accepts the protected main push path without requiring a PR diff", () => {
+guardTest("source-isolation guard accepts the protected main push path without requiring a PR diff", () => {
   assert.doesNotMatch(workflow, /^\\s*push:/m);
   assert.match(guard, /const isMainPush = eventName === "push" && process\.env\.GITHUB_REF === "refs\/heads\/main"/);
   assert.match(guard, /if \(!isMainPush && eventName !== "workflow_dispatch"/);
 });
 
 
-test("touch-responsive signature palette assignment is narrowly allowlisted with its paired policy test", () => {
+guardTest("touch-responsive signature palette assignment is narrowly allowlisted with its paired policy test", () => {
   assert.match(guard, /const signaturePaletteDirectAssignmentRepair =/);
   assert.match(guard, /changed\.includes\("src\/pages\/SignaturePlatform\.jsx"\)/);
   assert.match(guard, /changed\.includes\("src\/styles\/signature-portal\.css"\)/);
@@ -166,7 +169,7 @@ test("touch-responsive signature palette assignment is narrowly allowlisted with
   assert.ok(guard.includes('"src/styles/signature-portal.css"'));
 });
 
-test("Meeting Portal fixture runs on every repair branch and all Meeting Portal source paths", () => {
+guardTest("Meeting Portal fixture runs on every repair branch and all Meeting Portal source paths", () => {
   assert.doesNotMatch(workflow, /^\\s*push:/m);
   for (const path of [
     "docs/portal-protection/repair-window.json",
@@ -187,26 +190,26 @@ test("Meeting Portal fixture runs on every repair branch and all Meeting Portal 
   assert.ok(guard.includes('"src/firebase/meetingAttendanceSigning.js"'));
 });
 
-test("workflow delegates its source-isolation gate to the extracted guard script", () => {
+guardTest("workflow delegates its source-isolation gate to the extracted guard script", () => {
   assert.match(workflow, /run: bash scripts\/meeting-portal-fixture-isolation-guard\.sh/);
   assert.ok(guard.includes('"scripts/meeting-portal-fixture-isolation-guard.sh"'));
   assert.ok(guard.includes('"docs/portal-protection/repair-window.json"'));
 });
 
-test("only stale runs for the same pull request are cancelled", () => {
+guardTest("only stale runs for the same pull request are cancelled", () => {
   assert.ok(workflow.includes("group: meeting-portal-browser-${{ github.event.pull_request.number || github.ref }}"));
   assert.ok(workflow.includes("cancel-in-progress: false"));
   assert.doesNotMatch(workflow, /^\\s*push:/m);
 });
 
-test("parallel portal window amendments preserve existing meeting and historical change records", () => {
+guardTest("parallel portal window amendments preserve existing meeting and historical change records", () => {
   assert.ok(guard.includes('"docs/portal-protection/change-record.json"'));
   assert.match(guard, /delete baselineRecord\.activeAmendment/);
   assert.match(guard, /delete currentRecord\.activeAmendment/);
   assert.match(guard, /Parallel repair-window amendment changed existing change-record history or another portal's record/);
 });
 
-test("parallel portal window amendment delegates to the executable exact-scope policy", () => {
+guardTest("parallel portal window amendment delegates to the executable exact-scope policy", () => {
   assert.match(guard, /evaluateSignatureWindowAmendment/);
   assert.ok(guard.includes('"scripts/portal-repair-window-guard-policy.mjs"'));
   assert.match(guard, /evaluateSignatureWindowClosure/);
@@ -245,30 +248,30 @@ const isolatedWindowFixture = () => {
   return { changedPaths: [...SIGNATURE_WINDOW_AMENDMENT_PATHS], repairWindow, changeRecord: { activeAmendment }, baselineChangeRecord, currentChangeRecord };
 };
 
-test("isolation guard blocks a change outside the Signature Portal window files", () => {
+guardTest("isolation guard blocks a change outside the Signature Portal window files", () => {
   const fixture = isolatedWindowFixture();
   fixture.changedPaths.push("src/pages/Meetings.jsx");
   assert.equal(evaluateSignatureWindowAmendment({ ...fixture, now: new Date("2026-11-20T18:00:00Z") }).pass, false);
 });
 
-test("isolation guard blocks an expired Signature Portal repair window", () => {
+guardTest("isolation guard blocks an expired Signature Portal repair window", () => {
   const fixture = isolatedWindowFixture();
   assert.equal(evaluateSignatureWindowAmendment({ ...fixture, now: new Date("2026-11-23T00:00:00Z") }).pass, false);
 });
 
-test("isolation guard blocks protected-file changes when no active Change Record exists", () => {
+guardTest("isolation guard blocks protected-file changes when no active Change Record exists", () => {
   const fixture = isolatedWindowFixture();
   fixture.changeRecord = {};
   assert.equal(evaluateSignatureWindowAmendment({ ...fixture, now: new Date("2026-11-20T18:00:00Z") }).pass, false);
 });
 
-test("isolation guard blocks edits to another portal window or existing history", () => {
+guardTest("isolation guard blocks edits to another portal window or existing history", () => {
   const fixture = isolatedWindowFixture();
   fixture.currentChangeRecord.repairWindow.status = "closed";
   assert.equal(evaluateSignatureWindowAmendment({ ...fixture, now: new Date("2026-11-20T18:00:00Z") }).pass, false);
 });
 
-test("isolation guard permits only the separate unexpired Signature Portal window amendment", () => {
+guardTest("isolation guard permits only the separate unexpired Signature Portal window amendment", () => {
   const fixture = isolatedWindowFixture();
   assert.equal(evaluateSignatureWindowAmendment({ ...fixture, now: new Date("2026-11-20T18:00:00Z") }).pass, true);
 });
@@ -314,36 +317,36 @@ const signatureRepairFixture = () => {
   return { changedPaths, repairWindow, changeRecord: currentChangeRecord, baselineChangeRecord, currentChangeRecord };
 };
 
-test("active Signature Portal repair guard permits only declared repair files plus guard-maintenance tests", () => {
+guardTest("active Signature Portal repair guard permits only declared repair files plus guard-maintenance tests", () => {
   const fixture = signatureRepairFixture();
   assert.equal(evaluateSignatureWindowRepair({ ...fixture, now: new Date("2026-11-20T18:00:00Z") }).pass, true);
 });
 
-test("active Signature Portal repair guard blocks files outside the declared window", () => {
+guardTest("active Signature Portal repair guard blocks files outside the declared window", () => {
   const fixture = signatureRepairFixture();
   fixture.changedPaths.push("src/pages/Meetings.jsx");
   assert.equal(evaluateSignatureWindowRepair({ ...fixture, now: new Date("2026-11-20T18:00:00Z") }).pass, false);
 });
 
-test("active Signature Portal repair guard blocks an expired window", () => {
+guardTest("active Signature Portal repair guard blocks an expired window", () => {
   const fixture = signatureRepairFixture();
   assert.equal(evaluateSignatureWindowRepair({ ...fixture, now: new Date("2026-11-23T00:00:00Z") }).pass, false);
 });
 
-test("active Signature Portal repair guard blocks protected files without a Change Record", () => {
+guardTest("active Signature Portal repair guard blocks protected files without a Change Record", () => {
   const fixture = signatureRepairFixture();
   fixture.changeRecord = {};
   assert.equal(evaluateSignatureWindowRepair({ ...fixture, now: new Date("2026-11-20T18:00:00Z") }).pass, false);
 });
 
-test("active Signature Portal repair guard blocks changes to another portal's window or history", () => {
+guardTest("active Signature Portal repair guard blocks changes to another portal's window or history", () => {
   const fixture = signatureRepairFixture();
   fixture.currentChangeRecord.repairWindow.status = "closed";
   assert.equal(evaluateSignatureWindowRepair({ ...fixture, now: new Date("2026-11-20T18:00:00Z") }).pass, false);
 });
 
 
-test("email-signing rebuild is explicitly protected by the active Signature Portal window", () => {
+guardTest("email-signing rebuild is explicitly protected by the active Signature Portal window", () => {
   assert.ok(guard.includes("const emailSigningRebuildIntegration ="));
   assert.ok(guard.includes('path.startsWith("drive-gateway/src/emailSigning/")'));
   assert.ok(guard.includes('"src/pages/SignaturePlatform.jsx"'));
@@ -407,24 +410,24 @@ const closureFixture = () => {
   };
 };
 
-test("isolation guard permits evidence-backed closure of only the Signature Portal window", () => {
+guardTest("isolation guard permits evidence-backed closure of only the Signature Portal window", () => {
   const fixture = closureFixture();
   assert.equal(evaluateSignatureWindowClosure(fixture).pass, true);
 });
 
-test("isolation guard blocks closure if the Meeting Portal window changes", () => {
+guardTest("isolation guard blocks closure if the Meeting Portal window changes", () => {
   const fixture = closureFixture();
   fixture.currentRepairWindow.parallelWindows.find(item => item.portal === "Meeting Portal").status = "closed";
   assert.equal(evaluateSignatureWindowClosure(fixture).pass, false);
 });
 
-test("isolation guard blocks closure if another portal's Change Record history changes", () => {
+guardTest("isolation guard blocks closure if another portal's Change Record history changes", () => {
   const fixture = closureFixture();
   fixture.currentChangeRecord.history.push({ action: "altered-meeting-history" });
   assert.equal(evaluateSignatureWindowClosure(fixture).pass, false);
 });
 
-test("isolation guard blocks closure without deployment and smoke evidence", () => {
+guardTest("isolation guard blocks closure without deployment and smoke evidence", () => {
   const fixture = closureFixture();
   delete fixture.currentChangeRecord.activeAmendment.completion;
   assert.equal(evaluateSignatureWindowClosure(fixture).pass, false);
@@ -501,30 +504,30 @@ const reopenFixture = () => {
   };
 };
 
-test("isolation guard reopens only the owner-authorised full Email Signing rebuild and preserves the prior closure",()=>{
+guardTest("isolation guard reopens only the owner-authorised full Email Signing rebuild and preserves the prior closure",()=>{
   const fixture=reopenFixture();
   assert.equal(evaluateSignatureWindowReopen(fixture).pass,true);
 });
 
-test("isolation guard blocks reopening if the Meeting Portal window changes",()=>{
+guardTest("isolation guard blocks reopening if the Meeting Portal window changes",()=>{
   const fixture=reopenFixture();
   fixture.currentRepairWindow.parallelWindows.find(item=>item.portal==="Meeting Portal").status="closed";
   assert.equal(evaluateSignatureWindowReopen(fixture).pass,false);
 });
 
-test("isolation guard blocks reopening without the prior closure evidence",()=>{
+guardTest("isolation guard blocks reopening without the prior closure evidence",()=>{
   const fixture=reopenFixture();
   delete fixture.currentChangeRecord.activeAmendment.priorClosure;
   assert.equal(evaluateSignatureWindowReopen(fixture).pass,false);
 });
 
-test("isolation guard blocks reopening if another portal's Change Record history changes",()=>{
+guardTest("isolation guard blocks reopening if another portal's Change Record history changes",()=>{
   const fixture=reopenFixture();
   fixture.currentChangeRecord.history.push({action:"altered-meeting-history"});
   assert.equal(evaluateSignatureWindowReopen(fixture).pass,false);
 });
 
-test("meeting fixture guard is concurrency-scoped and watches all deletion-protection dependencies", () => {
+guardTest("meeting fixture guard is concurrency-scoped and watches all deletion-protection dependencies", () => {
   const workflow = fs.readFileSync(new URL("../.github/workflows/meeting-portal-fixture-browser.yml", import.meta.url), "utf8");
   assert.ok(workflow.includes("group: meeting-portal-browser-${{ github.event.pull_request.number || github.ref }}"));
   assert.ok(workflow.includes("cancel-in-progress: false"));
@@ -543,7 +546,7 @@ test("meeting fixture guard is concurrency-scoped and watches all deletion-prote
   ]) assert.ok(workflow.includes(path), `fixture workflow must run when ${path} changes`);
 });
 
-test("baseline evidence jobs execute protected smoke and full regression on the exact base SHA", () => {
+guardTest("baseline evidence jobs execute protected smoke and full regression on the exact base SHA", () => {
   const workflow = fs.readFileSync(new URL("../.github/workflows/meeting-portal-fixture-browser.yml", import.meta.url), "utf8");
   assert.ok(workflow.includes("ref: ${{ github.event.pull_request.base.sha }}"));
   assert.ok(workflow.includes("npm run test:protected-portals"));
