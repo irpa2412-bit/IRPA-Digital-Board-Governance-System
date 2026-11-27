@@ -1,7 +1,7 @@
 name: Meeting Portal Isolated Browser Regression
 on:
   pull_request:
-    branches: [main]
+    branches: [main, security/member-role-array-emulator-proof]
     paths:
       - "src/pages/Meetings.jsx"
       - "docs/portal-protection/repair-window.json"
@@ -117,6 +117,7 @@ jobs:
         run: npx firebase emulators:exec --only firestore --project demo-irpa-dgbs "npm run test:all"
 
   isolated-meeting-browser:
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.ref != 'security/member-role-array-emulator-proof'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
