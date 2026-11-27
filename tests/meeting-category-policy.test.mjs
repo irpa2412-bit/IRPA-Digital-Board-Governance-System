@@ -612,3 +612,5 @@ test("Meeting Portal frontend grants initiation and category visibility to any r
   assert.match(page, /identity\.memberIdentity===true\|\|identity\.employeeIdentity===true/);
 });
 
+
+// Keep the Meeting Portal Worker access regressions isolated from shared Firestore-rule tests.
