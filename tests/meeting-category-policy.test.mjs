@@ -175,7 +175,7 @@ async function requestMeetingDirectory({ uid, email, identityCollection, status 
   let listRead = false;
   globalThis.fetch = async (input, init = {}) => {
     const url = new URL(String(input));
-    const match = url.pathname.match(/\\/documents\\/(members|employees)\\/([^/]+)$/);
+    const match = url.pathname.match(/\/documents\/(members|employees)\/([^/]+)$/);
     if (match) {
       const [, collection, recordUid] = match;
       if (collection !== identityCollection || recordUid !== uid) return new Response("{}", { status: 404 });
