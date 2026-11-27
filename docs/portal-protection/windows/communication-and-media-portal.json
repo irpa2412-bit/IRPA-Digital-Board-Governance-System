@@ -1,22 +1,30 @@
 {
   "schemaVersion": 1,
   "portal": "Communication and Media Portal",
-  "status": "closed",
+  "status": "open",
   "durationHours": 72,
   "inactivityCloseHours": 72,
   "warningHours": 12,
-  "openedAt": null,
-  "expiresAt": null,
-  "lastActivityAt": null,
+  "openedAt": "2026-11-27T17:41:34.000Z",
+  "expiresAt": "2026-11-30T17:41:34.000Z",
+  "lastActivityAt": "2026-11-27T17:41:34.000Z",
   "emergency": false,
   "emergencyLimitHours": 24,
-  "reason": "No active repair authorization. An owner-approved APPROVE or RENEW comment opens one 72-hour window for this portal only.",
+  "reason": "Owner-authorised coordinated shared-file protection cycle for src/App.jsx. Independently verify this portal's navigation and security invariants while the common application shell exposes the Meeting Portal to every IRPA member/employee identity. Preserve all portal-specific controls.",
   "scope": [
     "src/pages/CommunicationMediaPortal.jsx",
     "src/pages/CommunicationMediaOperations.jsx",
     "src/pages/CommunicationMediaStudio.jsx",
     "src/pages/Communications/",
-    "src/pages/SocialMediaAccounts.jsx"
+    "src/pages/SocialMediaAccounts.jsx",
+    "src/App.jsx"
   ],
-  "activityLog": []
+  "activityLog": [
+    {
+      "at": "2026-11-27T17:41:34.000Z",
+      "action": "owner-authorised coordinated shared-file protection cycle",
+      "description": "Independent Communication and Media Portal Change Record, smoke and lock-test cycle for the shared src/App.jsx dependency. Scope is limited to the common shell; portal-specific internals and protections remain unchanged."
+    }
+  ],
+  "emergencyExpiresAt": null
 }
