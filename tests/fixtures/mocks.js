@@ -179,13 +179,50 @@ export async function callMeetingService(path, payload = {}) {
     writeStore(store); recordAction({ type: "meeting-update", meetingId, keys: Object.keys(payload.data || {}) });
     return { ok: true, testOnly: true };
   }
+  if (path === "/api/meeting-outcomes/public") {
+    return { resolutions: clone(store.resolutions || []), testOnly: true };
+  }
+  if (path === "/api/meeting-resolutions/create") {
+    const data = payload.data || {};
+    const row = { id: `TEST-resolution-${store.nextId++}`, ...clone(data), meetingId: data.meetingId || meetingId };
+    store.resolutions.push(row);
+    writeStore(store);
+    recordAction({ type: "resolution-create", resolutionId: row.id, meetingId: row.meetingId });
+    return { id: row.id, resolution: clone(row), testOnly: true };
+  }
+  if (path === "/api/meeting-resolutions/update") {
+    const resolutionId = payload.resolutionId;
+    store.resolutions = (store.resolutions || []).map(row => String(row.id) === String(resolutionId) ? { ...row, ...clone(payload.data || {}) } : row);
+    writeStore(store);
+    recordAction({ type: "resolution-update", resolutionId });
+    return { ok: true, testOnly: true };
+  }
+  if (path === "/api/meeting-resolutions/delete") {
+    store.resolutions = (store.resolutions || []).filter(row => String(row.id) !== String(payload.resolutionId));
+    writeStore(store);
+    recordAction({ type: "resolution-delete", resolutionId: payload.resolutionId });
+    return { ok: true, testOnly: true };
+  }
   if (path === "/api/meeting-room/event") {
     store.meetingRoomEvents.push({ id: `TEST-event-${store.nextId++}`, meetingId, ...(payload.event || {}) });
     writeStore(store); recordAction({ type: "meeting-event", meetingId }); return { ok: true };
   }
   if (path === "/api/meeting-voting/open") {
-    const issue = { id: "TEST-vote-001", meetingId, votingReference: payload.votingReference, status: "Open" };
-    store.votes.push(issue); writeStore(store); recordAction({ type: "vote-open", meetingId, issueId: issue.id }); return { issue };
+    const issue = {
+      id: `TEST-vote-${store.nextId++}`, meetingId,
+      resolutionId: payload.resolutionId || null,
+      resolutionReference: payload.resolutionReference || null,
+      votingReference: payload.votingReference, status: "Open"
+    };
+    store.votes.push(issue);
+    if (payload.resolutionId) {
+      store.resolutions = (store.resolutions || []).map(row => String(row.id) === String(payload.resolutionId)
+        ? { ...row, status: "Voting Open", votingStatus: "Voting Open", votingResult: "Pending", votingIssueId: issue.id }
+        : row);
+    }
+    writeStore(store);
+    recordAction({ type: "vote-open", meetingId, issueId: issue.id, resolutionId: payload.resolutionId || null });
+    return { issue, alreadyOpen: false, testOnly: true };
   }
   if (path === "/api/meeting-decisions/create") {
     const row = { id: `TEST-decision-${store.nextId++}`, ...(payload.data || {}), meetingId };
