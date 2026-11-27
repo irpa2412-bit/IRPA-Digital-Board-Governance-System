@@ -405,3 +405,5 @@ test("legacy invitee directory export delegates to the authenticated Cloudflare 
 
 
 
+
+import "./meeting-portal-worker-policy.test.mjs";
