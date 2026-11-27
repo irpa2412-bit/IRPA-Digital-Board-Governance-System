@@ -98,29 +98,33 @@ async function verifyRealRunEvidence(record, affected) {
       const ref = parseGitHubJobEvidence(item);
       if (!ref) { diagnostics.push("candidate URL could not be parsed"); continue; }
       if (ref.repository.toLowerCase() !== repository.toLowerCase()) { diagnostics.push("candidate repository does not match workflow repository"); continue; }
-      let jobResponse, logsResponse;
+      let runResponse, jobsResponse;
       try {
-        [jobResponse, logsResponse] = await Promise.all([
-          fetch(`${api}/repos/${repository}/actions/jobs/${ref.jobId}`, { headers }),
-          fetch(`${api}/repos/${repository}/actions/jobs/${ref.jobId}/logs`, { headers })
+        [runResponse, jobsResponse] = await Promise.all([
+          fetch(`${api}/repos/${repository}/actions/runs/${ref.runId}`, { headers }),
+          fetch(`${api}/repos/${repository}/actions/runs/${ref.runId}/jobs?per_page=100`, { headers })
         ]);
       } catch (error) {
         diagnostics.push(`GitHub Actions API request failed: ${error instanceof Error ? error.message : String(error)}`);
         continue;
       }
-      if (!jobResponse.ok || !logsResponse.ok) {
-        diagnostics.push(`job API HTTP ${jobResponse.status}; logs API HTTP ${logsResponse.status}`);
+      if (!runResponse.ok || !jobsResponse.ok) {
+        const [runError, jobsError] = await Promise.all([
+          runResponse.ok ? Promise.resolve("") : runResponse.text(),
+          jobsResponse.ok ? Promise.resolve("") : jobsResponse.text()
+        ]);
+        diagnostics.push(`run API HTTP ${runResponse.status}${runError ? ` (${runError.slice(0, 240)})` : ""}; jobs API HTTP ${jobsResponse.status}${jobsError ? ` (${jobsError.slice(0, 240)})` : ""}`);
         continue;
       }
-      const job = await jobResponse.json();
-      const logs = await logsResponse.text();
-      const checkedOutBaseline = logs.includes(`git checkout --progress --force ${record.baseline.commit}`) ||
-        logs.includes(`HEAD is now at ${record.baseline.commit.slice(0, 8)}`);
-      if (job.run_id === ref.runId && job.status === "completed" && job.conclusion === "success" && checkedOutBaseline) {
+      const [run, jobsPayload] = await Promise.all([runResponse.json(), jobsResponse.json()]);
+      const job = (jobsPayload.jobs ?? []).find(candidate => Number(candidate.id) === ref.jobId);
+      const baseCommitVerified = (run.pull_requests ?? []).some(pull => pull.base?.sha === record.baseline.commit);
+      if (run.id === ref.runId && run.event === "pull_request" && baseCommitVerified &&
+          job?.run_id === ref.runId && job.status === "completed" && job.conclusion === "success") {
         verified = true;
         break;
       }
-      diagnostics.push(`run ${job.run_id} (expected ${ref.runId}); status ${job.status}; conclusion ${job.conclusion}; baseline checkout ${checkedOutBaseline}`);
+      diagnostics.push(`run ${run.id} (expected ${ref.runId}); event ${run.event}; PR base commit verified ${baseCommitVerified}; job ${job?.id ?? "missing"} status ${job?.status ?? "unknown"}; conclusion ${job?.conclusion ?? "unknown"}`);
     }
     if (!verified) {
       return {
