@@ -334,13 +334,11 @@ test("meeting directory projection exposes metadata only and excludes private pr
   }
 });
 
-test("combined Worker and Firestore rules preserve universal non-ongoing access and live participant restrictions", () => {
-  const rules = readFileSync(new URL("../firestore.rules", import.meta.url), "utf8");
+test("Meeting Worker enforces the live-proceedings boundary for uninvited identities", () => {
   const worker = readFileSync(new URL("../drive-gateway/src/meetingServices.mjs", import.meta.url), "utf8");
-  assert.ok(rules.includes("function meetingUser(){return activeMember()||activeEmployee();}"));
-  assert.ok(rules.includes('function meetingReadAllowed(data){return meetingParticipant(data)||(meetingUser()&&data.get("status","")!="In Progress"&&data.get("proceedingsStatus","")!="In Progress");}'));
-  assert.ok(rules.includes("match /meetings/{id}{allow read:if meetingReadAllowed(resource.data);"));
   assert.ok(worker.includes("meetingContextAccessAllowed"));
+  assert.ok(worker.includes('const ongoing=lower(meeting.status)==="in progress"||lower(meeting.proceedingsStatus)==="in progress";'));
+  assert.ok(worker.includes("return !ongoing||explicitParticipant;"));
   assert.ok(worker.includes("if(!c.participant)throw Object.assign(new Error(\"Live meeting admission is restricted to invited participants and leaders appointed to this specific meeting.\"),{status:403});"));
 });
 
