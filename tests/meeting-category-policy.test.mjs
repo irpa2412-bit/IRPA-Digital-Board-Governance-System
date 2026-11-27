@@ -18,13 +18,13 @@ const governance = {
   initiatorUid: "secretary-1"
 };
 
-test("private meeting visibility depends on explicit participation, not category or board role", () => {
+test("every active member and employee can view the sanitized Meeting Portal directory across categories", () => {
   assert.equal(canAccessMeetingCategory(governance, {
     uid: "staff-1", active: true, activeEmployee: true, role: "Staff"
-  }), false);
+  }), true);
   assert.equal(canAccessMeetingCategory(governance, {
     uid: "board-1", active: true, activeMember: true, isBoardMember: true, role: "Board Member"
-  }), false);
+  }), true);
   assert.equal(canAccessMeetingCategory({ ...governance, participantUids: ["staff-1"] }, {
     uid: "staff-1", active: true, activeEmployee: true, role: "Staff"
   }), true);
@@ -40,9 +40,10 @@ test("administrator-only accounts do not gain private meeting access", () => {
   }), true);
 });
 
-test("general meeting category does not grant private access to all active IRPA persons", () => {
+test("inactive and external identities do not receive the general Meeting Portal directory", () => {
   const general = { meetingCategory: "GENERAL", meetingPolicyId: "GENERAL" };
-  assert.equal(canAccessMeetingCategory(general, { uid: "member-1", active: true, activeMember: true }), false);
+  assert.equal(canAccessMeetingCategory(general, { uid: "member-1", active: true, activeMember: true }), true);
+  assert.equal(canAccessMeetingCategory(general, { uid: "inactive-1", active: false, activeMember: false, activeEmployee: false }), false);
   assert.equal(canAccessMeetingCategory({ ...general, participantUids: ["member-1"] }, {
     uid: "member-1", active: true, activeMember: true
   }), true);
@@ -110,10 +111,10 @@ test("meeting register retrieval avoids an unscoped collection read", () => {
   const source = meetingDataSource.slice(start, end);
   assert.doesNotMatch(source, /if\s*\(user\.uid\)\s*\{\s*const all\s*=\s*await getDocs\(ref\)/);
   assert.doesNotMatch(source, /MEETING_CATEGORIES|meetingCategory|meetingPolicyId/);
-  assert.match(source, /where\("initiatorUid","==",uid\)/);
-  assert.match(source, /for\(const field of \["participantUids"/);
-  assert.match(source, /coOrganizerUids/);
-  assert.match(source, /canAccessMeetingCategory\(meeting,identity\)/);
+  assert.match(source, /collection\(db,"meetingPortalDirectory"\)/);
+  assert.match(source, /orderBy\("createdAt","desc"\)/);
+  assert.doesNotMatch(source, /collection\(db,COLLECTIONS\.meetings\)/);
+  assert.match(source, /meetingPortalDirectory/);
 });
 
 test("active Meeting Portal attendance screens never call undeployed Firebase attendance callables",()=>{
@@ -203,6 +204,28 @@ async function createMeetingAsInstitutionalIdentity({ uid, email, member = null,
     globalThis.fetch = originalFetch;
   }
 }
+
+test("meeting directory projection exposes metadata only and excludes private proceedings and credentials", async () => {
+  const { meetingPortalDirectoryEntry } = await import("../drive-gateway/src/meetingServices.mjs");
+  const entry = meetingPortalDirectoryEntry({
+    title: "Quarterly meeting", meetingCategory: "GOVERNANCE", meetingType: "Board Meeting",
+    meetingReference: "IRPA-MTG-2026-001", date: "2026-11-27", startTime: "10:00",
+    status: "Scheduled", initiatorUid: "member-1", agenda: "Confidential agenda",
+    minutes: "Private minutes", transcript: "Private transcript",
+    platformPasscode: "secret", participantUids: ["member-1","member-2"]
+  }, "meeting-1");
+  assert.deepEqual(Object.keys(entry).sort(), [
+    "createdAt","date","endTime","id","initiatorUid","meetingCategory","meetingIdentity",
+    "meetingPolicyId","meetingReference","meetingType","registerStatus","startTime","status",
+    "title","updatedAt"
+  ].sort());
+  assert.equal(entry.title, "Quarterly meeting");
+  assert.equal("agenda" in entry, false);
+  assert.equal("minutes" in entry, false);
+  assert.equal("transcript" in entry, false);
+  assert.equal("platformPasscode" in entry, false);
+  assert.equal("participantUids" in entry, false);
+});
 
 test("active staff can initiate a Governance-level meeting through the authenticated Worker", async () => {
   const result = await createMeetingAsInstitutionalIdentity({
@@ -354,7 +377,7 @@ test("production and staging Firestore rules enforce the same Meeting Portal aut
   const staging = readFileSync(new URL("../firestore.staging.rules", import.meta.url), "utf8");
   for (const source of [prod, staging]) {
     assert.match(source, /function meetingUser\(\)\{return activeMember\(\)\|\|activeEmployee\(\);\}/);
-    assert.match(source, /function meetingCategoryReadAllowed\(data\)\{return meetingParticipant\(data\);\}/);
+    assert.match(source, /match \/meetingPortalDirectory\/\{id\}\{allow read:if meetingUser\(\);allow create,update,delete:if false;\}/);
     assert.match(source, /match \/meetings\/\{id\}\{allow read:if meetingParticipant\(resource\.data\)/);
     assert.match(source, /match \/meetingRoomEvents\/\{id\}\{allow read:if meetingParticipantRecordRead\(resource\.data\)/);
     assert.match(source, /match \/transcriptions\/\{id\}\{allow read:if meetingParticipantRecordRead\(resource\.data\)/);
@@ -367,7 +390,7 @@ test("production and staging Firestore rules enforce the same Meeting Portal aut
 });
 
 
-test("Meeting Worker requires a verified IRPA person and participant membership for private meeting context", () => {
+test("Meeting Worker allows universal portal initiation while retaining participant-only private meeting context", () => {
   assert.match(meetingServicesGovernanceSource, /const isAdminIdentity=claims\.admin===true/);
   assert.match(meetingServicesGovernanceSource, /if\(isAdminIdentity&&!activeIdentity\)/);
   assert.doesNotMatch(meetingServicesGovernanceSource, /subscription\|\|participantRecord/);
