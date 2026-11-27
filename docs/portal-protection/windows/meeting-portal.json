@@ -6,7 +6,7 @@
   "lastActivityAt": "2026-11-27T17:41:34.000Z",
   "inactivityCloseHours": 72,
   "emergency": false,
-  "reason": "Owner-authorised coordinated shared-file protection cycle for src/App.jsx. Independently verify this portal's navigation and security invariants while the common application shell exposes the Meeting Portal to every IRPA member/employee identity. Preserve all portal-specific controls.",
+  "reason": "Owner-authorised coordinated shared-file protection cycle for src/App.jsx. Independently verify this portal's navigation and security invariants while the common application shell exposes the Meeting Portal to every IRPA member/employee identity. Preserve all portal-specific controls. The cross-portal browser fixture isolation guard is also included as a shared validation dependency.",
   "scope": [
     "drive-gateway/src/index.js",
     "drive-gateway/src/meetingServices.mjs",
@@ -30,7 +30,8 @@
     "tests/meeting-working-documents-security.test.mjs",
     "tests/org-structure-access-preservation.test.cjs",
     "tests/policies-strategic-plan-portal.test.mjs",
-    "tests/staging-admin-access-preservation.test.cjs"
+    "tests/staging-admin-access-preservation.test.cjs",
+    "scripts/meeting-portal-fixture-isolation-guard.sh"
   ],
   "activityLog": [
     {
