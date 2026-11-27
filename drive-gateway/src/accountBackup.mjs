@@ -80,6 +80,29 @@ export function createAccountBackupRouter({ authenticateFirebaseRequest, getDriv
         return json({ ok:true, fileId:uploaded.id, fileName:uploaded.name, byteLength:bytes.length, sha256:actualDigest, destinationVerified:true }, 200, headers);
       }
 
+      if (pathname === "/api/account-backup/download") {
+        const body = await request.json().catch(() => null);
+        const fileId = String(body?.fileId || "").trim();
+        if (!/^[A-Za-z0-9_-]{10,200}$/.test(fileId)) {
+          return json({ ok:false, error:"INVALID_BACKUP_DOWNLOAD_REQUEST" }, 400, headers);
+        }
+        const metadataResponse = await fetch("https://www.googleapis.com/drive/v3/files/" + encodeURIComponent(fileId) + "?fields=id,name,mimeType,parents,trashed,size", { headers:{ Authorization:"Bearer " + accessToken } });
+        const metadata = await metadataResponse.json().catch(() => ({}));
+        if (!metadataResponse.ok || metadata.trashed === true || metadata.mimeType !== BACKUP_MIME ||
+            !(metadata.parents || []).includes(folderId) || !/^[a-zA-Z0-9._-]{1,120}\\.enc\\.json$/.test(String(metadata.name || ""))) {
+          return json({ ok:false, error:"BACKUP_FILE_OUTSIDE_CUSTODIAN_FOLDER" }, 403, headers);
+        }
+        const declaredSize = Number(metadata.size || 0);
+        if (!declaredSize || declaredSize > MAX_BACKUP_BYTES) return json({ ok:false, error:"BACKUP_READ_SIZE_OUT_OF_RANGE" }, 413, headers);
+        const download = await fetch("https://www.googleapis.com/drive/v3/files/" + encodeURIComponent(fileId) + "?alt=media", { headers:{ Authorization:"Bearer " + accessToken } });
+        if (!download.ok) return json({ ok:false, error:"BACKUP_READBACK_FAILED" }, 502, headers);
+        const bytes = new Uint8Array(await download.arrayBuffer());
+        if (!bytes.length || bytes.length > MAX_BACKUP_BYTES || bytes.length !== declaredSize) {
+          return json({ ok:false, error:"BACKUP_READBACK_SIZE_INVALID" }, 502, headers);
+        }
+        return json({ ok:true, fileId, fileName:metadata.name, byteLength:bytes.length, sha256:await sha256Hex(bytes), encryptedPayload:btoa(String.fromCharCode(...bytes)) }, 200, headers);
+      }
+
       if (pathname === "/api/account-backup/verify") {
         const body = await request.json().catch(() => null);
         const fileId = String(body?.fileId || "").trim();
