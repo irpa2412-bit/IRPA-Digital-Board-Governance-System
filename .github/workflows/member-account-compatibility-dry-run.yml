@@ -1,0 +1,76 @@
+name: Member account compatibility dry run (read only)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: irpa-member-account-compatibility-dry-run
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    name: Read every Auth user and member record
+    environment: production
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Verify workflow is running from main
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF" != "refs/heads/main" ]]; then
+            echo "::error::This production compatibility audit may run only from main."
+            exit 1
+          fi
+
+      - name: Syntax-check read-only audit script
+        run: node --check scripts/member-account-compatibility-audit.cjs
+
+      - name: Install Firebase Admin SDK
+        run: npm install --prefix functions --no-save --no-package-lock --ignore-scripts firebase-admin@13.5.0
+      - name: Run read-only account compatibility audit
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
+          GITHUB_STEP_SUMMARY: ${{ github.step_summary }}
+        run: node scripts/member-account-compatibility-audit.cjs
+      - name: Check repository visibility before publishing per-account report
+        id: report_access
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          visibility="$(gh api "repos/${GITHUB_REPOSITORY}" --jq '.visibility')"
+          if [[ "$visibility" == "private" ]]; then
+            echo "private=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "private=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Repository visibility is $visibility. The per-account report is withheld; GitHub Actions artifacts are downloadable by anyone with repository read access."
+            rm -f reports/member-account-compatibility-dry-run.json
+            {
+              echo ""
+              echo "### Per-account report"
+              echo "WITHHELD: repository visibility is `$visibility`. No account-level artifact was published."
+              echo "Only aggregate category and reason-code counts are shown above."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload pseudonymous per-account report (one-day retention)
+        if: always() && steps.report_access.outputs.private == 'true' && hashFiles('reports/member-account-compatibility-dry-run.json') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: irpa-member-account-compatibility-dry-run
+          path: reports/member-account-compatibility-dry-run.json
+          retention-days: 1
+          if-no-files-found: error
