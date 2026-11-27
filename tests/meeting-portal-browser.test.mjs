@@ -49,9 +49,9 @@ try {
       const persisted = await page.evaluate(key => JSON.parse(localStorage.getItem(key)), storeKey);
       const created = persisted.meetings.find(meeting => meeting.title === createdTitle);
       assert.ok(created, "TEST meeting should be saved in isolated localStorage");
-      assert.deepEqual(created.memberUids, ["fixture-board-member-active", "fixture-board-secretary-employee"], "Board Member and explicitly appointed Board Secretary employee records must persist");
-      assert.deepEqual(created.participantUids, ["fixture-board-member-auth-uid", "fixture-board-secretary-uid"], "authenticated Board Member and explicitly appointed Board Secretary participant UIDs must persist");
-      assert.deepEqual(created.participantEmails, ["board-member@example.test", "board-secretary@example.test"], "participant emails must persist");
+      assert.deepEqual([...created.memberUids].sort(), ["fixture-board-member-active", "fixture-board-secretary-employee"].sort(), "Board Member and explicitly appointed Board Secretary employee records must persist");
+      assert.deepEqual([...created.participantUids].sort(), ["fixture-board-member-auth-uid", "fixture-board-secretary-uid"].sort(), "authenticated Board Member and explicitly appointed Board Secretary participant UIDs must persist regardless of insertion order");
+      assert.deepEqual([...created.participantEmails].sort(), ["board-member@example.test", "board-secretary@example.test"].sort(), "participant emails must persist regardless of insertion order");
       assert.equal(created.venue, "TEST Longido Meeting Room");
       assert.equal(created.meetingChairpersonUid, "fixture-board-member-auth-uid", "formal proceedings require the permanent meeting Chairperson");
       assert.equal(created.meetingSecretaryUid, "fixture-board-secretary-uid", "formal proceedings require the permanent meeting Secretary");
