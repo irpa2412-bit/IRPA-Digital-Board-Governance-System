@@ -156,7 +156,6 @@ async function context(ctx,env,token,claims,meetingId){
   getDoc(ctx,env,token,"adminProfiles",uid),getDoc(ctx,env,token,"members",uid),getDoc(ctx,env,token,"employees",uid),
   listByField(ctx,env,token,"participants","meetingId",meetingId)
  ]);
- const isAdminIdentity=claims.admin===true||email==="irpa2412@gmail.com"||adminProfile?.active===true;
  const activeRecord=r=>!!r&&["active","activated"].includes(lower(r.status||r.registrationStatus||r.employmentStatus));
  const activeIdentity=activeRecord(member)||activeRecord(employee);
  const values=(...items)=>items.flatMap(item=>Array.isArray(item)?item:[]);
@@ -168,10 +167,9 @@ async function context(ctx,env,token,claims,meetingId){
  const participantRecord=participants.some(row=>!denied.has(lower(row.status||row.registrationStatus))&&
   ([row.uid,row.userId,row.participantUid,row.memberUid,row.invitedUid].map(clean).includes(uid)||
    Boolean(email&&[row.email,row.participantEmail,row.invitedEmail].some(value=>lower(value)===email))));
- const explicitParticipant=byUid([...listedUids,...organiserUids])||byEmail(listedEmails)||participantRecord;
- if(isAdminIdentity&&!activeIdentity)throw Object.assign(new Error("An active IRPA member or employee identity is required for Meeting Portal access."),{status:403});
- if(!activeIdentity&&!explicitParticipant)throw Object.assign(new Error("An active IRPA identity or an invitation to this specific meeting is required."),{status:403});
- if(!explicitParticipant)throw Object.assign(new Error("You are not listed as a participant in this meeting."),{status:403});
+ const appointedOfficer=["chair","secretary","administrator","transitionChair","transitionSecretary","transitionAdministrator"].some(role=>meetingRoleAssigned(meeting,uid,role));
+ const explicitParticipant=byUid([...listedUids,...organiserUids])||byEmail(listedEmails)||participantRecord||appointedOfficer;
+ if(!meetingContextAccessAllowed(meeting,activeIdentity,explicitParticipant))throw Object.assign(new Error("This meeting is restricted to invited participants while proceedings are in progress; active IRPA members and employees may access meeting records outside live proceedings."),{status:403});
  const chair=meetingRoleAssigned(meeting,uid,"chair"),secretary=meetingRoleAssigned(meeting,uid,"secretary");
  const meetingAdministrator=meetingRoleAssigned(meeting,uid,"administrator");
  const transitionOfficer=transitionCommitteeActive(meeting)&&
@@ -180,7 +178,7 @@ async function context(ctx,env,token,claims,meetingId){
  const canManage=activeIdentity&&(organiser||chair||secretary||meetingAdministrator||transitionOfficer);
  const canManageParticipants=activeIdentity&&(organiser||chair||secretary||meetingAdministrator||transitionOfficer);
  return {
-  uid,email,meeting,participant:true,canManage,canManageParticipants,canRead:true,
+  uid,email,meeting,participant:explicitParticipant,canManage,canManageParticipants,canRead:true,
   isAdmin:false,category:categoryOf(meeting),
   confidentiality:clean(meeting.confidentialityClass)||(categoryOf(meeting)==="GOVERNANCE"?"BOARD_RESTRICTED":"INTERNAL")
  };
@@ -194,6 +192,11 @@ const MEETING_APPOINTMENT_FIELDS = {
   transitionAdministratorUid: "transitionAdministratorName"
 };
 const MEETING_APPOINTMENT_KEYS = new Set(Object.keys(MEETING_APPOINTMENT_FIELDS));
+export function meetingContextAccessAllowed(meeting={},activeIdentity=false,explicitParticipant=false){
+ if(!activeIdentity&&!explicitParticipant)return false;
+ const ongoing=lower(meeting.status)==="in progress"||lower(meeting.proceedingsStatus)==="in progress";
+ return !ongoing||explicitParticipant;
+}
 const activeInstitutionalRecord = record => !!record && ["active","activated"].includes(lower(record.status||record.registrationStatus||record.employmentStatus));
 export function meetingPortalDirectoryEntry(record={},id="") {
  const value=record||{};
@@ -440,7 +443,7 @@ const meetingId=clean(data.meetingId),workingDocumentId=clean(data.workingDocume
 if(!meetingId||!workingDocumentId||!["ASSESSMENT","COMMENT","SIGNATURE_REQUEST"].includes(reviewType))return fail(ctx,request,"A meeting, working document and supported review type are required.",400);
 if(!comment||comment.length>5000)return fail(ctx,request,"Enter a comment or assessment of up to 5,000 characters.",400);
 const c=await context(ctx,env,token,claims,meetingId);
-if(!c.canRead||!c.participant&&!c.canManage)return fail(ctx,request,"Only an authorised meeting participant may review working documents.",403);
+if(!c.canRead)return fail(ctx,request,"Only an authorised meeting participant may review working documents.",403);
 const document=await getDoc(ctx,env,token,"meetingWorkingDocuments",workingDocumentId);
 if(!document||clean(document.meetingId)!==meetingId||clean(document.status)!=="ACTIVE")return fail(ctx,request,"Active working document not found for this meeting.",404);
 const [member,employee,participants]=await Promise.all([
@@ -1057,7 +1060,7 @@ return response(ctx,request,{ok:true,eventId,createdAt:now.toISOString()});
 }
 if(pathname==="/api/meeting-room/activity"){
 const meetingId=clean(data.meetingId),c=await context(ctx,env,token,claims,meetingId);
-if(!c.canRead||!c.participant)return fail(ctx,request,"You are not authorised to view this meeting's private activity.",403);
+if(!c.canRead)return fail(ctx,request,"You are not authorised to view this meeting's private activity.",403);
 const events=await listByField(ctx,env,token,"meetingRoomEvents","meetingId",meetingId);
 const recentEvents=events.sort((a,b)=>String(b.createdAt||"").localeCompare(String(a.createdAt||""))).slice(0,30);
 return response(ctx,request,{ok:true,events:recentEvents});
