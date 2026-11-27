@@ -76,6 +76,7 @@ export async function getCurrentEmployeeProfile() {
 }
 export async function getAdminProfile() { return null; }
 export async function getRecords(collection) { return clone(readStore()[collection] || []); }
+export async function getMyMeetingSubscriptions() { return clone(readStore().meetingSubscriptions || []); }
 export async function getAccessibleMeetingRecords() {
   const meetings = readStore().meetings || [];
   if (auth.currentUser?.uid === hostUser.uid) return clone(meetings);
