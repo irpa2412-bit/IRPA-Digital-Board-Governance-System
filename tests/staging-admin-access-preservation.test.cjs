@@ -76,6 +76,13 @@ test("staging member can save and replace only Signature Profile fields", async 
     ...profile, signatureSha256: "d".repeat(64),
     signatureUrl: "data:image/png;base64,dXBkYXRlZA=="
   }, { merge: true }));
+  await assertSucceeds(profileRef.update({
+    status: "Revoked",
+    revokedAt: new Date("2026-11-27T07:02:00.000Z"),
+    revokedByUid: uid,
+    revokedByEmail: email,
+    revocationReason: "User-initiated signature application revocation"
+  }));
   for (const field of ["role","roles","assignedRoles","selectedRoles"]) {
     await assertFails(profileRef.update({
       [field]: field === "role" ? "Executive Director" : ["Executive Director"]

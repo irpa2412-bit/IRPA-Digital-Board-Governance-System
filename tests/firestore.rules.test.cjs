@@ -158,6 +158,15 @@ test("member can create and update only the explicit Signature Profile fields", 
   assert.equal(saved.data().signatureSha256, "b".repeat(64));
   assert.equal(saved.data().legacyMigrationMarker, "preserve-existing-record");
 
+  // The Signature Profile owner can still revoke their own signing profile.
+  await assertSucceeds(profileRef.update({
+    status: "Revoked",
+    revokedAt: new Date("2026-11-27T07:02:00.000Z"),
+    revokedByUid: uid,
+    revokedByEmail: email,
+    revocationReason: "User-initiated signature application revocation"
+  }));
+
   for (const field of ["role","roles","assignedRoles","selectedRoles","permissions","grantedClaims"]) {
     await assertFails(profileRef.update({
       [field]: field === "role" ? "Executive Director" : ["Executive Director"]
