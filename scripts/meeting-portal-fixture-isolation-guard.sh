@@ -73,6 +73,7 @@ const allowed = new Set([
   "drive-gateway/src/index.js",
   "drive-gateway/src/meetingPortal.mjs",
   "drive-gateway/src/meetingServices.mjs",
+  "drive-gateway/tests/meeting-services-router.test.mjs",
   "drive-gateway/src/meetingEnvironment.mjs",
   "drive-gateway/src/meetingDeletion.mjs",
   "drive-gateway/tests/meeting-environment.test.mjs",
@@ -143,6 +144,7 @@ const allowed = new Set([
   "functions/liveMeeting.js",
   "scripts/check-meeting-media-governance.mjs",
   "src/firebase/meetingPolicy.js",
+  "src/pages/Resolutions.jsx",
   "src/pages/Voting.jsx",
   "tests/meeting-room-authorization-boundary.test.mjs",
   // Explicitly permit the separate authenticated cross-portal mobile navigation race regression.
