@@ -45,6 +45,23 @@ The inventory-stability check is not a sign-in test. Testing whether every origi
 
 This change adds the backup endpoint and manual workflow only. It does not deploy the Gateway, change Firestore rules, run a production export, or alter any account. Production backup execution must wait until the Gateway change is reviewed and deployed and the separate encryption/admin-email GitHub secrets are configured. Firestore-rules deployment remains subject to its existing explicit approval and release gates.
 
+## PCU post-installation recovery
+
+After the Portals Control Unit (PCU) has been installed and its production release verified, the owner can run **PCU Post-Installation Backup Recovery Preflight** from GitHub Actions. The workflow requires the exact `PCU INSTALLED` confirmation, the Drive backup file ID, the existing Firebase administrator secret, and the same 32-byte encryption key used for backup.
+
+The preflight:
+1. Retrieves the encrypted file only through the authenticated Gateway download route.
+2. Rechecks the dedicated Drive folder custody and permission list, file parent, MIME type, size and SHA-256.
+3. Decrypts the AES-256-GCM envelope and verifies the plaintext digest and expected Firebase project ID.
+4. Compares backed-up Auth UIDs and emails against the currently installed Firebase project, and checks the backed-up `members` document IDs.
+5. Reports whether PCU tenant collections are present after installation.
+
+This preflight is deliberately read-only. It does not create Auth users, change claims, write member records, overwrite PCU governance records, change Firestore rules, or deploy PCU. It reports an aggregate readiness result only; no personal account data is written to GitHub logs or artifacts.
+
+The backup created before PCU installation contains Firebase Auth inventory and `members` records. It does not contain PCU governance records created after installation. PCU's own tenant collections must therefore be backed up separately after installation before they can be restored from a later PCU snapshot.
+
+**Restoration boundary:** the preflight distinguishes missing identities from UID/email conflicts. A conflict blocks readiness. Actual restoration must be a separately approved, additive operation: preserve existing UIDs and records; never overwrite a current identity or member document; require identity review for ambiguous mappings; and require users to reset passwords because the account backup intentionally contains no passwords or password hashes. Existing provider sessions are not recoverable and users will need to reauthenticate.
+
 ## Retention
 
 This is a one-time backup workflow. It does not establish a recurring schedule, retention period, legal hold, RPO/RTO, or restore policy. Those remain subject to IRPA management approval under the SRS.
