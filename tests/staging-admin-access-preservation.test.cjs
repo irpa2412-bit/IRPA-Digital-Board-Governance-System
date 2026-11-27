@@ -49,40 +49,32 @@ test("primary administrator claim grants no private Meeting Portal access or del
   await assertFails(db.doc("meetings/primary-admin-claim").delete());
 });
 
-test("adminProfiles plus an active Member record grant no private meeting access without participation", async () => {
-  const titles = [
-    "Administrator",
-    "Executive Director",
-    "Director Field",
-    "Field Director",
-    "Operations Director",
-    "Research Director",
-    "Communications Officer"
-  ];
-
-  for (let index = 0; index < titles.length; index += 1) {
-    const uid = `staging-admin-${index}`;
-    const meetingId = `staging-admin-meeting-${index}`;
-    await env.withSecurityRulesDisabled(async context => {
-      const db = context.firestore();
-      await db.doc(`adminProfiles/${uid}`).set({ active: true });
-      await db.doc(`members/${uid}`).set({ uid, status: "Active", role: titles[index] });
-      await db.doc(`meetings/${meetingId}`).set({
-        title: "Staging administrator access preservation test",
-        meetingCategory: "ADMINISTRATIVE",
-        meetingPolicyId: "ADMINISTRATIVE",
-        meetingType: "Management Meeting",
-        initiatorUid: "test-initiator",
-        initiatorEmail: "initiator@example.test",
-        registerStatus: "Draft",
-        status: "Scheduled"
-      });
+test("every Member identity receives non-ongoing Meeting Portal access regardless of status or title", async () => {
+  const titles = ["Administrator","Executive Director","Director Field","Field Director","Operations Director","Research Director","Communications Officer"];
+  for (let index=0; index<titles.length; index+=1) {
+    const uid=`staging-member-${index}`, meetingId=`staging-member-meeting-${index}`;
+    await env.withSecurityRulesDisabled(async context=>{
+      const db=context.firestore();
+      await db.doc(`members/${uid}`).set({uid,status:index===0?"Suspended":"Active",role:titles[index]});
+      await db.doc(`meetings/${meetingId}`).set({title:"Meeting Portal universal access test",meetingCategory:"ADMINISTRATIVE",meetingPolicyId:"ADMINISTRATIVE",meetingType:"Management Meeting",initiatorUid:"other-user",registerStatus:"Draft",status:"Scheduled"});
+      await db.doc(`meetings/${meetingId}-live`).set({title:"Ongoing meeting",meetingCategory:"ADMINISTRATIVE",meetingPolicyId:"ADMINISTRATIVE",meetingType:"Management Meeting",initiatorUid:"other-user",participantUids:["invited-user"],registerStatus:"Registered",status:"In Progress"});
     });
-
-    const db = env.authenticatedContext(uid, { admin: true }).firestore();
-    await assertFails(db.doc(`meetings/${meetingId}`).get());
+    const db=env.authenticatedContext(uid,{email:`member-${index}@example.test`}).firestore();
+    await assertSucceeds(db.doc(`meetings/${meetingId}`).get());
+    await assertFails(db.doc(`meetings/${meetingId}-live`).get());
     await assertFails(db.doc(`meetings/${meetingId}`).delete());
   }
+});
+
+test("administrator-only identity without a Member or Employee record has no general Meeting Portal access", async () => {
+  await env.withSecurityRulesDisabled(async context=>{
+    const db=context.firestore();
+    await db.doc("adminProfiles/admin-only").set({active:true});
+    await db.doc("meetings/admin-only-meeting").set({title:"Meeting Portal access test",meetingCategory:"ADMINISTRATIVE",meetingPolicyId:"ADMINISTRATIVE",meetingType:"Management Meeting",initiatorUid:"other-user",status:"Scheduled"});
+  });
+  const admin=env.authenticatedContext("admin-only",{admin:true,email:"admin-only@example.test"}).firestore();
+  await assertFails(admin.doc("meetings/admin-only-meeting").get());
+  await assertFails(admin.doc("meetings/admin-only-meeting").delete());
 });
 
 test("staging members can update ordinary profile fields but cannot self-assign authority", async () => {
