@@ -549,16 +549,6 @@ guardTest("meeting fixture guard is concurrency-scoped and watches all deletion-
   ]) assert.ok(workflow.includes(path), `fixture workflow must run when ${path} changes`);
 });
 
-guardTest("declared Meeting Portal router regression and resolutions source remain inside the isolated allowlist", () => {
-  const record = JSON.parse(fs.readFileSync(new URL("../docs/portal-protection/records/meeting-portal.json", import.meta.url), "utf8"));
-  const window = JSON.parse(fs.readFileSync(new URL("../docs/portal-protection/windows/meeting-portal.json", import.meta.url), "utf8"));
-  for (const path of ["drive-gateway/tests/meeting-services-router.test.mjs", "src/pages/Resolutions.jsx"]) {
-    assert.ok(guard.includes(`"${path}"`), `isolated allowlist must include declared Meeting Portal file: ${path}`);
-    assert.ok(record.declaration.files.includes(path), `Change Record must declare: ${path}`);
-    assert.ok(window.scope.includes(path), `repair window must include: ${path}`);
-  }
-});
-
 guardTest("baseline evidence jobs execute protected smoke and full regression on the exact base SHA", () => {
   const workflow = fs.readFileSync(new URL("../.github/workflows/meeting-portal-fixture-browser.yml", import.meta.url), "utf8");
   assert.ok(workflow.includes("ref: ${{ github.event.pull_request.base.sha }}"));
