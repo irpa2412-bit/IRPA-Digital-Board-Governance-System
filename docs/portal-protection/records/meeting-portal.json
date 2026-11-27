@@ -42,7 +42,8 @@
       "tests/meeting-working-documents-security.test.mjs",
       "drive-gateway/src/index.js",
       "src/pages/Resolutions.jsx",
-      "drive-gateway/tests/meeting-services-router.test.mjs"
+      "drive-gateway/tests/meeting-services-router.test.mjs",
+      "src/FieldEntryDataGate.jsx"
     ],
     "expectedEffect": "Universal full Meeting Portal access for every IRPA identity across all categories, records, working documents and archives, with unrestricted meeting initiation/registration by an IRPA identity. No active-status, department, role, organisational-authority, invitation or participant-list gate may restrict ordinary portal access. External invitees receive only invited-meeting access. The meeting-specific Chairperson, Secretary and Administrator appointments and their distinct authorities remain in force; registration-stage appointments may be empty but all three are required before proceedings; Transition Committee authority expires at proceedings start. Board voting, quorum, resolutions, formal approvals, restricted Board records, audit protections, minimum ten-year retention and trial-only deletion remain protected.",
     "prohibitedChanges": [
