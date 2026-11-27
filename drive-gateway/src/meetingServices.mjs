@@ -799,6 +799,77 @@ return response(ctx,request,{
   auditId
 });
 }
+if(pathname==="/api/meeting-resolutions/create"){
+const incoming=data.data&&typeof data.data==="object"?data.data:{};
+const meetingId=clean(incoming.meetingId);
+if(!meetingId)return fail(ctx,request,"An originating meeting is required.",400);
+const c=await context(ctx,env,token,claims,meetingId);
+if(!c.canManage)return fail(ctx,request,"Only the organiser or an officer appointed to this specific meeting may create a resolution.",403);
+if(terminal.has(lower(c.meeting.status)))return fail(ctx,request,"A resolution cannot be created for a closed or archived meeting.",409);
+const matterPresented=clean(incoming.matterPresented);
+const proposedResolution=clean(incoming.proposedResolution);
+if(!matterPresented||!proposedResolution)return fail(ctx,request,"The matter presented and proposed resolution are required.",400);
+const id=crypto.randomUUID(),now=new Date(),reference=clean(incoming.resolutionReference)||"IRPA-RES-"+now.getUTCFullYear()+"-"+id.slice(0,8).toUpperCase();
+const record={
+ meetingId,
+ meetingReference:clean(c.meeting.meetingReference||c.meeting.reference||c.meeting.title),
+ resolutionReference:reference,
+ matterPresented,
+ proposedResolution,
+ mover:clean(incoming.mover),
+ seconder:clean(incoming.seconder),
+ status:["Draft","Submitted"].includes(clean(incoming.status))?clean(incoming.status):"Draft",
+ votingRequired:incoming.votingRequired===true,
+ votingStatus:incoming.votingRequired===true?"Not Open":"Not Required",
+ votingResult:"Pending",
+ createdByUid:c.uid,
+ createdAt:now,
+ updatedAt:now
+};
+await writeDoc(ctx,env,token,"resolutions",id,record,false);
+await audit(ctx,env,token,claims,"MEETING_RESOLUTION_CREATED",c.meeting,id,{resolutionReference:reference});
+return response(ctx,request,{ok:true,id,resolution:record});
+}
+if(pathname==="/api/meeting-resolutions/update"){
+const resolutionId=clean(data.resolutionId);
+const incoming=data.data&&typeof data.data==="object"?data.data:{};
+if(!resolutionId)return fail(ctx,request,"A resolution ID is required.",400);
+const current=await getDoc(ctx,env,token,"resolutions",resolutionId);
+if(!current)return fail(ctx,request,"Resolution not found.",404);
+const c=await context(ctx,env,token,claims,current.meetingId);
+if(!c.canManage)return fail(ctx,request,"Only the organiser or an officer appointed to this specific meeting may update a resolution.",403);
+if(terminal.has(lower(c.meeting.status)))return fail(ctx,request,"A resolution in a closed or archived meeting cannot be changed.",409);
+if(!["draft","submitted"].includes(lower(current.status))||clean(current.votingIssueId))return fail(ctx,request,"Only an unlinked draft or submitted resolution may be updated.",409);
+if(clean(incoming.meetingId)&&clean(incoming.meetingId)!==clean(current.meetingId))return fail(ctx,request,"A resolution cannot be moved outside its originating meeting.",409);
+const patch={};
+for(const key of ["matterPresented","proposedResolution","mover","seconder"])if(incoming[key]!==undefined)patch[key]=clean(incoming[key]);
+if(incoming.status!==undefined){
+ if(!["Draft","Submitted"].includes(clean(incoming.status)))return fail(ctx,request,"Voting and final outcome statuses are controlled by the Meeting Worker.",409);
+ patch.status=clean(incoming.status);
+}
+if(incoming.votingRequired!==undefined)patch.votingRequired=incoming.votingRequired===true;
+if(patch.matterPresented!==undefined&&!patch.matterPresented)return fail(ctx,request,"The matter presented is required.",400);
+if(patch.proposedResolution!==undefined&&!patch.proposedResolution)return fail(ctx,request,"The proposed resolution is required.",400);
+if(!Object.keys(patch).length)return response(ctx,request,{ok:true,resolutionId,changedFields:[]});
+patch.updatedAt=new Date();
+await patchDoc(ctx,env,token,"resolutions",resolutionId,patch);
+await audit(ctx,env,token,claims,"MEETING_RESOLUTION_UPDATED",c.meeting,resolutionId,{changedFields:Object.keys(patch)});
+return response(ctx,request,{ok:true,resolutionId,changedFields:Object.keys(patch)});
+}
+if(pathname==="/api/meeting-resolutions/delete"){
+const resolutionId=clean(data.resolutionId);
+if(!resolutionId)return fail(ctx,request,"A resolution ID is required.",400);
+const current=await getDoc(ctx,env,token,"resolutions",resolutionId);
+if(!current)return fail(ctx,request,"Resolution not found.",404);
+const c=await context(ctx,env,token,claims,current.meetingId);
+if(!c.canManage)return fail(ctx,request,"Only the organiser or an officer appointed to this specific meeting may delete a draft resolution.",403);
+if(terminal.has(lower(c.meeting.status)))return fail(ctx,request,"Resolution records in a closed or archived meeting are immutable.",409);
+if(lower(current.status)!=="draft"||clean(current.votingIssueId))return fail(ctx,request,"Only an unlinked Draft resolution may be deleted.",409);
+const base="projects/"+ctx.getFirebaseProjectId(env)+"/databases/(default)/documents/";
+await commitWrites(ctx,env,token,[{delete:base+"resolutions/"+resolutionId,currentDocument:{updateTime:current.updateTime}}]);
+await audit(ctx,env,token,claims,"MEETING_RESOLUTION_DELETED",c.meeting,resolutionId,{resolutionReference:clean(current.resolutionReference)});
+return response(ctx,request,{ok:true,deleted:true,resolutionId});
+}
 if(pathname==="/api/meeting-voting/open"){
 const meetingId=clean(data.meetingId),reference=clean(data.votingReference),resolutionId=clean(data.resolutionId);
 if(!meetingId||!reference)return fail(ctx,request,"Meeting ID and voting reference are required.",400);
