@@ -57,6 +57,26 @@ async function signingJson(path,token,label){
 async function sha256(bytes){
   return createHash("sha256").update(Buffer.from(bytes)).digest("hex");
 }
+function firestoreValue(value){
+  if(Array.isArray(value))return{arrayValue:{values:value.map(item=>typeof item==="object"&&item!==null?{mapValue:{fields:Object.fromEntries(Object.entries(item).map(([key,val])=>[key,firestoreValue(val)]))}}:firestoreValue(item))}};
+  if(value&&typeof value==="object")return{mapValue:{fields:Object.fromEntries(Object.entries(value).map(([key,val])=>[key,firestoreValue(val)]))}};
+  if(typeof value==="boolean")return{booleanValue:value};
+  if(typeof value==="number"&&Number.isInteger(value))return{integerValue:String(value)};
+  return{stringValue:String(value??"")};
+}
+async function createStagingSourceDraft(externalReference,ownerUid,documentId){
+  const response=await fetch("https://firestore.googleapis.com/v1/projects/"+encodeURIComponent(project)+"/databases/(default)/documents/signatureEnvelopes?documentId="+encodeURIComponent(externalReference),{
+    method:"POST",headers:{...authHeaders,"content-type":"application/json"},
+    body:JSON.stringify({fields:Object.fromEntries(Object.entries({
+      envelopeReference:externalReference,title:"IRPA Staging Cryptographic Acceptance",documentId,
+      ownerUid,senderUid:ownerUid,recordOrigin:"TRIAL",status:"Draft",signingMode:"Sequential",
+      recipients:[{uid:ownerUid,email,name:"IRPA Staging Crypto Test Signer"}],participantUids:[ownerUid]
+    }).map(([key,value])=>[key,firestoreValue(value)]))})
+  });
+  const body=await response.json().catch(()=>({}));
+  assert.equal(response.ok,true,"Could not create the owner-bound TRIAL source draft in staging Firestore (HTTP "+response.status+").");
+  assert.equal(body.name?.split("/").at(-1),externalReference,"Staging source draft ID mismatch.");
+}
 
 const pdf=await PDFDocument.create();
 const page=pdf.addPage([595.28,841.89]);
@@ -82,6 +102,8 @@ const retrievedOriginal=await fetch(base+"/api/documents/"+encodeURIComponent(do
 assert.equal(retrievedOriginal.ok,true,"Stored source PDF could not be retrieved.");
 assert.equal(retrievedOriginal.headers.get("x-document-sha256"),originalHash);
 assert.equal(await sha256(new Uint8Array(await retrievedOriginal.arrayBuffer())),originalHash);
+// The Gateway requires an owner-bound source draft with a recorded TRIAL environment.
+await createStagingSourceDraft(externalReference,expectedUid,documentId);
 
 const envelopePayload={
   externalReference,
