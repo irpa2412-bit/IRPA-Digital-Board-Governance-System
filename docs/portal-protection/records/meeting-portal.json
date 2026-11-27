@@ -112,9 +112,9 @@
       "baseline smoke for Meeting Portal on exact baseline c8234bdd7921756e812fa5ab98a20706e4c55d90: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/46060508563/job/140713488550",
       "full regression for Meeting Portal on exact baseline c8234bdd7921756e812fa5ab98a20706e4c55d90: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/46060508563/job/140713488952",
       "Meeting Portal portal smoke on exact baseline c8234bdd7921756e812fa5ab98a20706e4c55d90: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/46060508563/job/140713488550",
-      "Baseline smoke PASS on exact PR #1009 pre-change base 494812a1339afcacfa6b47807c1b7e7b0503563a: run 46065345848, job 140729546651 checked out the exact baseline and completed the registered protected-portal smoke successfully.",
-      "Full regression PASS on exact PR #1009 pre-change base 494812a1339afcacfa6b47807c1b7e7b0503563a: run 46065345848, job 140729546755 checked out the exact baseline and completed the full root regression suite in the Firestore emulator successfully.",
-      "Meeting Portal portal smoke PASS on exact PR #1009 pre-change base 494812a1339afcacfa6b47807c1b7e7b0503563a: run 46065345848, job 140729546651 completed the registered protected-portal smoke successfully."
+      "Baseline smoke PASS on exact PR #1009 pre-change base 494812a1339afcacfa6b47807c1b7e7b0503563a: run 46065345848, job 140729546651 checked out the exact baseline and completed the registered protected-portal smoke successfully. https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/46065345848/job/140729546651",
+      "Full regression PASS on exact PR #1009 pre-change base 494812a1339afcacfa6b47807c1b7e7b0503563a: run 46065345848, job 140729546755 checked out the exact baseline and completed the full root regression suite in the Firestore emulator successfully. https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/46065345848/job/140729546755",
+      "Meeting Portal portal smoke PASS on exact PR #1009 pre-change base 494812a1339afcacfa6b47807c1b7e7b0503563a: run 46065345848, job 140729546651 completed the registered protected-portal smoke successfully. https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/46065345848/job/140729546651"
     ]
   },
   "renewals": [
