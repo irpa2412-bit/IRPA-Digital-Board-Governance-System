@@ -75,6 +75,7 @@ jobs:
         run: npm run test:protected-portals
 
   baseline-full-regression:
+    name: baseline-full-regression-${{ github.event.pull_request.base.sha }}
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 90
