@@ -66,16 +66,19 @@ function createAuditErrorDiagnostics() {
       output = output.replace(pattern, "$1[REDACTED]");
     }
 
-    const collectionPathPattern = new RegExp(
-      "((?:" + ACCOUNT_COLLECTIONS.join("|") + ")/)[^/\\\\s?#\\\"'),]+",
-      "gi"
-    );
+    for (const collection of ACCOUNT_COLLECTIONS) {
+      const pathPattern = new RegExp("\\b" + collection + "/[^/\\s?#\"'),]+", "gi");
+      output = output.replace(pathPattern, collection + "/[REDACTED_ID]");
+    }
 
     output = output
       .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, "[REDACTED_EMAIL]")
-      .replace(collectionPathPattern, "$1[REDACTED_ID]")
       .replace(
         /\b(uid|user_?id|auth_?uid|account_?id|document_?id|email)\s*[:=]\s*(?:"[^"]*"|'[^']*'|[^\s,;)}]+)/gi,
+        "$1=[REDACTED]"
+      )
+      .replace(
+        /\b(display_?name|first_?name|middle_?name|last_?name|full_?name|given_?name|family_?name|member_?name|signer_?name)\s*[:=]\s*(?:"[^"]*"|'[^']*'|[^\s,;)}]+)/gi,
         "$1=[REDACTED]"
       )
       .replace(/\b[0-9a-f]{8}-[0-9a-f-]{27,}\b/gi, "[REDACTED_ID]")
