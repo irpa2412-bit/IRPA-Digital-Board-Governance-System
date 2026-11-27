@@ -127,8 +127,8 @@ async function verifyRealRunEvidence(record, affected) {
       const job = (jobsPayload.jobs ?? []).find(candidate => Number(candidate.id) === ref.jobId);
       const baseCommitVerified = (run.pull_requests ?? []).some(pull => pull.base?.sha === record.baseline.commit);
       const expectedJobName = label === "baseline smoke" || label.endsWith("portal smoke")
-        ? "baseline-protection-smoke"
-        : "baseline-full-regression";
+        ? `baseline-protection-smoke-${record.baseline.commit}`
+        : `baseline-full-regression-${record.baseline.commit}`;
       if (run.id === ref.runId && run.event === "pull_request" && baseCommitVerified &&
           job?.run_id === ref.runId && job.name === expectedJobName &&
           job.status === "completed" && job.conclusion === "success") {
