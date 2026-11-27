@@ -7,6 +7,10 @@ const workflow = readFileSync(new URL("../.github/workflows/meeting-portal-fixtu
 const guard = readFileSync(new URL("../scripts/meeting-portal-fixture-isolation-guard.sh", import.meta.url), "utf8");
 const policy = readFileSync(new URL("../scripts/portal-repair-window-guard-policy.mjs", import.meta.url), "utf8");
 
+test("shared security PRs skip the isolated Meeting Portal browser job while fix PRs retain it", () => {
+  assert.match(workflow, /isolated-meeting-browser:\\s+if: github\\.event_name != 'pull_request' \\|\\| !startsWith\\(github\\.event\\.pull_request\\.head\\.ref, 'security\\/'\\)/);
+});
+
 test("isolation baseline compares against the fetched current main snapshot", () => {
   assert.match(guard, /git fetch origin main:refs\/remotes\/origin\/main/);
   assert.match(guard, /const eventName = process\.env\.EVENT_NAME\?\.trim\(\)/);
