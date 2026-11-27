@@ -1,23 +1,18 @@
-export function formatRecoveryRouteError({status,body={},button,route}) {
+export function formatRecoveryRouteError({status,body={},requestId,button,route}) {
   const label=String(button||"Recovery action");
   const path=String(route||"unknown route");
-  let message;
-  let code;
-  if(Number(status)===404 && body?.error==="Not found.") {
-    message="Recovery service route missing: "+path;
-    code="ROUTE_MISSING";
-  } else if(Number(status)===401) {
-    message="Not signed in";
-    code="NOT_SIGNED_IN";
-  } else if(Number(status)===403) {
-    message="Not your envelope";
-    code="NOT_YOUR_ENVELOPE";
-  } else if(Number(status)===503) {
-    message="Service unavailable";
-    code="SERVICE_UNAVAILABLE";
-  } else {
-    message=String(body?.error||("Recovery request failed (HTTP "+(status||"unknown")+")."));
-    code=String(body?.code||"RECOVERY_REQUEST_FAILED");
-  }
-  return message+" ("+code+") — Button: "+label+" — Route: "+path;
+  const code=String(body?.code||(
+    Number(status)===404&&body?.error==="Not found."?"ROUTE_MISSING":
+    Number(status)===401?"TOKEN_INVALID":
+    Number(status)===403?"NOT_OWNER":
+    Number(status)>=500?"PROFILE_LOOKUP_FAILED":"RECOVERY_REQUEST_FAILED"
+  ));
+  const message=String(code==="ROUTE_MISSING"?"Recovery service route missing: "+path:(body?.error||({
+    TOKEN_INVALID:"Firebase ID token is invalid or expired",
+    PROFILE_LOOKUP_FAILED:"Owner profile lookup failed",
+    NOT_ACTIVATED:"Owner account is not activated",
+    NOT_OWNER:"This account is not the envelope owner"
+  }[code]||("Recovery request failed (HTTP "+(status||"unknown")+")"))));
+  const id=String(requestId||body?.requestId||"not supplied");
+  return message+" ("+code+") — Request ID: "+id+" — Button: "+label+" — Route: "+path;
 }
