@@ -7,20 +7,26 @@
   "warningHours": 12,
   "openedAt": "2026-11-27T17:41:34.000Z",
   "expiresAt": "2026-11-30T17:41:34.000Z",
-  "lastActivityAt": "2026-11-27T17:41:34.000Z",
+  "lastActivityAt": "2026-11-27T19:17:59.933Z",
   "emergency": false,
   "emergencyLimitHours": 24,
   "reason": "Owner-authorised coordinated shared-file protection cycle for src/App.jsx. Independently verify this portal's navigation and security invariants while the common application shell exposes the Meeting Portal to every IRPA member/employee identity. Preserve all portal-specific controls. The cross-portal browser fixture isolation guard is also included as a shared validation dependency.",
   "scope": [
     "src/pages/BoardMembers.jsx",
     "src/App.jsx",
-    "scripts/meeting-portal-fixture-isolation-guard.sh"
+    "scripts/meeting-portal-fixture-isolation-guard.sh",
+    "scripts/portal-protection-smoke.mjs"
   ],
   "activityLog": [
     {
       "at": "2026-11-27T17:41:34.000Z",
       "action": "owner-authorised coordinated shared-file protection cycle",
       "description": "Independent Board Members Portal Change Record, smoke and lock-test cycle for the shared src/App.jsx dependency. Scope is limited to the common shell; portal-specific internals and protections remain unchanged."
+    },
+    {
+      "at": "2026-11-27T19:17:59.933Z",
+      "action": "owner-authorised shared protection-cycle diagnostic visibility extension",
+      "description": "Added the shared portal smoke reporter to the exact scope so failures expose complete assertion output; all seven owner lock tests remain mandatory."
     }
   ],
   "emergencyExpiresAt": null
