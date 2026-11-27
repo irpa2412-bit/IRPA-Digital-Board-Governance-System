@@ -35,7 +35,8 @@
     "drive-gateway/tests/meeting-services-router.test.mjs",
     "docs/portal-protection/windows/meeting-portal.json",
     "docs/portal-protection/records/meeting-portal.json",
-    "src/firebase/meetingGatewayApi.js"
+    "src/firebase/meetingGatewayApi.js",
+    "src/FieldEntryDataGate.jsx"
   ],
   "activityLog": [
     {
