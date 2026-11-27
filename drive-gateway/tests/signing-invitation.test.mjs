@@ -207,3 +207,41 @@ test("replaced email signing links show the explicit replacement notice through 
   const body=await response.json();
   assert.equal(body.error,"This link was replaced. Please use the newest email.");
 });
+
+test("staging crypto test mode returns a token only for the owner's own email-link signer",async()=>{
+  const sent=[];
+  const ctx=buildEsignContext({
+    env:{DRIVE_MOCK:"true",IRPA_ENVIRONMENT:"staging",IRPA_STAGING_CRYPTO_TEST_MODE:"true",IRPA_APP_URL:"https://irpa.example.test"},
+    verifyUser:async()=>null,
+    sendInvitation:async invitation=>sent.push(invitation),
+    logger:{error(){}}
+  });
+  const bytes=new TextEncoder().encode("%PDF-1.7\\nStaging email-link token gate fixture");
+  const source=await ctx.storage.put({path:"source/staging-email-link.pdf",bytes,contentType:"application/pdf",metadata:{}});
+  const documentId="DOC-STAGING-EMAIL-LINK-"+Date.now();
+  await ctx.meta.create("documents",documentId,{id:documentId,status:"Stored",ownerUid:"staging-owner",primaryStorageId:source.id,sha256:await sha256Hex(bytes),fileName:"staging-email-link.pdf",title:"Staging email-link test",classification:"Restricted"});
+  const user={uid:"staging-owner",email:"staging-owner@example.test",isAdmin:false};
+  const payload={documentId,title:"Staging email-link test",classification:"Restricted",archives:["board-governance"],signingMode:"Sequential",returnTokens:true,signers:[{identityType:"email-link",email:user.email,name:"Staging Owner",order:1}],fields:[{fieldId:"STAGING-SIGNATURE",type:"Signature",page:1,x:8,y:30,width:45,height:10,signerId:"S1",required:true}]};
+  const result=await createEnvelope(ctx,user,payload);
+  assert.equal(result.invitations[0].status,"Sent");
+  assert.equal(result.tokens.length,1);
+  assert.equal(new URL(sent[0].link).searchParams.get("emailSignToken"),result.tokens[0]);
+});
+
+test("staging crypto test mode does not return an email-link token for another recipient",async()=>{
+  const sent=[];
+  const ctx=buildEsignContext({
+    env:{DRIVE_MOCK:"true",IRPA_ENVIRONMENT:"staging",IRPA_STAGING_CRYPTO_TEST_MODE:"true",IRPA_APP_URL:"https://irpa.example.test"},
+    verifyUser:async()=>null,
+    sendInvitation:async invitation=>sent.push(invitation),
+    logger:{error(){}}
+  });
+  const bytes=new TextEncoder().encode("%PDF-1.7\\nStaging external email-link token gate fixture");
+  const source=await ctx.storage.put({path:"source/staging-external-email-link.pdf",bytes,contentType:"application/pdf",metadata:{}});
+  const documentId="DOC-STAGING-EXTERNAL-EMAIL-LINK-"+Date.now();
+  await ctx.meta.create("documents",documentId,{id:documentId,status:"Stored",ownerUid:"staging-owner",primaryStorageId:source.id,sha256:await sha256Hex(bytes),fileName:"staging-external-email-link.pdf",title:"Staging email-link test",classification:"Restricted"});
+  const result=await createEnvelope(ctx,{uid:"staging-owner",email:"staging-owner@example.test",isAdmin:false},{documentId,title:"Staging email-link test",classification:"Restricted",archives:["board-governance"],signingMode:"Sequential",returnTokens:true,signers:[{identityType:"email-link",email:"external-recipient@example.test",name:"External Staging Signer",order:1}],fields:[{fieldId:"STAGING-SIGNATURE",type:"Signature",page:1,x:8,y:30,width:45,height:10,signerId:"S1",required:true}]});
+  assert.equal(result.invitations[0].status,"Sent");
+  assert.equal(result.tokens,undefined,"A staging owner must not receive another person's email-link token.");
+  assert.equal(sent.length,1);
+});

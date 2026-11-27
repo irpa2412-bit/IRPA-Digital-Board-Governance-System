@@ -289,7 +289,7 @@ export async function createEnvelope(ctx,user,body){
     }
     return{patch:{signers:updatedSigners,events}};
   });
-  const returnTokens=ctx.env?.IRPA_ENVIRONMENT==="staging"&&ctx.env?.IRPA_STAGING_CRYPTO_TEST_MODE==="true"?(body?.returnTokens===true&&signers.every(s=>s.uid===user.uid)):ctx.allowReturnTokens;
+  const stagingOwnerEmail=String(user?.email||"").trim().toLowerCase();const stagingSelfEmailLink=Boolean(stagingOwnerEmail&&signers.length===1&&signers.every(s=>s.identityType==="email-link"&&!s.uid&&s.email===stagingOwnerEmail));const returnTokens=ctx.env?.IRPA_ENVIRONMENT==="staging"&&ctx.env?.IRPA_STAGING_CRYPTO_TEST_MODE==="true"?(body?.returnTokens===true&&(signers.every(s=>s.uid===user.uid)||stagingSelfEmailLink)):ctx.allowReturnTokens;
   return{ok:true,envelopeId:id,status:ownerPreSignEmail?"Awaiting Owner Signature":"Sent",invitations:signers.map(s=>({signerId:s.id,email:s.email,status:s.invitation,...(s.deliveryStageCode?{stageCode:s.deliveryStageCode}:{})})),...(ownerPreSignSigner?{ownerSigningToken:`${id}.${ownerPreSignSigner.id}.${secrets[ownerPreSignIndex]}`}:{}),...(returnTokens?{tokens:secrets.map((s,i)=>signers[i].order===firstPosition?`${id}.S${i+1}.${s}`:null).filter(Boolean)}:{})};
 }
 async function consumeEmailLinkRateLimit(ctx,key,maxAttempts,now){
