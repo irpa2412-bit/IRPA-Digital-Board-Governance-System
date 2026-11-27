@@ -17,10 +17,18 @@ concurrency:
 
 jobs:
   backup:
-    if: ${{ inputs.confirm_production_backup == 'BACKUP IRPA PRODUCTION ACCOUNTS' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
+      - name: Require exact owner confirmation before accessing production
+        env:
+          CONFIRMATION: ${{ inputs.confirm_production_backup }}
+        run: |
+          if [ "$CONFIRMATION" != "BACKUP IRPA PRODUCTION ACCOUNTS" ]; then
+            echo "Exact owner confirmation phrase was not supplied; no production data was accessed."
+            exit 1
+          fi
+
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -225,8 +233,3 @@ jobs:
             process.exit(1);
           });
           NODE
-      - name: Refuse silent skip
-        if: ${{ inputs.confirm_production_backup != 'BACKUP IRPA PRODUCTION ACCOUNTS' }}
-        run: |
-          echo "Exact owner confirmation phrase was not supplied; no production data was accessed."
-          exit 1
