@@ -3,36 +3,28 @@
   "portal": "Meeting Portal",
   "status": "open",
   "openedAt": "2026-11-27T17:41:34.000Z",
-  "lastActivityAt": "2026-11-27T19:17:59.933Z",
+  "lastActivityAt": "2026-11-27T20:15:00.000Z",
   "inactivityCloseHours": 72,
   "emergency": false,
-  "reason": "Owner-authorised coordinated shared-file protection cycle for src/App.jsx. Independently verify this portal's navigation and security invariants while the common application shell exposes the Meeting Portal to every IRPA member/employee identity. Preserve all portal-specific controls. The cross-portal browser fixture isolation guard is also included as a shared validation dependency.",
+  "reason": "Owner-authorised Meeting Portal universal-access and meeting-scoped authority repair, stacked on shared access-layer PR #995.",
   "scope": [
-    "drive-gateway/src/index.js",
+    ".github/workflows/meeting-portal-fixture-browser.yml",
+    "docs/portal-protection/records/meeting-portal.json",
+    "docs/portal-protection/windows/meeting-portal.json",
     "drive-gateway/src/meetingServices.mjs",
-    "drive-gateway/tests/meeting-translation-cloudflare.test.mjs",
-    "firestore.rules",
-    "firestore.staging.rules",
-    "functions/meetingAttendanceRegister.js",
-    "functions/meetingRecords.js",
+    "drive-gateway/tests/meeting-services-router.test.mjs",
     "scripts/check-meeting-media-governance.mjs",
-    "src/App.jsx",
-    "src/firebase/data.js",
-    "src/firebase/meetingPolicy.js",
-    "src/meeting/IRPADGBSMeetingRoomMedia.jsx",
-    "src/meeting/MeetingAccessControl.jsx",
-    "src/pages/MeetingRoom.jsx",
-    "src/pages/Meetings.jsx",
-    "src/pages/OperationalGatewaysParticipants.jsx",
-    "tests/meeting-category-firestore-rules.test.cjs",
-    "tests/meeting-category-policy.test.mjs",
-    "tests/meeting-room-authorization-boundary.test.mjs",
-    "tests/meeting-working-documents-security.test.mjs",
-    "tests/org-structure-access-preservation.test.cjs",
-    "tests/policies-strategic-plan-portal.test.mjs",
-    "tests/staging-admin-access-preservation.test.cjs",
     "scripts/meeting-portal-fixture-isolation-guard.sh",
-    "scripts/portal-protection-smoke.mjs"
+    "src/FieldEntryDataGate.jsx",
+    "src/firebase/meetingGatewayApi.js",
+    "src/firebase/meetingPolicy.js",
+    "src/pages/Meetings.jsx",
+    "src/pages/Resolutions.jsx",
+    "src/pages/Voting.jsx",
+    "tests/fixtures/mocks.js",
+    "tests/meeting-category-policy.test.mjs",
+    "tests/meeting-isolation-guard.test.mjs",
+    "tests/meeting-portal-browser.test.mjs"
   ],
   "activityLog": [
     {
@@ -130,11 +122,16 @@
       "at": "2026-11-27T19:17:59.933Z",
       "action": "owner-authorised shared protection-cycle diagnostic visibility extension",
       "description": "Added the shared portal smoke reporter to the exact scope so failures expose complete assertion output; all seven owner lock tests remain mandatory."
+    },
+    {
+      "at": "2026-11-27T20:15:00.000Z",
+      "action": "rebased Meeting Portal implementation on shared access-layer PR #995",
+      "description": "Separated the Meeting Portal implementation scope from src/App.jsx and the seven-owner shared-file protection cycle. Retained the strict isolation guard and all Meeting Portal-specific regression tests."
     }
   ],
   "baseline": {
-    "commit": "331201cb3c626cc96cd006fe8263bf69bafea9b1",
-    "rollbackCommit": "331201cb3c626cc96cd006fe8263bf69bafea9b1"
+    "commit": "87f6327d02a0d540b55c5815de624d038a6e6bad",
+    "rollbackCommit": "87f6327d02a0d540b55c5815de624d038a6e6bad"
   },
   "durationHours": 72,
   "warningHours": 12,
