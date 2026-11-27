@@ -138,8 +138,8 @@ const meetingShellSource = readFileSync(new URL("../src/App.jsx", import.meta.ur
 const meetingGateSource = readFileSync(new URL("../src/FieldEntryDataGate.jsx", import.meta.url), "utf8");
 test("verified IRPA persons see Meeting Portal without authority selection or first-entry gate", () => {
   assert.doesNotMatch(meetingShellSource, /authoritySelectionRequired|portalAccessFrozen/);
-  assert.match(meetingShellSource, /meetingProfileAccess\?\["Dashboard",\.\.\.MEETING_PORTAL_MODULES\]/);
-  assert.match(meetingShellSource, /enrollmentType:verifiedProfile\?"member":verifiedEmployee\?"employee":verifiedAuditor\?"auditor":"administrator"/);
+  assert.match(meetingShellSource, /meetingProfileAccess\?\["Dashboard","Role Descriptions",\.\.\.MEETING_PORTAL_MODULES\]:\["Dashboard"\]/);
+  assert.match(meetingShellSource, /registeredPortalModules=meetingProfileAccess&&!sessionAdministrator&&Boolean\(selectedAuthority\)/);
   assert.match(meetingGateSource, /MEETING_PORTALS\.has\(name\.toLowerCase\(\)\)/);
 });
 
@@ -369,6 +369,8 @@ test("production and staging Firestore rules enforce the same Meeting Portal aut
 test("Meeting Worker requires a verified IRPA person and participant membership for private meeting context", () => {
   assert.match(meetingServicesGovernanceSource, /const isAdminIdentity=claims\.admin===true/);
   assert.match(meetingServicesGovernanceSource, /if\(isAdminIdentity&&!activeIdentity\)/);
+  assert.doesNotMatch(meetingServicesGovernanceSource, /subscription\|\|participantRecord/);
+  assert.match(meetingServicesGovernanceSource, /participantUids,meeting\.attendeeUids,meeting\.memberUids,meeting\.invitedUids/);
   assert.match(meetingServicesGovernanceSource, /if\(!explicitParticipant\)/);
   assert.match(meetingServicesGovernanceSource, /canRead:true/);
   assert.match(meetingServicesGovernanceSource, /isAdmin:false/);
@@ -380,7 +382,7 @@ test("Meeting Worker exposes public outcomes separately and never publishes raw 
   assert.match(meetingServicesGovernanceSource, /\\/api\\/meeting-outcomes\\/public/);
   assert.match(meetingServicesGovernanceSource, /meetingPublicOutcomes/);
   assert.match(meetingServicesGovernanceSource, /summarizeMeetingVotes/);
-  const activity = meetingServicesGovernanceSource.split('if(pathname==="/api/meeting-room/activity"){')[1]?.split("\\n}")[0] || "";
+  const activity = meetingServicesGovernanceSource.match(/if\(pathname==="\/api\/meeting-room\/activity"\)\{([\s\S]*?)\n\}/)?.[1] || "";
   assert.ok(activity.includes("meetingRoomEvents"));
   assert.ok(!activity.includes('"votes"'));
   assert.ok(!activity.includes("visibleVotes"));

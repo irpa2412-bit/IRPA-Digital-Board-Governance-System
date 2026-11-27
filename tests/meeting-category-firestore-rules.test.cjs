@@ -293,6 +293,33 @@ test("meeting-room events and transcripts remain private to listed meeting parti
   await assertFails(nonparticipant.doc("transcriptions/private-transcript").get());
 });
 
+test("voting participant self-read also requires participation in the parent meeting", async () => {
+  await testEnv.withSecurityRulesDisabled(async context => {
+    const db = context.firestore();
+    await db.doc("meetings/vote-parent").set(meeting({
+      meetingCategory: "GENERAL", participantUids: ["board-member"]
+    }));
+    await db.doc("votingIssues/issue-parent").set({
+      meetingId: "vote-parent", status: "Open", votingReference: "Test motion"
+    });
+    await db.doc("votingIssues/issue-parent/participants/board-member").set({
+      uid: "board-member", issueId: "issue-parent", status: "VOTED"
+    });
+    await db.doc("votingIssues/issue-parent/participants/staff-user").set({
+      uid: "staff-user", issueId: "issue-parent", status: "VOTED"
+    });
+  });
+  const participantDb = testEnv.authenticatedContext("board-member", {
+    email: "board@example.test"
+  }).firestore();
+  const nonparticipantDb = testEnv.authenticatedContext("staff-user", {
+    email: "staff@example.test"
+  }).firestore();
+  await assertSucceeds(participantDb.doc("votingIssues/issue-parent/participants/board-member").get());
+  await assertFails(nonparticipantDb.doc("votingIssues/issue-parent/participants/staff-user").get());
+  await assertFails(nonparticipantDb.doc("votingIssues/issue-parent/participants/board-member").get());
+});
+
 test("public meeting outcomes are readable by active members and employees, not admin-only or external identities", async () => {
   await testEnv.withSecurityRulesDisabled(async context => {
     await context.firestore().doc("meetingPublicOutcomes/outcome-1").set({
@@ -304,10 +331,12 @@ test("public meeting outcomes are readable by active members and employees, not 
   const employeeDb = testEnv.authenticatedContext("staff-user", { email: "staff@example.test" }).firestore();
   const adminDb = testEnv.authenticatedContext("admin-user", { email: "admin@example.test", admin: true }).firestore();
   const externalDb = testEnv.authenticatedContext("external-user", { email: "external@example.test" }).firestore();
+  const unauthenticatedDb = testEnv.unauthenticatedContext().firestore();
   await assertSucceeds(memberDb.doc("meetingPublicOutcomes/outcome-1").get());
   await assertSucceeds(employeeDb.doc("meetingPublicOutcomes/outcome-1").get());
   await assertFails(adminDb.doc("meetingPublicOutcomes/outcome-1").get());
   await assertFails(externalDb.doc("meetingPublicOutcomes/outcome-1").get());
+  await assertFails(unauthenticatedDb.doc("meetingPublicOutcomes/outcome-1").get());
   await assertFails(employeeDb.doc("votes/raw-ballot").get());
 });
 
