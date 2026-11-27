@@ -119,7 +119,7 @@ jobs:
         run: npx firebase emulators:exec --only firestore --project demo-irpa-dgbs "npm run test:all"
 
   isolated-meeting-browser:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - name: Checkout pull request revision
@@ -137,19 +137,20 @@ jobs:
         run: node --test tests/meeting-isolation-guard.test.mjs
       - name: Test meeting policy and invitation removal
         run: node --test tests/invitation-removal-policy.test.mjs tests/meeting-category-policy.test.mjs tests/meeting-quorum-reconciliation.test.mjs
-      - name: Install isolated browser runner
+      - name: Install isolated Playwright runner without resolving application dependencies
         run: |
-          npm install --no-save --package-lock=false playwright
-          npx playwright install --with-deps chromium
+          set -euo pipefail
+          PLAYWRIGHT_PREFIX="$RUNNER_TEMP/irpa-playwright"
+          mkdir -p "$PLAYWRIGHT_PREFIX"
+          npm install --prefix "$PLAYWRIGHT_PREFIX" --no-save --package-lock=false playwright@1.56.1
+          mkdir -p node_modules node_modules/.bin
+          ln -sfn "$PLAYWRIGHT_PREFIX/node_modules/playwright" node_modules/playwright
+          ln -sfn "$PLAYWRIGHT_PREFIX/node_modules/.bin/playwright" node_modules/.bin/playwright
+          "$PLAYWRIGHT_PREFIX/node_modules/.bin/playwright" install --with-deps chromium
       - name: Assert runtime source isolation from unrelated portals
         env:
           EVENT_NAME: ${{ github.event_name }}
-        run: |
-          if grep -Fq 'BASE_REF="${GITHUB_BASE_REF:-main}"' scripts/meeting-portal-fixture-isolation-guard.sh; then
-            bash scripts/meeting-portal-fixture-isolation-guard.sh
-          else
-            echo "Fixture source-isolation check is deferred to the dependent Meeting Portal implementation PR."
-          fi
+        run: bash scripts/meeting-portal-fixture-isolation-guard.sh
       - name: Start the isolated Vite fixture
         run: |
           set -euo pipefail
