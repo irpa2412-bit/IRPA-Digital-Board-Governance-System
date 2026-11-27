@@ -3,7 +3,7 @@
   "portal": "Meeting Portal",
   "status": "open",
   "openedAt": "2026-11-27T16:49:53Z",
-  "lastActivityAt": "2026-11-27T17:30:00Z",
+  "lastActivityAt": "2026-11-27T17:32:00Z",
   "inactivityCloseHours": 72,
   "emergency": false,
   "reason": "Owner-authorised completion of universal full Meeting Portal access for everyone in IRPA and open meeting initiation, while preserving meeting-specific Chairperson, Secretary and Administrator responsibilities, optional registration-stage appointments, mandatory validation before proceedings, temporary Transition Committee handover, invitation-based live-room admission, Board governance safeguards and a minimum ten-year meeting-record retention period. Portal access must not be restricted by organisational role, department, membership/employment status, invitation or participant listing. No unrelated portal, collection or signature behavior is changed.",
@@ -32,7 +32,9 @@
     "tests/policies-strategic-plan-portal.test.mjs",
     "tests/staging-admin-access-preservation.test.cjs",
     "src/pages/Resolutions.jsx",
-    "drive-gateway/tests/meeting-services-router.test.mjs"
+    "drive-gateway/tests/meeting-services-router.test.mjs",
+    "docs/portal-protection/windows/meeting-portal.json",
+    "docs/portal-protection/records/meeting-portal.json"
   ],
   "activityLog": [
     {
