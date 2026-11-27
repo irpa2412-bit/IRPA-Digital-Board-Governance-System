@@ -64,6 +64,23 @@ beforeEach(async () => {
 });
 
 
+test("member and employee records grant non-ongoing Meeting Portal access regardless of status; ongoing meetings remain participant-only", async () => {
+  await testEnv.withSecurityRulesDisabled(async context=>{
+    const db=context.firestore();
+    await db.doc("members/inactive-member").set({uid:"inactive-member",status:"Suspended"});
+    await db.doc("employees/former-employee").set({uid:"former-employee",status:"Former"});
+    await db.doc("meetings/scheduled-meeting").set({meetingCategory:"GENERAL",status:"Scheduled",initiatorUid:"other-user"});
+    await db.doc("meetings/ongoing-meeting").set({meetingCategory:"GENERAL",status:"In Progress",initiatorUid:"other-user",participantUids:["invited-user"]});
+  });
+  const member=testEnv.authenticatedContext("inactive-member",{email:"inactive@example.test"}).firestore();
+  const employee=testEnv.authenticatedContext("former-employee",{email:"former@example.test"}).firestore();
+  await assertSucceeds(member.doc("meetings/scheduled-meeting").get());
+  await assertSucceeds(employee.doc("meetings/scheduled-meeting").get());
+  await assertFails(member.doc("meetings/ongoing-meeting").get());
+  const invited=testEnv.authenticatedContext("invited-user",{email:"invited@example.test"}).firestore();
+  await assertSucceeds(invited.doc("meetings/ongoing-meeting").get());
+});
+
 test("members can maintain ordinary profile fields but cannot self-assign institutional authority", async () => {
   const uid = "profile-editor-with-invitation";
   const email = "profile-editor-with-invitation@example.test";
