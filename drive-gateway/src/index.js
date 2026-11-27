@@ -226,6 +226,25 @@ const signatureRecoveryRouter = createSignatureRecoveryRouter({
       async list(collection) {
         if (!allowedCollections.has(collection)) throw new Error("Recovery Firestore collection is not permitted.");
         return listFirestoreCollectionDocuments(env, collection, adminToken);
+      },
+      async listOwned(collection, ownerUid, {admin=false}={}) {
+        if (!["envelopes","signatureEnvelopes"].includes(collection)) {
+          throw new Error("Owner-scoped recovery listing is not permitted for this collection.");
+        }
+        const uid = String(ownerUid || "").trim();
+        if (!uid) throw new Error("An authenticated recovery owner is required.");
+        if (admin) return listFirestoreCollectionDocuments(env, collection, adminToken);
+        const fields = ["createdBy","createdByUid","ownerUid","senderUid"];
+        const matches = await Promise.all(fields.map(field =>
+          getFirestoreDocumentsByField(env, collection, field, uid, adminToken, 100)
+        ));
+        const byPath = new Map();
+        for (const document of matches.flat()) {
+          const path = String(document?.name || "");
+          const id = path.split("/").pop();
+          if (id) byPath.set(id, { ...(firestoreDocumentToPlain(document) || {}), id });
+        }
+        return [...byPath.values()];
       }
     };
     return ctx;
