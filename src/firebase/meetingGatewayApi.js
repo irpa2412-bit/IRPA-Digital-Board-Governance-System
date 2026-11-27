@@ -31,6 +31,8 @@ export const dispatchMeetingInvitation = payload => callMeetingService("/api/mee
 export const issueLiveMeetingToken = payload => callMeetingService("/api/meeting-media/token", payload);
 
 export const getMeetingRoomActivity = meetingId => callMeetingService("/api/meeting-room/activity", { meetingId });
+export const getPublicMeetingOutcomes = () => callMeetingService("/api/meeting-outcomes/public");
+export const getParticipantMeetingVoting = meetingIds => callMeetingService("/api/meeting-voting/participant-list", { meetingIds });
 export const getMyMeetingSubscriptions = async () => (await callMeetingService("/api/meeting-subscriptions/mine")).subscriptions || [];
 export const getAccessibleMeetingRecords = async () => (await callMeetingService("/api/meeting-register/list")).meetings || [];
 
