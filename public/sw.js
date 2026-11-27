@@ -1,8 +1,23 @@
-/* Versioned IRPA-DBGS shell. Never cache auth, API, signing or upload traffic. */
-const CACHE_PREFIX="irpa-dbgs-shell-",CACHE_NAME="irpa-dbgs-shell-20261030-1",OFFLINE_URL="/offline.html";
+/* Build-keyed shell cache. API/auth/signing traffic is never cached. */
+const CACHE_PREFIX="irpa-dbgs-shell-";
+const BUILD_KEY="20261126-refresh-pwa-1";
+const CACHE_NAME=CACHE_PREFIX+BUILD_KEY;
+const OFFLINE_URL="/offline.html";
 const APP_SHELL=["/","/index.html","/manifest.webmanifest",OFFLINE_URL,"/icons/irpa-192.svg","/icons/irpa-512.svg","/icons/irpa-maskable.svg","/install.js"];
-function excluded(url){const p=url.pathname.toLowerCase();return p.startsWith("/api/")||p.includes("/worker/")||p.includes("auth")||p.includes("sign")||p.includes("signature")||p.includes("invitation")||p.endsWith(".pdf")||p.includes("/pdf/")||p.includes("token")||p.includes("upload")||p.includes("approval");}
-self.addEventListener("install",e=>e.waitUntil(caches.open(CACHE_NAME).then(c=>c.addAll(APP_SHELL)).then(()=>self.skipWaiting())));
-self.addEventListener("activate",e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith(CACHE_PREFIX)&&k!==CACHE_NAME).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
-self.addEventListener("fetch",e=>{const r=e.request;if(r.method!=="GET")return;const u=new URL(r.url);if(u.origin!==self.location.origin||excluded(u))return;if(r.mode==="navigate"){e.respondWith(fetch(r).then(res=>{if(res.ok)caches.open(CACHE_NAME).then(c=>c.put("/",res.clone())).catch(()=>{});return res;}).catch(async()=>(await caches.match("/"))||(await caches.match(OFFLINE_URL))||Response.error()));return;}const p=u.pathname,asset=APP_SHELL.includes(p)||p.startsWith("/assets/")||/\.(?:js|css|woff2?|ttf|svg|png|webp|ico)$/.test(p);if(!asset)return;e.respondWith((async()=>{const cached=await caches.match(r);try{const res=await fetch(r);if(res.ok&&res.type!=="opaque")await caches.open(CACHE_NAME).then(c=>c.put(r,res.clone())).catch(()=>{});return res;}catch{return cached||Response.error();}})());});
-self.addEventListener("message",e=>{if(e.data?.type==="SKIP_WAITING")self.skipWaiting();});
+function excluded(url){const p=url.pathname.toLowerCase();return p.startsWith("/api/")||p.includes("/api/")||p.includes("/worker/")||p.includes("auth")||p.includes("sign")||p.includes("signature")||p.includes("invitation")||p.endsWith(".pdf")||p.includes("/pdf/")||p.includes("token")||p.includes("upload")||p.includes("approval");}
+self.addEventListener("install",event=>event.waitUntil(caches.open(CACHE_NAME).then(cache=>cache.addAll(APP_SHELL)).then(()=>self.skipWaiting())));
+self.addEventListener("activate",event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key.startsWith(CACHE_PREFIX)&&key!==CACHE_NAME).map(key=>caches.delete(key)))).then(()=>self.clients.claim())));
+self.addEventListener("fetch",event=>{
+ const request=event.request;
+ if(request.method!=="GET")return;
+ const url=new URL(request.url);
+ if(url.origin!==self.location.origin||excluded(url))return;
+ if(request.mode==="navigate"){
+  event.respondWith(fetch(request,{cache:"no-store"}).then(response=>{if(response.ok)caches.open(CACHE_NAME).then(cache=>cache.put("/",response.clone())).catch(()=>{});return response;}).catch(async()=>(await caches.match("/"))||(await caches.match(OFFLINE_URL))||Response.error()));
+  return;
+ }
+ const path=url.pathname,asset=APP_SHELL.includes(path)||path.startsWith("/assets/")||/\.(?:js|css|woff2?|ttf|svg|png|webp|ico)$/.test(path);
+ if(!asset)return;
+ event.respondWith((async()=>{const cached=await caches.match(request);try{const response=await fetch(request,{cache:"no-store"});if(response.ok&&response.type!=="opaque")await caches.open(CACHE_NAME).then(cache=>cache.put(request,response.clone())).catch(()=>{});return response;}catch{return cached||Response.error();}})());
+});
+self.addEventListener("message",event=>{if(event.data?.type==="SKIP_WAITING")void self.skipWaiting();});

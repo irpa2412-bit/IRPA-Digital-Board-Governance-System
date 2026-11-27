@@ -39,13 +39,13 @@ test("diagnostic UI explicitly confirms dry-run does not write or modify origina
 });
 
 import {formatRecoveryRouteError} from "../src/utils/recoveryRouteError.mjs";
-test("recovery errors identify the exact button and route with stable short codes",()=>{
+test("recovery errors identify stable auth codes, request IDs, button and route",()=>{
  const route="/api/recovery/envelopes/ENV-0000000000000000/evidence";
- assert.equal(formatRecoveryRouteError({status:404,body:{ok:false,error:"Not found."},button:"Check this document",route}),
-  "Recovery service route missing: "+route+" (ROUTE_MISSING) — Button: Check this document — Route: "+route);
- assert.match(formatRecoveryRouteError({status:401,body:{error:"Authentication required."},button:"Diagnose finalisation",route}),/^Not signed in \(NOT_SIGNED_IN\) — Button: Diagnose finalisation — Route:/);
- assert.match(formatRecoveryRouteError({status:403,body:{error:"Forbidden."},button:"Download completed copy",route}),/^Not your envelope \(NOT_YOUR_ENVELOPE\) — Button: Download completed copy — Route:/);
- assert.match(formatRecoveryRouteError({status:503,body:{error:"Unavailable."},button:"Generate watermarked preview",route}),/^Service unavailable \(SERVICE_UNAVAILABLE\) — Button: Generate watermarked preview — Route:/);
+ assert.match(formatRecoveryRouteError({status:404,body:{ok:false,error:"Not found."},button:"Check this document",route}),/ROUTE_MISSING/);
+ assert.match(formatRecoveryRouteError({status:401,body:{error:"Authentication required."},button:"Diagnose finalisation",route}),/TOKEN_INVALID/);
+ assert.match(formatRecoveryRouteError({status:403,body:{error:"Forbidden."},button:"Download completed copy",route}),/NOT_OWNER/);
+ assert.match(formatRecoveryRouteError({status:503,body:{error:"Unavailable."},button:"Generate watermarked preview",route}),/PROFILE_LOOKUP_FAILED/);
+ assert.match(formatRecoveryRouteError({status:403,body:{code:"NOT_ACTIVATED",requestId:"req-123"},button:"Refresh",route}),/NOT_ACTIVATED.*Request ID: req-123/);
 });
 test("each recovery action passes its own button label into the route error formatter",()=>{
  assert.match(source,/button:"Check this document"/);
@@ -53,4 +53,34 @@ test("each recovery action passes its own button label into the route error form
  assert.match(source,/button:"Download completed copy"/);
  assert.match(source,/button:"Generate watermarked preview"/);
  assert.match(queue,/formatRecoveryRouteError/);
+});
+
+test("refresh always forces a fresh Firebase ID token, bypasses HTTP caches and clears stale results before requesting",()=>{
+ assert.match(queue,/getIdToken\(user,true\)/);
+ assert.match(queue,/cache:"no-store"/);
+ assert.match(queue,/if\(reset\)\{setRows\(\[\]\);setTotal\(0\);setOffset\(0\);setSelected\(null\);\}/);
+ assert.match(queue,/Last refreshed at:/);
+ assert.match(queue,/Worker version:/);
+ assert.match(queue,/VITE_BUILD_COMMIT/);
+});
+test("PWA worker activates immediately, claims clients, versions its cache and bypasses API routes",()=>{
+ const sw=fs.readFileSync(new URL("../public/sw.js",import.meta.url),"utf8");
+ const main=fs.readFileSync(new URL("../src/main.jsx",import.meta.url),"utf8");
+ const install=fs.readFileSync(new URL("../public/install.js",import.meta.url),"utf8");
+ assert.match(sw,/self\.skipWaiting\(\)/);
+ assert.match(sw,/self\.clients\.claim\(\)/);
+ assert.match(sw,/p\.startsWith\("\/api\/"\)/);
+ assert.match(sw,/CACHE_PREFIX\+BUILD_KEY/);
+ assert.match(sw,/BUILD_KEY="20261126-refresh-pwa-1"/);
+ assert.match(main,/serviceWorker\.register/);
+ assert.match(install,/serviceWorker\.register/);
+ assert.match(main,/updateViaCache: "none"/);
+ assert.match(install,/updateViaCache:"none"/);
+});
+test("authentication diagnostics preserve the four required stable error codes and request IDs",()=>{
+ const route="/api/recovery/envelopes/ENV-0000000000000000/evidence";
+ for(const code of ["TOKEN_INVALID","PROFILE_LOOKUP_FAILED","NOT_ACTIVATED","NOT_OWNER"]){
+  assert.match(formatRecoveryRouteError({status:403,body:{code,error:"Access denied",requestId:"req-fixture"},button:"Refresh recovery queue",route}),new RegExp(code));
+  assert.match(formatRecoveryRouteError({status:403,body:{code,error:"Access denied",requestId:"req-fixture"},button:"Refresh recovery queue",route}),/Request ID: req-fixture/);
+ }
 });
