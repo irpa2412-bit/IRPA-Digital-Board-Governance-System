@@ -116,14 +116,25 @@ async function verifyCustodianFolder(accessToken, folderId, custodianEmail) {
       folder.mimeType !== "application/vnd.google-apps.folder" || folder.trashed === true || !owners.includes(custodianEmail)) {
     return { ok:false, error:"BACKUP_FOLDER_CUSTODY_OR_ACCESS_CHECK_FAILED" };
   }
-  const permissionsResponse = await fetch("https://www.googleapis.com/drive/v3/files/" + encodeURIComponent(folderId) + "/permissions?fields=permissions(type,emailAddress,domain,role,permissionDetails)&pageSize=100", { headers:{ Authorization:"Bearer " + accessToken } });
-  const permissionData = await permissionsResponse.json().catch(() => ({}));
-  if (!permissionsResponse.ok) return { ok:false, error:"BACKUP_FOLDER_PERMISSION_CHECK_FAILED" };
-  const unsafe = (permissionData.permissions || []).some(permission => {
-    if (permission.role === "owner" && String(permission.emailAddress || "").toLowerCase() === custodianEmail) return false;
-    return permission.type !== "user" || String(permission.emailAddress || "").toLowerCase() !== custodianEmail;
-  });
-  if (unsafe) return { ok:false, error:"BACKUP_FOLDER_HAS_UNAUTHORISED_ACCESS" };
+  const permissions = [];
+  let pageToken = "";
+  do {
+    const permissionUrl = new URL("https://www.googleapis.com/drive/v3/files/" + encodeURIComponent(folderId) + "/permissions");
+    permissionUrl.searchParams.set("fields", "permissions(type,emailAddress,domain,role,permissionDetails),nextPageToken");
+    permissionUrl.searchParams.set("pageSize", "100");
+    if (pageToken) permissionUrl.searchParams.set("pageToken", pageToken);
+    const permissionsResponse = await fetch(permissionUrl.toString(), { headers:{ Authorization:"Bearer " + accessToken } });
+    const permissionData = await permissionsResponse.json().catch(() => ({}));
+    if (!permissionsResponse.ok) return { ok:false, error:"BACKUP_FOLDER_PERMISSION_CHECK_FAILED" };
+    permissions.push(...(permissionData.permissions || []));
+    pageToken = permissionData.nextPageToken || "";
+    if (permissions.length > 1000) return { ok:false, error:"BACKUP_FOLDER_PERMISSION_SET_EXCEEDS_SAFE_LIMIT" };
+  } while (pageToken);
+  const safeOwnerOnly = permissions.length === 1 &&
+    permissions[0].type === "user" &&
+    String(permissions[0].emailAddress || "").toLowerCase() === custodianEmail &&
+    permissions[0].role === "owner";
+  if (!safeOwnerOnly) return { ok:false, error:"BACKUP_FOLDER_HAS_UNAUTHORISED_ACCESS" };
   return { ok:true };
 }
 
