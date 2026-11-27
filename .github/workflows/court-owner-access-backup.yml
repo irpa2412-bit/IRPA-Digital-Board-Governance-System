@@ -1,0 +1,246 @@
+name: Court envelope owner-access forensic backup (read only)
+# Push-triggered owner-identity scan; report commits are metadata-only.
+
+on:
+  push:
+    branches:
+      - incident/owner-access-20261126
+    paths:
+      - .github/workflows/court-owner-access-backup.yml
+      - '!docs/incident/results-20261126.md'
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: court-owner-access-forensic-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install Firebase Admin SDK
+        run: npm install --no-save firebase-admin@^13
+      - name: Read and export production owner-access evidence (no writes)
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$FIREBASE_SERVICE_ACCOUNT"
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          import crypto from "node:crypto";
+          import { initializeApp, cert } from "firebase-admin/app";
+          import { getFirestore, FieldPath } from "firebase-admin/firestore";
+          import { getAuth } from "firebase-admin/auth";
+
+          const project = "irpa-digital-board-governance";
+          const identity = {
+            uid: "UQxfLOXCl7bEQ7KNM6Tt4eKoJlg1",
+            email: "molleld@irpa.or.tz",
+            accounts: [
+              {uid:"UQxfLOXCl7bEQ7KNM6Tt4eKoJlg1",email:"molleld@irpa.or.tz"},
+              {uid:"qkwrd5Tk9TbbfcqHUapNdQsQXXo2",email:"irpa2412@gmail.com"},
+              {uid:"yPW2PVTDagZREYWluu3biGKXEel2",email:"danielmollel26@gmail.com"}
+            ],
+            since: "2026-11-01T00:00:00.000Z"
+          };
+          const excludedOldIds = new Set(["IRPA-ENV-2026-11501354","ENV-4b06e60941f8eb1d"]);
+          const knownUids = new Set(identity.accounts.map(x=>x.uid));
+          const knownEmails = new Set(identity.accounts.map(x=>x.email));
+          const sa = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+          if (sa.project_id !== project || !sa.client_email || !sa.private_key) {
+            throw new Error("Production service-account metadata validation failed.");
+          }
+          initializeApp({ credential: cert(sa), projectId: project });
+          const db = getFirestore();
+          const collections = ["signatureProfiles","envelopes","signatureEnvelopes","documents","signatures","signatureEvents"];
+          const exported = {};
+          const references = new Set([identity.uid,identity.email]);
+          const matched = new Map();
+          const scan = async name => {
+            const ref = db.collection(name);
+            let cursor = null, count = 0, pages = 0;
+            const rows = [];
+            while (true) {
+              let q = ref.orderBy(FieldPath.documentId()).limit(500);
+              if (cursor) q = q.startAfter(cursor);
+              const snap = await q.get();
+              pages++;
+              if (snap.empty) break;
+              for (const doc of snap.docs) {
+                const data = doc.data();
+                const row = { id: doc.id, path: doc.ref.path, data };
+                rows.push(row);
+                count++;
+                if (name === "signatureProfiles") {
+                  const uid=String(data.uid||data.ownerUid||doc.id||"");
+                  const profileEmails=["email","primaryEmail","secondaryEmail","alternateEmail","personalEmail","workEmail","contactEmail"].map(k=>String(data[k]||"").trim().toLowerCase()).filter(Boolean);
+                  if(knownUids.has(uid)||profileEmails.some(email=>knownEmails.has(email))){matched.set(doc.ref.path,row);for(const email of profileEmails)knownEmails.add(email);}
+                }
+                if (name === "envelopes" || name === "signatureEnvelopes") {
+                  const ownerIds=[data.ownerUid,data.senderUid,data.createdBy,data.createdByUid,...(Array.isArray(data.participantUids)?data.participantUids:[])].filter(Boolean).map(String);
+                  const recordEmails=[data.ownerEmail,data.senderEmail,data.email,...(Array.isArray(data.signers)?data.signers.map(x=>x?.email):[])].filter(Boolean).map(x=>String(x).trim().toLowerCase());
+                  const stamp=value=>value?.toDate?value.toDate().toISOString():String(value||"");
+                  const recent=stamp(data.createdAt)>=identity.since||stamp(data.updatedAt)>=identity.since;
+                  const belongs=ownerIds.some(uid=>knownUids.has(uid))||recordEmails.some(email=>knownEmails.has(email));
+                  if(recent&&belongs&&!excludedOldIds.has(doc.id)&&!excludedOldIds.has(String(data.envelopeReference||"")))matched.set(doc.ref.path,row);
+                  for(const uid of ownerIds)references.add(uid);
+                }
+              }
+              cursor = snap.docs[snap.docs.length-1];
+              if (snap.size < 500) break;
+            }
+            exported[name] = { count, pages, rows };
+          };
+          await scan("signatureProfiles");
+          const authUsers = [];
+          let pageToken;
+          do {
+            const page = await getAuth().listUsers(1000,pageToken);
+            for (const u of page.users) {
+              const email = String(u.email || "").trim().toLowerCase();
+              if (email && knownEmails.has(email)) {
+                authUsers.push({ uid:u.uid,email:u.email||null,emailVerified:u.emailVerified,disabled:u.disabled,creationTime:u.metadata?.creationTime||null,lastSignInTime:u.metadata?.lastSignInTime||null,providerIds:(u.providerData||[]).map(p=>p.providerId) });
+                knownUids.add(u.uid);
+              }
+            }
+            pageToken = page.pageToken;
+          } while (pageToken);
+          for (const name of collections.filter(name=>name!=="signatureProfiles")) await scan(name);
+
+          const envelopeRows = [...matched.values()].filter(row => ["envelopes","signatureEnvelopes"].includes(row.path.split("/")[0]));
+          const ownerUids = new Set(knownUids);
+          const emails = new Set(knownEmails);
+          for (const row of envelopeRows) {
+            const d = row.data || {};
+            for (const key of ["ownerUid","senderUid","createdBy","createdByUid"]) if (d[key]) ownerUids.add(String(d[key]));
+            for (const uid of Array.isArray(d.participantUids) ? d.participantUids : []) ownerUids.add(String(uid));
+            for (const key of ["ownerEmail","senderEmail","email"]) if (d[key]) emails.add(String(d[key]).trim().toLowerCase());
+            for (const signer of Array.isArray(d.signers) ? d.signers : []) if (signer.email) emails.add(String(signer.email).trim().toLowerCase());
+          }
+          for (const row of exported.signatureProfiles.rows) {
+            const d = row.data || {};
+            const uid = String(d.uid || row.id);
+            const email = String(d.email || "").trim().toLowerCase();
+            if (uid===identity.uid || (email&&emails.has(email))) {
+              matched.set(row.path,row);
+              for(const key of ["email","primaryEmail","secondaryEmail","alternateEmail","personalEmail","workEmail","contactEmail"]){const v=String(d[key]||"").trim().toLowerCase();if(v)emails.add(v);}
+            }
+          }
+          const identityRecords = [...matched.values()].filter(row=>["envelopes","signatureEnvelopes"].includes(row.path.split("/")[0])).map(row=>{
+            const d=row.data||{},signers=Array.isArray(d.signers)?d.signers:[],fields=Array.isArray(d.fields)?d.fields:[];
+            const doc=exported.documents.rows.find(x=>x.id===d.documentId)?.data||{};
+            const iso=v=>v?.toDate?v.toDate().toISOString():v||null;
+            const signedFieldIds=new Set(signers.filter(x=>x?.status==="Signed"||x?.signedAt).flatMap(x=>Object.keys(x?.fieldValues||{})));
+            const storageId=doc.primaryStorageId||doc.storageId||doc.driveFileId||doc.googleDriveFileId||doc.fileId||doc.sourceFileId||
+              d.primaryStorageId||d.storageId||d.sourcePdfStorageId||d.driveFileId||null;
+            return {collection:row.path.split("/")[0],envelopeId:row.id,documentId:d.documentId||null,title:d.title||doc.title||null,
+              environment:d.dataEnvironment||d.environment||d.recordOrigin||null,status:d.status||null,createdAt:iso(d.createdAt),
+              updatedAt:iso(d.updatedAt),ownerUid:d.ownerUid||d.createdByUid||d.createdBy||null,senderUid:d.senderUid||null,
+              ownerEmail:d.ownerEmail||d.senderEmail||d.email||null,participantUids:Array.isArray(d.participantUids)?d.participantUids:[],
+              signerCount:signers.length,signedFieldsCount:fields.length===signers.length?signers.filter(x=>x?.status==="Signed"||x?.signedAt).length:Math.min(fields.length,signers.filter(x=>x?.status==="Signed"||x?.signedAt).length),
+              sourcePdfStorageId:storageId};
+          });
+          const allEnvelopes=["envelopes","signatureEnvelopes"].flatMap(name=>exported[name].rows.map(row=>({collection:name,id:row.id,data:row.data||{}})));
+          const dateMs=v=>{if(v?.toDate)return v.toDate().getTime();const n=Date.parse(String(v||""));return Number.isFinite(n)?n:0;};
+          const mostRecentFive=allEnvelopes.sort((a,b)=>dateMs(b.data.createdAt)-dateMs(a.data.createdAt)).slice(0,5).map(x=>({collection:x.collection,envelopeId:x.id,documentId:x.data.documentId||null,title:x.data.title||null,environment:x.data.dataEnvironment||x.data.environment||x.data.recordOrigin||null,status:x.data.status||null,createdAt:x.data.createdAt?.toDate?.().toISOString?.()||x.data.createdAt||null}));
+          const ownerAuthUsers=authUsers;
+          const emailGroups = new Map();
+          for (const u of ownerAuthUsers) { const e=String(u.email||"").toLowerCase(); if(e) emailGroups.set(e,[...(emailGroups.get(e)||[]),u]); }
+          const duplicateEmails = [...emailGroups.entries()].filter(([,users])=>users.length>1).map(([email,users])=>({email,uids:users.map(u=>u.uid),created:users.map(u=>u.creationTime)}));
+          const storedOwnerUids=[...new Set(identityRecords.flatMap(x=>[x.ownerUid,x.senderUid].filter(Boolean)))].sort();
+          const identityComparison = { records: identityRecords, storedOwnerUids, authAccounts: ownerAuthUsers, duplicateEmails,
+            possibleRecreatedAccounts: duplicateEmails.map(x=>({email:x.email,accounts:x.uids.length,created:x.created})) };
+          console.log("COURT_ENVELOPE_IDENTITY_COMPARISON");
+          console.log(JSON.stringify({courtCandidates:identityRecords,mostRecentFiveOverall:mostRecentFive,storedOwnerUids,authAccounts:ownerAuthUsers.map(x=>({uid:x.uid,email:x.email,creationTime:x.creationTime,providerIds:x.providerIds})),duplicateEmails}));
+          const artifactName = "court-owner-access-backup-" + process.env.GITHUB_SHA;
+          const payload = {
+            generatedAt: new Date().toISOString(),
+            projectId: project,
+            readOnly: true,
+            identity,
+            excludedOldIds:[...excludedOldIds],
+            courtCandidates:identityRecords,
+            mostRecentFiveOverall:mostRecentFive,
+            collectionCounts: Object.fromEntries(Object.entries(exported).map(([k,v])=>[k,{count:v.count,pages:v.pages}])),
+            ownerUidCandidates: identityComparison.storedOwnerUids,
+            ownerEmailCandidates: [...emails],
+            matchingAuthAccounts: ownerAuthUsers,
+            identityComparison,
+            matchedRecords: [...matched.values()],
+            collections: exported
+          };
+          const raw = Buffer.from(JSON.stringify(payload,null,2));
+          fs.mkdirSync("forensic-backup",{recursive:true});
+          fs.writeFileSync("forensic-backup/court-owner-access-backup.json",raw,{flag:"wx"});
+          const sha = crypto.createHash("sha256").update(raw).digest("hex");
+          fs.writeFileSync("forensic-backup/SHA256SUMS.txt",sha+"  court-owner-access-backup.json\n",{flag:"wx"});
+          fs.writeFileSync("forensic-backup/manifest.json",JSON.stringify({projectId:project,generatedAt:payload.generatedAt,readOnly:true,exportFile:"court-owner-access-backup.json",byteLength:raw.length,sha256:sha,collectionCounts:payload.collectionCounts,artifactName,retentionDays:90},null,2),{flag:"wx"});
+          console.log("READ_ONLY_BACKUP_CREATED");
+          console.log(JSON.stringify({projectId:project,readOnly:true,byteLength:raw.length,sha256:sha,collectionCounts:payload.collectionCounts,artifactName,retentionDays:90,matchingAuthAccountCount:authUsers.length,matchedRecordCount:matched.size}));
+          NODE
+      - name: Upload immutable forensic backup artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: court-owner-access-backup-${{ github.sha }}
+          path: forensic-backup/
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Commit counts, hashes and IDs; comment on PR #982
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p docs/signature-recovery docs/incident
+          cp forensic-backup/manifest.json docs/signature-recovery/owner-access-backup-manifest.json
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          const m=JSON.parse(fs.readFileSync("forensic-backup/manifest.json","utf8"));
+          const p=JSON.parse(fs.readFileSync("forensic-backup/court-owner-access-backup.json","utf8"));
+          const records=p.identityComparison?.records||[];
+          const auth=p.identityComparison?.authAccounts||[];
+          const owners=p.identityComparison?.storedOwnerUids||[];
+          const loginAccounts=p.identityComparison?.authAccounts||[];
+          const logins=[...new Set(loginAccounts.map(x=>x.uid).filter(Boolean))].sort();
+          const counts=Object.entries(m.collectionCounts||{}).map(([k,v])=>`| ${k} | ${v.count} |`).join("\n");
+          const report=[
+            "# Court owner-access incident results — 2026-11-26","",
+            "| Backup field | Value |","|---|---|",
+            `| Export exists | ${m.byteLength>0?"YES":"NO"} |`,
+            `| Export byte length | ${m.byteLength} |`,
+            `| Export SHA-256 | ${m.sha256} |`,
+            `| Artifact | ${m.artifactName} (90 days) |`,
+            `| Matched envelope/profile records | ${records.length} |`,
+            `| Owner Firebase Auth accounts | ${loginAccounts.length} |`,
+            `| Duplicate login email groups | ${(p.identityComparison?.duplicateEmails||[]).length} |`,"",
+            "## Collection counts","","| Collection | Count |","|---|---:|",counts,"",
+            "## Court envelope candidates","","| Collection | Envelope ID | Document ID | Title | Environment | Status | Created | Owner UID | Owner email | Signers | Signed fields | Source PDF storage ID |","|---|---|---|---|---|---|---|---|---|---:|---:|---|",
+            ...records.map(x=>`| ${x.collection} | ${x.envelopeId} | ${x.documentId||""} | ${x.title||""} | ${x.environment||""} | ${x.status||""} | ${x.createdAt||""} | ${x.ownerUid||""} | ${x.ownerEmail||""} | ${x.signerCount} | ${x.signedFieldsCount} | ${x.sourcePdfStorageId||""} |`),"",
+            "## Five most recent envelopes overall","","| Collection | Envelope ID | Document ID | Title | Environment | Status | Created |","|---|---|---|---|---|---|---|",
+            ...(p.mostRecentFiveOverall||[]).map(x=>`| ${x.collection} | ${x.envelopeId} | ${x.documentId||""} | ${x.title||""} | ${x.environment||""} | ${x.status||""} | ${x.createdAt||""} |`),"",
+            "## Stored owner IDs vs personal Firebase Auth login IDs","",
+            `- Stored owner/sender UIDs: ${owners.join(", ")||"NONE"}`,
+            `- Personal Auth accounts: ${loginAccounts.map(x=>x.uid+" / "+(x.email||"no-email")+" / "+(x.creationTime||"unknown-created")).join("; ")||"NONE"}`,
+            `- UID overlap: ${owners.some(x=>logins.includes(x))?"MATCH":"NO MATCH"}`,
+            `- Duplicate email groups: ${(p.identityComparison?.duplicateEmails||[]).map(x=>x.email+" ("+x.uids.join(",")+")").join("; ")||"NONE"}`,""
+          ].join("\n");
+          fs.writeFileSync("docs/incident/results-20261126.md",report+"\n");
+          fs.writeFileSync("/tmp/pr-comment.md",report+"\n");
+          NODE
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/signature-recovery/owner-access-backup-manifest.json docs/incident/results-20261126.md
+          git commit -m "Record Court owner-access forensic results"
+          git push origin "HEAD:incident/owner-access-20261126"
+          gh pr review 982 --repo "${{ github.repository }}" --comment --body-file /tmp/pr-comment.md

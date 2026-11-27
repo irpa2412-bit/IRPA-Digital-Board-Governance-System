@@ -1,0 +1,156 @@
+name: Court owner-access read-only verification
+
+on:
+  push:
+    branches: [incident/owner-access-20261126]
+    paths:
+      - .github/workflows/court-owner-access-readonly-verification.yml
+      - '!docs/incident/results-20261126.md'
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: court-owner-access-readonly-verification
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Call production Gateway as the personal-profile owner (read only)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
+          OWNER_UID: UQxfLOXCl7bEQ7KNM6Tt4eKoJlg1
+          GATEWAY_URL: https://irpa-google-drive-gateway.irpa-governance.workers.dev
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p verification-pdfs
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          import crypto from "node:crypto";
+          const repo=process.env.GITHUB_REPOSITORY, uid=process.env.OWNER_UID;
+          const base=process.env.GATEWAY_URL, excluded=new Set(["IRPA-ENV-2026-11501354","ENV-4b06e60941f8eb1d"]);
+          const result={status:"PENDING",ownerUid:uid,routes:[],candidates:[],pdfs:[]};
+          const request=async(path,options={})=>fetch(base+path,options);
+          const prResponse=await fetch(`https://api.github.com/repos/${repo}/pulls/983`,{headers:{Authorization:"Bearer "+process.env.GH_TOKEN,Accept:"application/vnd.github+json"}});
+          if(!prResponse.ok)throw new Error("FIX_PR_LOOKUP_FAILED");
+          const pr=await prResponse.json();
+          let token=null;
+          if(!pr.merged){
+            result.status="WAITING_FOR_FIX_PR_MERGE";
+            result.routes.push({route:"deployment-gate",status:409,code:"FIX_PR_NOT_MERGED"});
+          }else{
+            const expected=pr.merge_commit_sha,deadline=Date.now()+180000;
+            let health={httpStatus:0,commit:null};
+            while(Date.now()<deadline){
+              const r=await request("/health"),h=await r.json().catch(()=>({}));
+              health={httpStatus:r.status,commit:h.commit||h.version||null};
+              if(r.status===200&&health.commit===expected)break;
+              await new Promise(resolve=>setTimeout(resolve,5000));
+            }
+            result.workerBefore=health;
+            if(health.httpStatus!==200||health.commit!==expected){
+              result.status="WORKER_DEPLOY_NOT_CONFIRMED";
+              result.routes.push({route:"deployment-gate",status:health.httpStatus,code:"WORKER_COMMIT_MISMATCH"});
+            }else{
+              const sa=JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT||"{}");
+              if(sa.project_id!=="irpa-digital-board-governance"||!sa.client_email||!sa.private_key)throw new Error("SERVICE_ACCOUNT_CONFIG_INVALID");
+              const html=fs.readFileSync("public/administrator.html","utf8");
+              const key=html.match(/apiKey\\s*:\\s*["']([^"']+)["']/)?.[1];
+              if(!key)throw new Error("FIREBASE_API_KEY_NOT_FOUND");
+              const now=Math.floor(Date.now()/1000),b64=x=>Buffer.from(JSON.stringify(x)).toString("base64url");
+              const unsigned=b64({alg:"RS256",typ:"JWT"})+"."+b64({iss:sa.client_email,sub:sa.client_email,aud:"https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit",iat:now,exp:now+3600,uid});
+              const custom=unsigned+"."+crypto.sign("RSA-SHA256",Buffer.from(unsigned),sa.private_key).toString("base64url");
+              const auth=await fetch("https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key="+encodeURIComponent(key),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({token:custom,returnSecureToken:true})});
+              const authBody=await auth.json().catch(()=>({}));
+              if(!auth.ok||!authBody.idToken)throw new Error("OWNER_AUTH_EXCHANGE_FAILED");
+              token=authBody.idToken;
+              const headers={Authorization:"Bearer "+token};
+              const call=async(label,path,method="GET")=>{
+                const r=await request(path,{method,headers});
+                const type=r.headers.get("content-type")||"";
+                if(type.includes("application/pdf")){
+                  const bytes=new Uint8Array(await r.arrayBuffer()),sha256=crypto.createHash("sha256").update(bytes).digest("hex");
+                  const file=label.replace(/[^a-z0-9-]/gi,"-")+".pdf";
+                  fs.writeFileSync("verification-pdfs/"+file,bytes);
+                  const item={route:label,status:r.status,code:null,sha256,bytes:bytes.length,file};
+                  result.routes.push(item);result.pdfs.push(item);return {item,body:null};
+                }
+                const body=await r.json().catch(()=>({}));
+                const item={route:label,status:r.status,code:body.code||body.errorCode||null,requestId:body.requestId||null};
+                result.routes.push(item);return {item,body};
+              };
+              const listed=await call("my-envelope-list","/api/signature-workflow/list");
+              const all=Array.isArray(listed.body?.envelopes)?listed.body.envelopes:[];
+              const recent=all.filter(e=>{
+                const id=String(e.id||e.envelopeId||"");
+                const time=Date.parse(e.createdAt||e.updatedAt||"");
+                return id&&!excluded.has(id)&&Number.isFinite(time)&&time>=Date.parse("2026-11-01T00:00:00Z");
+              });
+              result.listCounts={returned:all.length,recentOwnedOrAssigned:recent.length};
+              result.candidates=recent.filter(e=>/court|legal|judicial|tribunal|magistrate|hearing|summons|affidavit/i.test(String(e.title||e.documentTitle||"")))
+                .map(e=>({envelopeId:e.id||e.envelopeId,documentId:e.documentId||null,title:e.title||e.documentTitle||null,
+                  environment:e.dataEnvironment||e.environment||e.recordOrigin||null,status:e.status||null,createdAt:e.createdAt||null,
+                  ownerUid:e.ownerUid||e.createdByUid||e.createdBy||null,senderUid:e.senderUid||null,ownerEmail:e.ownerEmail||e.senderEmail||null,
+                  participantUids:e.participantUids||[],signerCount:Array.isArray(e.signers)?e.signers.length:(e.recipients||[]).length}));
+              let offset=0,total=0;
+              do{
+                const q=await call("recovery-envelope-list-"+offset,`/api/recovery/envelopes?limit=50&offset=${offset}&diagnostic=1`);
+                const items=Array.isArray(q.body?.items)?q.body.items:[];
+                total=Number(q.body?.total||0);offset+=items.length;if(!items.length)break;
+              }while(offset<total&&offset<10000);
+              result.recoveryQueueTotal=total;
+              for(const e of result.candidates){
+                const id=encodeURIComponent(e.envelopeId);
+                await call("evidence-"+e.envelopeId,`/api/recovery/envelopes/${id}/evidence?diagnostic=1`);
+                await call("emergency-retrieval-"+e.envelopeId,`/api/recovery/envelopes/${id}/emergency-retrieval`,"POST");
+                await call("completed-copy-"+e.envelopeId,`/api/recovery/envelopes/${id}/completed-copy.pdf`);
+              }
+              result.status="VERIFICATION_COMPLETED";
+              result.workerAfter=health;
+            }
+          }
+          fs.writeFileSync("verification-results.json",JSON.stringify(result,null,2));
+          const lines=["# Court owner-access verification — 2026-11-26","",`- Status: ${result.status}`,`- Owner UID: ${uid}`,
+            `- Worker commit: ${result.workerBefore?.commit||"NOT_VERIFIED"}`,`- Recent owned/assigned envelopes: ${result.listCounts?.recentOwnedOrAssigned??"NOT_RUN"}`,
+            `- Court/legal candidates: ${result.candidates.length}`,"","## Candidates",
+            ...(result.candidates.length?result.candidates.map(e=>`- ${e.envelopeId} | ${e.documentId||""} | ${e.title||""} | ${e.status||""}`):["- NONE_IDENTIFIED"]),
+            "","## Route results","| Route | HTTP | Error code | SHA-256 |","|---|---:|---|---|",
+            ...result.routes.map(x=>`| ${x.route} | ${x.status} | ${x.code||""} | ${x.sha256||""} |`)];
+          fs.writeFileSync("docs-results.md",lines.join("\\n")+"\\n");
+          console.log(JSON.stringify({status:result.status,workerCommit:result.workerBefore?.commit,candidateCount:result.candidates.length,routes:result.routes}));
+          NODE
+      - name: Commit metadata-only report and comment on PR #982
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p docs/incident
+          if [[ -f docs-results.md ]]; then cp docs-results.md docs/incident/results-20261126.md; else printf '%s\\n' '# Court owner-access verification' '- Status: WORKFLOW_FAILED_BEFORE_RESULT_GENERATION' > docs/incident/results-20261126.md; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/incident/results-20261126.md
+          git commit -m "Publish Court owner-access verification results" || true
+          git push origin "HEAD:incident/owner-access-20261126"
+          gh pr comment 982 --repo "$GITHUB_REPOSITORY" --body-file docs/incident/results-20261126.md
+      - name: Publish retrieved PDFs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: court-owner-access-readonly-pdfs-${{ github.sha }}
+          path: verification-pdfs/
+          if-no-files-found: ignore
+          retention-days: 90
