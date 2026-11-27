@@ -45,7 +45,7 @@ test("recovery queue uses owner-scoped Firestore reads and rechecks ownership",a
   const base=await f.ctx.meta.get("envelopes","ENV-REC-1");
   f.ctx.meta.list=async()=>[];
   const owned={...base,id:"FIRESTORE-OWNED",ownerUid:f.user.uid,status:"CompletionFailed"};
-  const other={...base,id:"FIRESTORE-OTHER",ownerUid:f.other.uid,status:"CompletionFailed"};
+  const other={...base,id:"FIRESTORE-OTHER",createdBy:undefined,createdByUid:undefined,ownerUid:f.other.uid,senderUid:f.other.uid,status:"CompletionFailed"};
   const calls=[];
   f.ctx.firestore={
     list:async()=>{throw new Error("unscoped Firestore collection listing must not be used");},
