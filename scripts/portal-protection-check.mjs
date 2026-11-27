@@ -126,10 +126,31 @@ async function verifyRealRunEvidence(record, affected) {
       }
       const [run, jobsPayload] = await Promise.all([runResponse.json(), jobsResponse.json()]);
       const job = (jobsPayload.jobs ?? []).find(candidate => Number(candidate.id) === ref.jobId);
-      const baseCommitVerified = (run.pull_requests ?? []).some(pull => pull.base?.sha === record.baseline.commit);
       const expectedJobName = label === "baseline smoke" || label.endsWith("portal smoke")
         ? `baseline-protection-smoke-${record.baseline.commit}`
         : `baseline-full-regression-${record.baseline.commit}`;
+      let baseCommitVerified = (run.pull_requests ?? []).some(pull => pull.base?.sha === record.baseline.commit);
+      // GitHub may omit pull_requests from historical run metadata after its PR is merged.
+      // In that case, verify the merged PR's original base, head branch and exact run head commit.
+      if (!baseCommitVerified && run.event === "pull_request" && Number.isInteger(Number(record.baseline.evidencePullRequest))) {
+        const pullNumber = Number(record.baseline.evidencePullRequest);
+        try {
+          const [pullResponse, commitsResponse] = await Promise.all([
+            readEvidence(`${api}/repos/${repository}/pulls/${pullNumber}`),
+            readEvidence(`${api}/repos/${repository}/pulls/${pullNumber}/commits?per_page=100`)
+          ]);
+          if (pullResponse.ok && commitsResponse.ok) {
+            const [pull, commits] = await Promise.all([pullResponse.json(), commitsResponse.json()]);
+            baseCommitVerified = pull.merged === true &&
+              pull.base?.sha === record.baseline.commit &&
+              pull.head?.ref === run.head_branch &&
+              pull.head?.repo?.full_name?.toLowerCase() === repository.toLowerCase() &&
+              Array.isArray(commits) && commits.some(commit => commit.sha === run.head_sha);
+          }
+        } catch {
+          baseCommitVerified = false;
+        }
+      }
       if (run.id === ref.runId && run.event === "pull_request" && baseCommitVerified &&
           job?.run_id === ref.runId && job.name === expectedJobName &&
           job.status === "completed" && job.conclusion === "success") {
