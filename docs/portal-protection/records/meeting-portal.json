@@ -71,7 +71,7 @@
     "emergency": false
   },
   "baseline": {
-    "commit": "84c26f3e500323a175332689d535e417247b7b78",
+    "commit": "494812a1339afcacfa6b47807c1b7e7b0503563a",
     "rollbackCommit": "84c26f3e500323a175332689d535e417247b7b78"
   },
   "validation": {
@@ -102,7 +102,9 @@
       "Meeting Portal portal smoke PASS on exact PR #955 base 331201cb3c626cc96cd006fe8263bf69bafea9b1: run 45385986460 job 138416884257 checked out the exact baseline and executed npm run test:protected-portals, which reported PASS for all seven registered portals including Meeting Portal. https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/45385986460/job/138416884257",
       "baseline smoke for Meeting Portal on exact baseline 84c26f3e500323a175332689d535e417247b7b78: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/46045884745/job/140664929338",
       "full regression for Meeting Portal on exact baseline 84c26f3e500323a175332689d535e417247b7b78: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/46045884745/job/140664928992",
-      "Meeting Portal portal smoke on exact baseline 84c26f3e500323a175332689d535e417247b7b78: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/46045884745/job/140664929338"
+      "Meeting Portal portal smoke on exact baseline 84c26f3e500323a175332689d535e417247b7b78: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/46045884745/job/140664929338",
+      "Baseline smoke and Meeting Portal portal smoke PASS on exact pre-change PR #1004 base SHA 494812a1339afcacfa6b47807c1b7e7b0503563a: run 46064995991, job 140728479212 checked out the exact base and npm run test:protected-portals passed all seven registered portals.",
+      "Full regression PASS on exact pre-change PR #1004 base SHA 494812a1339afcacfa6b47807c1b7e7b0503563a: run 46064995991, job 140728478841 checked out the exact base and completed npm run test:all in the Firestore emulator successfully."
     ]
   },
   "renewals": [
