@@ -77,12 +77,17 @@ test("shared Research Portal upload control exposes Research Archive only to Res
 });
 
 
-test("Policies and Strategic Plans remains authority-scoped while all active IRPA identities see Meeting Portal",()=>{
+test("Policies and Strategic Plans remains authority-scoped while every IRPA member and employee identity sees Meeting Portal",()=>{
  const fieldGate=readFileSync(new URL("../src/FieldEntryDataGate.jsx",import.meta.url),"utf8");
  assert.ok(app.includes('"Documents","Policies and Strategic Plans","Signature Platform"'));
  assert.ok(app.includes('const MEETING_PORTAL_MODULES=["Meetings","Meeting Room","Participants","Resolutions","Voting","Actions","Decisions"]'));
  assert.ok(app.includes('if(!selected)return ["Dashboard","Role Descriptions"]'));
  assert.ok(app.includes('meetingProfileAccess?["Dashboard","Role Descriptions",...MEETING_PORTAL_MODULES]:["Dashboard"]'));
+ assert.ok(app.includes("const meetingProfileAccess=Boolean(profile?.uid||employee?.uid);"));
+ assert.ok(app.includes("const portalAccessFrozen=!sessionAdministrator&&!selectedAuthority&&!meetingInviteSession&&!meetingProfileAccess;"));
+ assert.ok(app.includes("!selectedAuthority&&!meetingProfileAccess;"));
+ assert.ok(app.includes("meetingProfileAccess?ALL_MODULES:ALL_MODULES.filter(module=>!MEETING_PORTAL_MODULES.includes(module))"));
+ assert.ok(!app.includes("meetingProfileAccess=!sessionAdministrator&&(profile?.meetingIdentityAvailable===true||profile?.status===\"Active\""));
  assert.ok(app.includes('registeredPortalModules=meetingProfileAccess&&!sessionAdministrator&&Boolean(selectedAuthority)'));
  assert.ok(!app.includes("modules=sessionAdministrator?[...ALL_MODULES"));
  assert.ok(fieldGate.includes('if(MEETING_PORTALS.has(name.toLowerCase()))return false;'));
