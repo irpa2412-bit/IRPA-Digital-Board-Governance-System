@@ -7,11 +7,10 @@ const workflow = readFileSync(new URL("../.github/workflows/meeting-portal-fixtu
 const guard = readFileSync(new URL("../scripts/meeting-portal-fixture-isolation-guard.sh", import.meta.url), "utf8");
 const policy = readFileSync(new URL("../scripts/portal-repair-window-guard-policy.mjs", import.meta.url), "utf8");
 
-test("isolation baseline compares against the actual fetched PR base (or main for push runs)", () => {
-  assert.match(guard, /BASE_REF="\$\{GITHUB_BASE_REF:-main\}"/);
-  assert.match(guard, /git fetch origin "\$\{BASE_REF\}:refs\/remotes\/origin\/\$\{BASE_REF\}"/);
-  assert.match(guard, /const baseRef = process\.env\.GITHUB_BASE_REF\?\.trim\(\) \|\| "main"/);
-  assert.match(guard, /const base = `origin\/\$\{baseRef\}`/);
+test("isolation baseline compares against the fetched current main snapshot", () => {
+  assert.match(guard, /git fetch origin main:refs\/remotes\/origin\/main/);
+  assert.match(guard, /const eventName = process\.env\.EVENT_NAME\?\.trim\(\)/);
+  assert.match(guard, /const base = "origin\/main"/);
   assert.ok(guard.includes('git", ["diff", "--name-only", `${base}...HEAD`]'));
 });
 
