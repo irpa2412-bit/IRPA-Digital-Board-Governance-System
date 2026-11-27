@@ -314,6 +314,17 @@ test("meeting directory projection exposes metadata only and excludes private pr
   }
 });
 
+test("uninvited active IRPA identities can read non-ongoing meetings but cannot enter ongoing proceedings", async () => {
+  const { meetingContextAccessAllowed } = await import("../drive-gateway/src/meetingServices.mjs");
+  assert.equal(meetingContextAccessAllowed({ status: "Scheduled" }, true, false), true);
+  assert.equal(meetingContextAccessAllowed({ status: "Completed" }, true, false), true);
+  assert.equal(meetingContextAccessAllowed({ proceedingsStatus: "In Progress" }, true, false), false);
+  assert.equal(meetingContextAccessAllowed({ status: "In Progress" }, true, false), false);
+  assert.equal(meetingContextAccessAllowed({ status: "In Progress" }, true, true), true);
+  assert.equal(meetingContextAccessAllowed({ status: "Scheduled" }, false, false), false);
+  assert.equal(meetingContextAccessAllowed({ status: "In Progress" }, false, true), true);
+});
+
 test("active staff can initiate a Governance-level meeting through the authenticated Worker", async () => {
   const result = await createMeetingAsInstitutionalIdentity({
     uid: "staff-initiator", email: "staff@example.test",
