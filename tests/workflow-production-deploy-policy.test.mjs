@@ -39,10 +39,10 @@ test("production Firebase data mutations and Functions deployments require expli
 
 test("dedicated production Firestore rules workflow requires exact DEPLOY RULES confirmation", () => {
   const source = readWorkflow(".github/workflows/firestore-production-no-billing.yml");
-  assert.match(source, /confirm_production_firestore_rules_deployment:[\\s\\S]*?type: string/);
+  assert.match(source, /confirm_production_firestore_rules_deployment:[\s\S]*?type: string/);
   assert.match(source, /CONFIRMATION/);
   assert.match(source, /DEPLOY RULES/);
-  assert.match(source, /inputs\\.confirm_production_firestore_rules_deployment == 'DEPLOY RULES'/);
+  assert.match(source, /inputs\.confirm_production_firestore_rules_deployment == 'DEPLOY RULES'/);
   assert.match(source, /--only firestore:rules,firestore:indexes/);
   assert.match(source, /environment: production/);
 });
