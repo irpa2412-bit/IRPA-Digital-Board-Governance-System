@@ -289,5 +289,3 @@ export function onSnapshot(ref, callback) {
 }
 export default function FixtureNoopComponent() { return React.createElement(React.Fragment, null); }
 
-// The fixture has no remote subscriptions; keep the meeting list deterministic and offline.
-export async function getMyMeetingSubscriptions() { return []; }
