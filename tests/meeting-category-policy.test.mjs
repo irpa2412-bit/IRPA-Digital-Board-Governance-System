@@ -59,6 +59,7 @@ test("explicitly invited external participants can access only their listed meet
 
 test("only an active member or employee may initiate a meeting", () => {
   assert.equal(canRegisterMeeting({ active: true, activeMember: true, role: "Departmental Director" }), true);
+  assert.equal(canRegisterMeeting({ activeMember: true, role: "Ordinary Member" }), true);
   assert.equal(canRegisterMeeting({ active: true, activeEmployee: true, role: "Staff" }), true);
   assert.equal(canRegisterMeeting({ active: true, role: "Staff" }), false);
   assert.equal(canRegisterMeeting({ active: false, activeMember: true }), false);

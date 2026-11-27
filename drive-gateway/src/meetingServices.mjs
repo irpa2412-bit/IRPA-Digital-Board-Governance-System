@@ -160,7 +160,7 @@ async function context(ctx,env,token,claims,meetingId){
  const activeRecord=r=>!!r&&["active","activated"].includes(lower(r.status||r.registrationStatus||r.employmentStatus));
  const activeIdentity=activeRecord(member)||activeRecord(employee);
  const values=(...items)=>items.flatMap(item=>Array.isArray(item)?item:[]);
- const listedUids=values(meeting.participantUids,meeting.attendeeUids,meeting.memberUids,meeting.invitedUids,meeting.coOrganizerUids,meeting.coOrganiserUids);
+ const listedUids=values(meeting.participantUids,meeting.attendeeUids,meeting.invitedUids,meeting.coOrganizerUids,meeting.coOrganiserUids);
  const organiserUids=[meeting.initiatorUid,meeting.createdByUid,meeting.organizerUid,meeting.organiserUid,meeting.coOrganizerUid,meeting.coOrganiserUid];
  const listedEmails=values(meeting.participantEmails,meeting.attendeeEmails,meeting.invitedEmails).map(lower);
  const byUid=items=>items.map(clean).filter(Boolean).includes(uid);
