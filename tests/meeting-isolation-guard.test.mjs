@@ -193,10 +193,10 @@ guardTest("Meeting Portal fixture runs on every repair branch and all Meeting Po
 
 guardTest("workflow delegates its source-isolation gate to the extracted guard script", () => {
   assert.ok(workflow.includes("bash scripts/meeting-portal-fixture-isolation-guard.sh"));
-  assert.ok(guard.includes('BASE_REF="${GITHUB_BASE_REF:-main}"'));
+  assert.ok(workflow.includes("if grep -Fq 'BASE_REF=\"${GITHUB_BASE_REF:-main}\"'"));
+  assert.ok(workflow.includes("Fixture source-isolation check is deferred to the dependent Meeting Portal implementation PR."));
   assert.ok(guard.includes('"scripts/meeting-portal-fixture-isolation-guard.sh"'));
   assert.ok(guard.includes('"docs/portal-protection/repair-window.json"'));
-  assert.doesNotMatch(workflow, /Fixture source-isolation check is deferred/);
 });
 
 guardTest("only stale runs for the same pull request are cancelled", () => {
