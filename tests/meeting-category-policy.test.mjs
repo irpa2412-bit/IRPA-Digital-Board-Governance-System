@@ -18,10 +18,12 @@ const governance = {
   initiatorUid: "secretary-1"
 };
 
-test("governance category denies an unrelated active staff identity", () => {
+test("every registered IRPA identity can access governance meeting records outside live proceedings", () => {
   assert.equal(canAccessMeetingCategory(governance, {
     uid: "staff-1", active: true, activeEmployee: true, role: "Staff"
-  }), false);
+  }), true);
+  assert.equal(canAccessMeetingCategory(governance, {uid:"inactive-member",memberIdentity:true,activeMember:false}), true);
+  assert.equal(canAccessMeetingCategory(governance, {uid:"former-employee",employeeIdentity:true,activeEmployee:false}), true);
 });
 
 test("governance category allows authorised board roles and administrators", () => {
@@ -43,12 +45,13 @@ test("explicitly invited participants can access their meeting regardless of ins
   }, { isInvited: true }), true);
 });
 
-test("any active registered member or employee may initiate a meeting", () => {
+test("any registered member or employee identity may initiate a meeting regardless of status", () => {
   assert.equal(canRegisterMeeting({ active: true, role: "Departmental Director" }), true);
-  assert.equal(canRegisterMeeting({ active: false, role: "Departmental Director" }), false);
+  assert.equal(canRegisterMeeting({ active: false, role: "Departmental Director", memberIdentity:true }), true);
   assert.equal(canRegisterMeeting({ active: true, role: "Staff" }), true);
   assert.equal(canRegisterMeeting({ active: true, role: "Member" }), true);
-  assert.equal(canRegisterMeeting({ isAdmin: true }), true);
+  assert.equal(canRegisterMeeting({ active: false, employeeIdentity:true }), true);
+  assert.equal(canRegisterMeeting({ isAdmin: true }), false);
 });
 
 test("released meeting general details remain protected while the initiator may manage appointments before proceedings", () => {
@@ -125,8 +128,8 @@ test("active Meeting Portal attendance screens never call undeployed Firebase at
 
 
 const meetingCentreSource = readFileSync(new URL("../src/pages/Meetings.jsx", import.meta.url), "utf8");
-test("Meeting Centre exposes initiation to every active member and employee", () => {
-  assert.ok(meetingCentreSource.includes("const canRegisterMeeting = identity => canRegisterMeetingByRole(identity) || identity.activeMember===true || identity.activeEmployee===true"));
+test("Meeting Centre exposes initiation to every registered member and employee identity", () => {
+  assert.ok(meetingCentreSource.includes("identity.memberIdentity===true||identity.employeeIdentity===true"));
   assert.equal(meetingCentreSource.split("canRegisterMeeting({...actorIdentity,isAdmin:admin})").length - 1, 4);
 });
 
