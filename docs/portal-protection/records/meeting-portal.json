@@ -8,6 +8,7 @@
     ],
     "reason": "Owner-authorised Meeting Portal universal-access and meeting-scoped authority repair. The shared application shell and seven-owner protection cycle are handled in the merged security base; this record covers the Meeting Portal implementation, its isolation guard, and regression tests.",
     "files": [
+      ".github/workflows/meeting-portal-fixture-browser.yml",
       "docs/portal-protection/records/meeting-portal.json",
       "docs/portal-protection/windows/meeting-portal.json",
       "drive-gateway/src/index.js",
