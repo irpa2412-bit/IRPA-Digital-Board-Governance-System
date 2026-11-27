@@ -1,0 +1,235 @@
+name: Encrypted IRPA Account Backup (Owner Initiated)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_production_backup:
+        description: "Type BACKUP IRPA PRODUCTION ACCOUNTS to authorize this run"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: irpa-production-account-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Require exact owner confirmation before accessing production
+        env:
+          CONFIRMATION: ${{ inputs.confirm_production_backup }}
+        run: |
+          if [ "$CONFIRMATION" != "BACKUP IRPA PRODUCTION ACCOUNTS" ]; then
+            echo "Exact owner confirmation phrase was not supplied; no production data was accessed."
+            exit 1
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install existing Firebase Admin SDK dependency
+        run: npm --prefix functions install --omit=dev --no-audit --no-fund
+
+      - name: Export, encrypt, upload and verify production account backup
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
+          BACKUP_ADMIN_EMAIL: ${{ secrets.IRPA_ACCOUNT_BACKUP_ADMIN_EMAIL }}
+          BACKUP_ENCRYPTION_KEY: ${{ secrets.IRPA_ACCOUNT_BACKUP_ENCRYPTION_KEY }}
+          FIREBASE_WEB_API_KEY: "AIzaSyC2aMdxHD14nMnGiRyf4mSL1ixXdzBoOtE"
+          BACKUP_GATEWAY_URL: "https://irpa-google-drive-gateway.irpa-governance.workers.dev"
+        run: |
+          NODE_PATH="$GITHUB_WORKSPACE/functions/node_modules" node <<'NODE'
+          const crypto = require("node:crypto");
+          const { initializeApp, cert } = require("firebase-admin/app");
+          const { getAuth } = require("firebase-admin/auth");
+          const { getFirestore } = require("firebase-admin/firestore");
+
+          const projectId = "irpa-digital-board-governance";
+          const appOrigin = "https://irpa-digital-board-governance.web.app";
+          const gateway = String(process.env.BACKUP_GATEWAY_URL || "").replace(/\/+$/, "");
+          const apiKey = String(process.env.FIREBASE_WEB_API_KEY || "").trim();
+          const adminEmail = String(process.env.BACKUP_ADMIN_EMAIL || "").trim().toLowerCase();
+          const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT || "{}");
+          const key = Buffer.from(String(process.env.BACKUP_ENCRYPTION_KEY || ""), "base64");
+          if (serviceAccount.project_id !== projectId || !apiKey || !gateway || !adminEmail || key.length !== 32) {
+            throw new Error("Backup prerequisites failed: project, administrator, gateway or 256-bit encryption key is not configured.");
+          }
+
+          initializeApp({ credential: cert(serviceAccount), projectId });
+          const auth = getAuth();
+          const db = getFirestore();
+
+          async function allAuthUsers() {
+            const users = [];
+            let pageToken;
+            do {
+              const page = await auth.listUsers(1000, pageToken);
+              users.push(...page.users.map(user => ({
+                uid:user.uid, email:user.email || null, emailVerified:user.emailVerified,
+                disabled:user.disabled, displayName:user.displayName || null,
+                phoneNumber:user.phoneNumber || null, photoURL:user.photoURL || null,
+                customClaims:user.customClaims || {}, metadata:user.metadata?.toJSON?.() || {},
+                providerData:(user.providerData || []).map(p => ({
+                  providerId:p.providerId, uid:p.uid, email:p.email || null,
+                  displayName:p.displayName || null, phoneNumber:p.phoneNumber || null
+                }))
+              })));
+              pageToken = page.pageToken;
+            } while (pageToken);
+            return users;
+          }
+
+          async function memberSnapshot() {
+            const snapshot = await db.collection("members").get();
+            return snapshot.docs.map(doc => ({ id:doc.id, data:doc.data() }));
+          }
+
+          function recoveryMapping(members, users) {
+            const byUid = new Map(users.map(user => [user.uid, user]));
+            const byEmail = new Map();
+            for (const user of users) {
+              if (!user.email) continue;
+              const email = user.email.toLowerCase();
+              if (!byEmail.has(email)) byEmail.set(email, []);
+              byEmail.get(email).push(user);
+            }
+            const mapped = members.map(member => {
+              const data = member.data || {};
+              const uid = String(data.uid || data.authUid || data.firebaseUid || "").trim();
+              const email = String(data.email || "").trim().toLowerCase();
+              const uidMatch = uid ? byUid.get(uid) : null;
+              const emailMatches = email ? (byEmail.get(email) || []) : [];
+              const match = uidMatch || (emailMatches.length === 1 ? emailMatches[0] : null);
+              const uidEmailMismatch = uidMatch && email && String(uidMatch.email || "").toLowerCase() !== email;
+              const status = uidEmailMismatch ? "UID_MATCH_EMAIL_MISMATCH"
+                : uidMatch && emailMatches.length > 1 ? "UID_MATCH_EMAIL_AMBIGUOUS"
+                : uidMatch ? "UID_MATCH"
+                : emailMatches.length === 1 ? "UNIQUE_EMAIL_MATCH_UID_REVIEW"
+                : emailMatches.length > 1 ? "AMBIGUOUS_EMAIL_MATCH"
+                : "NO_AUTH_MATCH";
+              return {
+                memberRecordId:member.id, memberUid:uid || null, memberEmail:email || null,
+                matchedAuthUid:match?.uid || null, status,
+                requiresManualReview:status !== "UID_MATCH"
+              };
+            });
+            const memberIds = new Set(mapped.filter(row => row.matchedAuthUid).map(row => row.matchedAuthUid));
+            const authOnly = users.filter(user => !memberIds.has(user.uid)).map(user => ({
+              authUid:user.uid, email:user.email || null, status:"AUTH_WITHOUT_MEMBER_RECORD_REVIEW_REQUIRED"
+            }));
+            return { members:mapped, authOnly };
+          }
+
+          async function main() {
+            const admin = await auth.getUserByEmail(adminEmail);
+            if (admin.disabled || admin.customClaims?.admin !== true) {
+              throw new Error("Configured backup operator is not an enabled Firebase administrator.");
+            }
+            const customToken = await auth.createCustomToken(admin.uid);
+            const signIn = await fetch("https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=" + encodeURIComponent(apiKey), {
+              method:"POST",
+              headers:{ "Content-Type":"application/json", Referer:appOrigin },
+              body:JSON.stringify({ token:customToken, returnSecureToken:true })
+            });
+            const signedIn = await signIn.json().catch(() => ({}));
+            if (!signIn.ok || !signedIn.idToken) throw new Error("Gateway administrator session could not be established.");
+
+            const authUsers = await allAuthUsers();
+            const members = await memberSnapshot();
+            const mapping = recoveryMapping(members, authUsers);
+            const generatedAt = new Date().toISOString();
+            const plaintext = JSON.stringify({
+              schema:"irpa.account-backup.v1", generatedAt, projectId,
+              authUsers, members, recoveryMapping:mapping,
+              accountCreationPerformed:false,
+              note:"Encrypted point-in-time backup and recovery mapping only. No Firebase Auth or Firestore records were modified."
+            });
+            const plaintextDigest = crypto.createHash("sha256").update(plaintext).digest("hex");
+            const iv = crypto.randomBytes(12);
+            const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
+            const ciphertext = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
+            const encryptedEnvelope = JSON.stringify({
+              version:1, algorithm:"AES-256-GCM", iv:iv.toString("base64"),
+              tag:cipher.getAuthTag().toString("base64"),
+              plaintextSha256:plaintextDigest, ciphertext:ciphertext.toString("base64")
+            });
+            const encryptedBytes = Buffer.from(encryptedEnvelope, "utf8");
+            const checkEnvelope = JSON.parse(encryptedEnvelope);
+            const decipher = crypto.createDecipheriv("aes-256-gcm", key, Buffer.from(checkEnvelope.iv, "base64"));
+            decipher.setAuthTag(Buffer.from(checkEnvelope.tag, "base64"));
+            const roundTrip = Buffer.concat([decipher.update(Buffer.from(checkEnvelope.ciphertext, "base64")), decipher.final()]);
+            if (crypto.createHash("sha256").update(roundTrip).digest("hex") !== plaintextDigest ||
+                roundTrip.toString("utf8") !== plaintext) {
+              throw new Error("AES-256-GCM encryption round-trip verification failed.");
+            }
+            const encryptedDigest = crypto.createHash("sha256").update(encryptedBytes).digest("hex");
+            const fileName = "irpa-account-backup-" + generatedAt.replace(/[:.]/g, "-") + ".enc.json";
+
+            const requestGateway = async (path, body) => {
+              const response = await fetch(gateway + path, {
+                method:"POST",
+                headers:{
+                  Authorization:"Bearer " + signedIn.idToken,
+                  "Content-Type":"application/json",
+                  Origin:appOrigin
+                },
+                body:JSON.stringify(body)
+              });
+              const result = await response.json().catch(() => ({}));
+              if (!response.ok || result.ok !== true) throw new Error("Gateway operation failed (" + response.status + "): " + String(result.error || "unspecified error"));
+              return result;
+            };
+
+            await requestGateway("/api/account-backup/provision", {});
+            const uploaded = await requestGateway("/api/account-backup/upload", {
+              fileName, sha256:encryptedDigest, encryptedPayload:encryptedBytes.toString("base64")
+            });
+            const verified = await requestGateway("/api/account-backup/verify", {
+              fileId:uploaded.fileId, sha256:encryptedDigest
+            });
+            if (verified.verified !== true || verified.sha256 !== encryptedDigest || verified.byteLength !== encryptedBytes.length) {
+              throw new Error("Drive read-back integrity verification did not match the uploaded encrypted backup.");
+            }
+
+            // Confirm the source inventory did not change during the backup window.
+            const authUsersAfter = await allAuthUsers();
+            const membersAfter = await memberSnapshot();
+            const beforeAuth = authUsers.map(user => user.uid).sort();
+            const afterAuth = authUsersAfter.map(user => user.uid).sort();
+            const beforeMembers = members.map(member => member.id).sort();
+            const afterMembers = membersAfter.map(member => member.id).sort();
+            if (JSON.stringify(beforeAuth) !== JSON.stringify(afterAuth) ||
+                JSON.stringify(beforeMembers) !== JSON.stringify(afterMembers)) {
+              throw new Error("Source inventory changed during backup; the backup is stored but consistency gate is NOT PASS.");
+            }
+
+            // No account-level values, email addresses, file IDs, tokens or backup bytes are logged.
+            console.log("BACKUP_DESTINATION=DEDICATED_RESTRICTED_GOOGLE_DRIVE_FOLDER");
+            console.log("BACKUP_ENCRYPTION=AES-256-GCM");
+            console.log("DRIVE_READBACK_INTEGRITY=PASS");
+            console.log("SOURCE_INVENTORY_STABILITY=PASS");
+            console.log("AUTH_USER_COUNT=" + authUsers.length);
+            console.log("MEMBER_RECORD_COUNT=" + members.length);
+            console.log("MEMBER_UID_MATCH_COUNT=" + mapping.members.filter(x => x.status === "UID_MATCH").length);
+            console.log("RECOVERY_MAPPING_REVIEW_REQUIRED=" + mapping.members.filter(x => x.requiresManualReview).length);
+            console.log("AUTH_ONLY_REVIEW_COUNT=" + mapping.authOnly.length);
+            console.log("ACCOUNT_CREATION=NOT_PERFORMED");
+            console.log("LOGIN_AUTHENTICATION_TEST=NOT_PERFORMED_CREDENTIALS_REQUIRED");
+            console.log("RESULT=PASS_BACKUP_AND_INVENTORY_ONLY");
+          }
+
+          main().catch(error => {
+            console.error(error?.message || "Account backup failed.");
+            process.exit(1);
+          });
+          NODE
