@@ -51,6 +51,28 @@ function meeting(overrides = {}) {
     ...overrides
   };
 }
+test("all IRPA member and employee identities can read non-Board meeting records regardless of status; live meetings remain invite-only", async () => {
+  await testEnv.withSecurityRulesDisabled(async context => {
+    const db=context.firestore();
+    await db.doc("members/inactive-member").set({uid:"inactive-member",status:"Suspended",role:"Member"});
+    await db.doc("employees/former-employee").set({uid:"former-employee",status:"Former",role:"Staff"});
+    await db.doc("members/active-member").set({uid:"active-member",status:"Active",role:"Member"});
+    await db.doc("meetings/scheduled-general").set({title:"General meeting",meetingCategory:"GENERAL",status:"Scheduled",confidentialityClass:"INTERNAL"});
+    await db.doc("meetings/ongoing-general").set({title:"Ongoing general",meetingCategory:"GENERAL",status:"In Progress",confidentialityClass:"INTERNAL",participantUids:["invited-member"]});
+    await db.doc("meetings/board-restricted").set({title:"Board meeting",meetingCategory:"GOVERNANCE",status:"Scheduled",confidentialityClass:"BOARD_RESTRICTED"});
+  });
+  const inactive=testEnv.authenticatedContext("inactive-member",{email:"inactive-member@example.test"}).firestore();
+  const former=testEnv.authenticatedContext("former-employee",{email:"former-employee@example.test"}).firestore();
+  const active=testEnv.authenticatedContext("active-member",{email:"active-member@example.test"}).firestore();
+  await assertSucceeds(inactive.doc("meetings/scheduled-general").get());
+  await assertSucceeds(former.doc("meetings/scheduled-general").get());
+  await assertSucceeds(active.doc("meetings/scheduled-general").get());
+  await assertFails(inactive.doc("meetings/ongoing-general").get());
+  const invited=testEnv.authenticatedContext("invited-member",{email:"invited@example.test"}).firestore();
+  await assertSucceeds(invited.doc("meetings/ongoing-general").get());
+  await assertFails(inactive.doc("meetings/board-restricted").get());
+});
+
 test("active designated departmental director can create a categorized meeting", async () => {
   const db = testEnv.authenticatedContext("departmental-director", {
     email: "director@example.test"
