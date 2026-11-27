@@ -655,8 +655,7 @@ const uid=clean(claims.user_id),email=lower(claims.email);
 if(!uid)return fail(ctx,request,"A valid IRPA sign-in is required.",401);
 const [adminProfile,member,employee]=await Promise.all([getDoc(ctx,env,token,"adminProfiles",uid),getDoc(ctx,env,token,"members",uid),getDoc(ctx,env,token,"employees",uid)]);
 const isAdmin=claims.admin===true||email==="irpa2412@gmail.com"||adminProfile?.active===true;
-const active=r=>r&&["active","activated"].includes(lower(r.status||r.registrationStatus||r.employmentStatus));
-if(!(active(member)||active(employee)))return fail(ctx,request,"An active registered IRPA member or employee identity is required to initiate a meeting.",403);
+if(!member&&!employee)return fail(ctx,request,"An IRPA member or employee register identity is required to initiate a meeting.",403);
 const category=clean(incoming.meetingCategory||incoming.meetingPolicyId||"OTHER").toUpperCase();
 if(!["GOVERNANCE","ADMINISTRATIVE","STAFF","GENERAL","OTHER"].includes(category))return fail(ctx,request,"Choose a valid meeting category.",400);
 const appointmentValidation=await validateMeetingAppointments(ctx,env,token,incoming);
@@ -665,7 +664,7 @@ if(incoming.leadershipElectionRequired===true){
  const transitionUids=["transitionChairpersonUid","transitionSecretaryUid","transitionAdministratorUid"];
  if(transitionUids.some(key=>!clean(appointmentValidation.patch[key]??incoming[key])))return fail(ctx,request,"A leadership-election meeting requires all three temporary Transition Committee appointments before election voting can open.",409);
 }
-// Meeting initiation is open to every active registered member and employee.
+// Meeting initiation is open to every IRPA member and employee identity regardless of status.
 // Category-specific access, participant admission, Board voting, quorum and
 // formal approval remain enforced by their separate policies and routes.
 if(clean(incoming.initiatorUid)!==uid)return fail(ctx,request,"The meeting initiator must match the authenticated account.",403);
