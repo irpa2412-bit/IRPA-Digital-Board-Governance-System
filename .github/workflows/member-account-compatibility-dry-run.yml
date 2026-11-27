@@ -37,6 +37,9 @@ jobs:
       - name: Syntax-check read-only audit script
         run: node --check scripts/member-account-compatibility-audit.cjs
 
+      - name: Test read-only audit safeguards
+        run: node --test tests/member-account-compatibility-audit.test.cjs
+
       - name: Install Firebase Admin SDK
         run: npm install --prefix functions --no-save --no-package-lock --ignore-scripts firebase-admin@13.5.0
       - name: Run read-only account compatibility audit
