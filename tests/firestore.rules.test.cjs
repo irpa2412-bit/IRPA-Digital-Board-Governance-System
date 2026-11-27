@@ -95,9 +95,12 @@ test("members can maintain ordinary profile fields but cannot self-assign instit
 
   const memberDb = testEnv.authenticatedContext(uid, { email }).firestore();
   const profile = memberDb.doc("members/" + uid);
-  await assertSucceeds(profile.update({ displayName: "Updated member name" }));
+  await assertSucceeds(profile.update({ name: "Updated member name" }));
   await assertSucceeds(profile.update({ phone: "+255700000000" }));
   await assertSucceeds(profile.update({ address: "Longido, Arusha" }));
+  await assertSucceeds(profile.update({ biography: "Updated member biography" }));
+  await assertFails(profile.update({ gender: "Other" }));
+  await assertFails(profile.update({ nationality: "Other" }));
 
   for (const [field,value] of [
     ["role","Executive Director"],
@@ -132,6 +135,25 @@ test("members can maintain ordinary profile fields but cannot self-assign instit
   assert.deepEqual(saved.data().roles, ["Finance Manager"]);
   assert.deepEqual(saved.data().assignedRoles, ["Finance Manager"]);
   assert.deepEqual(saved.data().selectedRoles, ["Finance Manager"]);
+});
+
+test("employees can maintain name and phone but cannot self-change employment authority", async () => {
+  const uid="employee-profile-editor",email="employee-profile-editor@example.test";
+  await testEnv.withSecurityRulesDisabled(async context=>{
+    await context.firestore().doc("employees/"+uid).set({
+      uid,email,status:"Active",role:"Programme Officer",department:"Programmes",unit:"Rangeland",
+      employmentType:"Full-time",startDate:"2025-01-01",invitationId:"EMP-INV-1"
+    });
+  });
+  const db=testEnv.authenticatedContext(uid,{email}).firestore();
+  const profile=db.doc("employees/"+uid);
+  await assertSucceeds(profile.update({name:"Updated employee name"}));
+  await assertSucceeds(profile.update({phone:"+255700000001"}));
+  for(const [field,value] of [
+    ["role","Executive Director"],["department","Finance"],["unit","Board Office"],
+    ["employmentType","Contract"],["status","Inactive"],["startDate","2026-01-01"],
+    ["invitationId","REPLACED"],["email","attacker@example.test"],["uid","attacker"]
+  ]) await assertFails(profile.update({[field]:value}));
 });
 
 test("member invitation activation remains limited to activation fields", async () => {
