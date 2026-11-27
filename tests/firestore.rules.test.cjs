@@ -64,29 +64,38 @@ beforeEach(async () => {
 });
 
 
-test("members cannot self-edit their institutional profile; administrator role changes remain available", async () => {
+test("members can maintain ordinary profile fields but cannot self-assign institutional authority", async () => {
   const uid = "profile-editor-with-invitation";
   const email = "profile-editor-with-invitation@example.test";
   await testEnv.withSecurityRulesDisabled(async context => {
     await context.firestore().doc("members/" + uid).set({
-      uid, email, status: "Active", role: "Member",
+      uid, email, status: "Active", role: "Member", roles: ["Member"],
+      assignedRoles: ["Member"], selectedRoles: ["Member"],
+      roleAssignments: [], permissions: [], grantedClaims: [],
       memberType: "Governance Member", invitationId: "TEST-INVITATION-ID"
     });
   });
 
   const memberDb = testEnv.authenticatedContext(uid, { email }).firestore();
   const profile = memberDb.doc("members/" + uid);
+  await assertSucceeds(profile.update({ displayName: "Updated member name" }));
+  await assertSucceeds(profile.update({ phone: "+255700000000" }));
+  await assertSucceeds(profile.update({ address: "Longido, Arusha" }));
+
   for (const [field,value] of [
-    ["displayName","No member profile edit"],
-    ["phone","+255700000000"],
     ["role","Executive Director"],
     ["roles",["Executive Director"]],
     ["assignedRoles",["Executive Director"]],
     ["selectedRoles",["Executive Director"]],
+    ["roleAssignments",[{ role:"Executive Director" }]],
+    ["permissions",["admin"]],
+    ["grantedClaims",["admin"]],
+    ["status","Inactive"],
+    ["memberType","Administrator"],
+    ["invitationId","REPLACED-INVITATION-ID"],
     ["accountActivated",true],
     ["registrationStatus","Activated"],
-    ["activatedAt",new Date("2026-11-27T07:00:00.000Z")],
-    ["invitationId","REPLACED-INVITATION-ID"]
+    ["activatedAt",new Date("2026-11-27T07:00:00.000Z")]
   ]) {
     await assertFails(profile.update({ [field]: value }));
   }
@@ -105,6 +114,29 @@ test("members cannot self-edit their institutional profile; administrator role c
   assert.deepEqual(saved.data().roles, ["Finance Manager"]);
   assert.deepEqual(saved.data().assignedRoles, ["Finance Manager"]);
   assert.deepEqual(saved.data().selectedRoles, ["Finance Manager"]);
+});
+
+test("member invitation activation remains limited to activation fields", async () => {
+  const uid = "member-activation";
+  const email = "activation@example.test";
+  await testEnv.withSecurityRulesDisabled(async context => {
+    const db = context.firestore();
+    await db.doc("invitations/INV-ACTIVATION").set({
+      email, status: "Invitation Requested", role: "Member", memberType: "Governance Member"
+    });
+    await db.doc("members/" + uid).set({
+      uid, email, status: "Pending", role: "Member", memberType: "Governance Member",
+      invitationId: "INV-ACTIVATION", accountActivated: false, registrationStatus: "Pending"
+    });
+  });
+  const memberDb = testEnv.authenticatedContext(uid, { email }).firestore();
+  await assertSucceeds(memberDb.doc("members/" + uid).update({
+    accountActivated: true, registrationStatus: "Activated",
+    registrationEmailStatus: "Completed", activatedAt: new Date("2026-11-27T07:00:00.000Z")
+  }));
+  await assertFails(memberDb.doc("members/" + uid).update({
+    role: "Executive Director", registrationStatus: "Activated"
+  }));
 });
 
 test("member can create and update only the explicit Signature Profile fields", async () => {
