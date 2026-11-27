@@ -52,3 +52,113 @@ test("audit script contains no Firebase Auth or Firestore write operations", () 
   assert.doesNotMatch(auditSource, /\b(?:createUser|updateUser|deleteUser)\s*\(/);
   assert.doesNotMatch(auditSource, /\b(?:setDoc|updateDoc|deleteDoc|writeBatch|runTransaction)\s*\(/);
 });
+
+
+test("mocked Auth and Firestore audit completes without a ReferenceError or remote writes", () => {
+  const { execFileSync } = require("node:child_process");
+  const os = require("node:os");
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "irpa-member-audit-"));
+  const functionsDir = path.join(tempRoot, "functions");
+  fs.mkdirSync(functionsDir, { recursive: true });
+  fs.writeFileSync(path.join(functionsDir, "package.json"), '{"private":true}\n');
+
+  const mockPath = path.join(tempRoot, "mock-firebase-admin.cjs");
+  const mockCode = String.raw\`"use strict";
+const Module = require("node:module");
+const originalLoad = Module._load;
+const fixtureUser = {
+  uid: "fixture-member-uid",
+  email: "fixture-member@example.test",
+  disabled: false,
+  customClaims: {}
+};
+const fixtureDocs = {
+  members: [{
+    id: "fixture-member-uid",
+    data: {
+      uid: "fixture-member-uid",
+      email: "fixture-member@example.test",
+      role: "Member",
+      status: "Active",
+      registrationStatus: "Activated",
+      accountActivated: true,
+      activatedAt: "2026-11-27T00:00:00.000Z",
+      invitationId: "fixture-invitation"
+    }
+  }],
+  invitations: [{
+    id: "fixture-invitation",
+    data: {
+      email: "fixture-member@example.test",
+      status: "Activated",
+      acceptedUid: "fixture-member-uid"
+    }
+  }],
+  adminProfiles: [],
+  employees: [],
+  auditorProfiles: [],
+  signatureProfiles: [{
+    id: "fixture-member-uid",
+    data: {
+      uid: "fixture-member-uid",
+      email: "fixture-member@example.test",
+      status: "Active"
+    }
+  }],
+  signerIdentities: []
+};
+Module._load = function(request, parent, isMain) {
+  if (request === "firebase-admin/app") {
+    return { initializeApp() {}, cert(value) { return value; } };
+  }
+  if (request === "firebase-admin/auth") {
+    return { getAuth() { return { async listUsers() { return { users: [fixtureUser] }; } }; } };
+  }
+  if (request === "firebase-admin/firestore") {
+    return {
+      getFirestore() {
+        return {
+          collection(name) {
+            return {
+              async get() {
+                const entries = fixtureDocs[name] || [];
+                return {
+                  docs: entries.map(entry => ({
+                    id: entry.id,
+                    data() { return entry.data; }
+                  }))
+                };
+              }
+            };
+          }
+        };
+      }
+    };
+  }
+  return originalLoad.call(this, request, parent, isMain);
+};
+\`;
+  fs.writeFileSync(mockPath, mockCode);
+  const summaryPath = path.join(tempRoot, "step-summary.md");
+  const scriptPath = path.resolve(process.cwd(), "scripts/member-account-compatibility-audit.cjs");
+  try {
+    const stdout = execFileSync(process.execPath, ["--require", mockPath, scriptPath], {
+      cwd: tempRoot,
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        FIREBASE_SERVICE_ACCOUNT: JSON.stringify({ project_id: "irpa-digital-board-governance" }),
+        GITHUB_STEP_SUMMARY: summaryPath
+      }
+    });
+    assert.match(stdout, /AUDIT_COMPLETE/);
+    assert.match(stdout, /ACCOUNT_COMPATIBILITY_DRY_RUN_COUNTS=/);
+    assert.doesNotMatch(stdout, /ReferenceError|fixture-member|fixture@example/);
+    const summary = fs.readFileSync(summaryPath, "utf8");
+    assert.match(summary, /Accounts by category/);
+    assert.match(summary, /Findings by reason code/);
+    assert.doesNotMatch(summary, /fixture-member|fixture@example|uid|email/i);
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
