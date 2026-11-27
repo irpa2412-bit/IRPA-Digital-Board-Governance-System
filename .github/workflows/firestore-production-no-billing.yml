@@ -4,13 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       confirm_production_firestore_rules_deployment:
-        description: "Select yes to authorize publishing production Firestore rules and indexes"
+        description: "Type exactly DEPLOY RULES to authorize publishing production Firestore rules and indexes"
         required: true
-        type: choice
-        options:
-          - "no"
-          - "yes"
-        default: "no"
+        type: string
 
 permissions:
   contents: read
@@ -42,8 +38,19 @@ jobs:
         with:
           project_id: irpa-digital-board-governance
 
+      - name: Require exact production rules confirmation
+        shell: bash
+        env:
+          CONFIRMATION: ${{ inputs.confirm_production_firestore_rules_deployment }}
+        run: |
+          set -euo pipefail
+          if [[ "$CONFIRMATION" != "DEPLOY RULES" ]]; then
+            echo "::error::Production Firestore deployment requires the exact confirmation DEPLOY RULES."
+            exit 1
+          fi
+
       - name: Deploy Firestore Rules and Indexes only
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.confirm_production_firestore_rules_deployment == 'yes'
+        if: github.event_name == 'workflow_dispatch' && inputs.confirm_production_firestore_rules_deployment == 'DEPLOY RULES'
         run: |
           set -euo pipefail
           npx --yes firebase-tools deploy --project irpa-digital-board-governance --only firestore:rules,firestore:indexes --non-interactive
