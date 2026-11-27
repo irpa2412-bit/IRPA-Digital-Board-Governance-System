@@ -84,8 +84,22 @@ async function allUsers(a){let out=[],token;do{const p=await a.listUsers(1000,to
  const categoryCounts=Object.fromEntries([...categorySets].map(([k,v])=>[k,v.size])),loginPathCounts=accountSummaries.reduce((o,x)=>(o[x.loginPathState]=(o[x.loginPathState]||0)+1,o),{});
  const report={schemaVersion:1,auditMode:"READ_ONLY",targetProjectId:PROJECT,targetPlan:"ADMIN_ONLY_MEMBERS_WORKER_ACTIVATION_ALLOWLISTED_SIGNATURE_PROFILES",generatedAt:new Date().toISOString(),policyReference:{proposedMemberRule:"members/{id}: update allowed only for administrator",signatureProfileAllowlist:[...ALLOW],legacyFieldHandling:"Existing fields outside allowlist are reported but preserved; proposed update rule checks changedKeys."},scannedCounts:{firebaseAuthUsers:users.length,memberRecords:members.length,invitationRecords:invitations.length,adminProfiles:admins.length,employeeRecords:employees.length,auditorProfiles:auditors.length,signatureProfiles:profiles.length,signerIdentities:signers.length},categoryCounts,reasonCodeCounts:reasonCounts,loginPathCounts,distinctAccountsWithBlockingFindings:blocked.size,distinctAccountsWithLoginPathDenials:loginDenied.size,findings,accountSummaries};
  const fs=require("node:fs");fs.mkdirSync("reports",{recursive:true});fs.writeFileSync("reports/member-account-compatibility-dry-run.json",JSON.stringify(report,null,2)+"\n",{mode:0o600});
- const safe={auditMode:"READ_ONLY",targetProjectId:PROJECT,generatedAt:report.generatedAt,scannedCounts:report.scannedCounts,categoryCounts,reasonCodeCounts,loginPathCounts,distinctAccountsWithBlockingFindings:blocked.size,distinctAccountsWithLoginPathDenials:loginDenied.size,rawPersonalDataInLogs:false,rawPersonalDataInSummary:false};
- console.log("ACCOUNT_COMPATIBILITY_DRY_RUN_SUMMARY="+JSON.stringify(safe));
- const summary=["## IRPA member account compatibility — read-only dry run","","Project: "+PROJECT,"Mode: READ_ONLY","Firebase Auth users scanned: **"+users.length+"**","Member records scanned: **"+members.length+"**","Distinct accounts with blocking findings: **"+blocked.size+"**","Distinct accounts with login-path denials: **"+loginDenied.size+"**","","### Counts by category","","| Category | Accounts |","|---|---:|",...Object.entries(categoryCounts).sort(([a],[b])=>a.localeCompare(b)).map(([k,v])=>"| "+k+" | "+v+" |"),"","### Counts by reason code","","| Reason code | Findings |","|---|---:|",...Object.entries(reasonCounts).sort(([a],[b])=>a.localeCompare(b)).map(([k,v])=>"| "+k+" | "+v+" |"),"","The one-day artifact contains pseudonymous account/document references and reason codes only. No names, emails, raw UIDs, document IDs or document field values are written to logs or this summary.",""].join("\n");
- fs.writeFileSync(process.env.GITHUB_STEP_SUMMARY,summary);console.log("AUDIT_COMPLETE");
+ const safe={categoryCounts,reasonCodeCounts};
+ console.log("ACCOUNT_COMPATIBILITY_DRY_RUN_COUNTS="+JSON.stringify(safe));
+ const summary=[
+  "## Accounts by category",
+  "",
+  "| Category | Account count |",
+  "|---|---:|",
+  ...Object.entries(categoryCounts).sort(([a],[b])=>a.localeCompare(b)).map(([k,v])=>"| "+k+" | "+v+" |"),
+  "",
+  "## Findings by reason code",
+  "",
+  "| Reason code | Finding count |",
+  "|---|---:|",
+  ...Object.entries(reasonCounts).sort(([a],[b])=>a.localeCompare(b)).map(([k,v])=>"| "+k+" | "+v+" |"),
+  ""
+ ].join("\n");
+ fs.writeFileSync(process.env.GITHUB_STEP_SUMMARY,summary);
+ console.log("AUDIT_COMPLETE");
 })().catch(e=>{const code=String(e&&(e.code||e.name)||"UNCLASSIFIED").replace(/[^A-Z0-9_:-]/gi,"_").slice(0,80);console.error("ACCOUNT_COMPATIBILITY_DRY_RUN_FAILED="+code);process.exit(1);});
