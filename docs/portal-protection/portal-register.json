@@ -131,7 +131,8 @@
         "drive-gateway/tests/meeting-environment.test.mjs",
         "src/FieldEntryDataGate.jsx",
         "src/pages/Resolutions.jsx",
-        "src/pages/Voting.jsx"
+        "src/pages/Voting.jsx",
+        "tests/meeting-isolation-guard.test.mjs"
       ],
       "sharedDependencies": [
         "src/App.jsx",
