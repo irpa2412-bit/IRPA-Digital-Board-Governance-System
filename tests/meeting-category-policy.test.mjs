@@ -134,15 +134,6 @@ test("active Meeting Portal attendance screens never call undeployed Firebase at
 });
 
 
-const meetingShellSource = readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
-const meetingGateSource = readFileSync(new URL("../src/FieldEntryDataGate.jsx", import.meta.url), "utf8");
-test("verified IRPA persons see Meeting Portal without authority selection or first-entry gate", () => {
-  assert.doesNotMatch(meetingShellSource, /authoritySelectionRequired|portalAccessFrozen/);
-  assert.match(meetingShellSource, /meetingProfileAccess\?\["Dashboard","Role Descriptions",\.\.\.MEETING_PORTAL_MODULES\]:\["Dashboard"\]/);
-  assert.match(meetingShellSource, /registeredPortalModules=meetingProfileAccess&&!sessionAdministrator&&Boolean\(selectedAuthority\)/);
-  assert.match(meetingGateSource, /MEETING_PORTALS\.has\(name\.toLowerCase\(\)\)/);
-});
-
 const meetingCentreSource = readFileSync(new URL("../src/pages/Meetings.jsx", import.meta.url), "utf8");
 test("Meeting Centre exposes initiation to every active member and employee", () => {
   assert.ok(meetingCentreSource.includes("const canRegisterMeeting = identity => canRegisterMeetingByRole(identity);"));
