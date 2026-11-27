@@ -1,0 +1,34 @@
+name: Member account compatibility audit contract
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/member-account-compatibility-dry-run.yml"
+      - "scripts/member-account-compatibility-audit.cjs"
+      - "tests/member-account-compatibility-audit.test.cjs"
+      - ".github/workflows/member-account-compatibility-audit-test.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/member-account-compatibility-dry-run.yml"
+      - "scripts/member-account-compatibility-audit.cjs"
+      - "tests/member-account-compatibility-audit.test.cjs"
+      - ".github/workflows/member-account-compatibility-audit-test.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  audit-contract:
+    name: Audit safety and runtime contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Syntax-check read-only audit script
+        run: node --check scripts/member-account-compatibility-audit.cjs
+      - name: Run audit regression tests
+        run: node --test tests/member-account-compatibility-audit.test.cjs
