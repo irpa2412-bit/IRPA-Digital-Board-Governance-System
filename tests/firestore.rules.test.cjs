@@ -97,7 +97,8 @@ test("members can maintain ordinary profile fields but cannot self-assign instit
     ["registrationStatus","Activated"],
     ["activatedAt",new Date("2026-11-27T07:00:00.000Z")]
   ]) {
-    await assertFails(profile.update({ [field]: value }));
+    try { await assertFails(profile.update({ [field]: value })); }
+    catch (error) { throw new Error(`Member self-update unexpectedly allowed protected field ${field}: ${error.message}`); }
   }
 
   const adminDb = testEnv.authenticatedContext("admin-user", {
