@@ -1,5 +1,7 @@
 "use strict";
 const crypto=require("node:crypto"),path=require("node:path"),{createRequire}=require("node:module");
+const {createAuditErrorDiagnostics}=require("./audit-error-diagnostics.cjs");
+const auditDiagnostics=createAuditErrorDiagnostics();
 const req=createRequire(path.resolve(process.cwd(),"functions/package.json"));
 const {initializeApp,cert}=req("firebase-admin/app"),{getAuth}=req("firebase-admin/auth"),{getFirestore}=req("firebase-admin/firestore");
 const PROJECT="irpa-digital-board-governance";
@@ -11,11 +13,11 @@ const activeEmployee=d=>norm(d.status)==="active"||norm(d.employmentStatus)==="a
 const activeAuditor=d=>d.active!==false&&(d.active===true||["active","activated"].includes(norm(d.status))||norm(d.registrationStatus)==="activated"||d.accountActivated===true);
 const add=x=>findings.push({...x,accountRef:hash("account",x.accountKey),...(x.recordKey?{recordRef:hash("record",x.recordKey)}:{}),accountKey:undefined,recordKey:undefined});
 const dedupe=xs=>[...new Map(xs.filter(Boolean).map(x=>[x.id||x.uid,x])).values()];
-const read=async(db,n)=>{const s=await db.collection(n).get();return s.docs.map(d=>({id:d.id,data:d.data()||{}}));};
-async function allUsers(a){let out=[],token;do{const p=await a.listUsers(1000,token);out.push(...p.users);token=p.pageToken;}while(token);return out;}
+const read=async(db,n)=>{const s=await db.collection(n).get();return s.docs.map(d=>{auditDiagnostics.registerSensitiveValue(d.id);const data=d.data()||{};auditDiagnostics.registerIdentity(data);return {id:d.id,data};});};
+async function allUsers(a){let out=[],token;do{const p=await a.listUsers(1000,token);for(const user of p.users||[]){auditDiagnostics.registerIdentity(user);auditDiagnostics.registerSensitiveValue(user.uid);auditDiagnostics.registerSensitiveValue(user.email);}out.push(...p.users);token=p.pageToken;}while(token);return out;}
 (async()=>{
  const raw=process.env.FIREBASE_SERVICE_ACCOUNT;if(!raw)throw new Error("SERVICE_ACCOUNT_SECRET_MISSING");
- const sa=JSON.parse(raw);if(sa.project_id!==PROJECT)throw new Error("SERVICE_ACCOUNT_PROJECT_MISMATCH");
+ const sa=JSON.parse(raw);auditDiagnostics.registerSensitiveValue(sa.client_email);if(sa.project_id!==PROJECT)throw new Error("SERVICE_ACCOUNT_PROJECT_MISMATCH");
  initializeApp({credential:cert(sa),projectId:PROJECT});
  const auth=getAuth(),db=getFirestore();
  const [users,members,invitations,admins,employees,auditors,profiles,signers]=await Promise.all([
@@ -102,4 +104,4 @@ async function allUsers(a){let out=[],token;do{const p=await a.listUsers(1000,to
  ].join("\n");
  fs.writeFileSync(process.env.GITHUB_STEP_SUMMARY,summary);
  console.log("AUDIT_COMPLETE");
-})().catch(e=>{const code=String(e&&(e.code||e.name)||"UNCLASSIFIED").replace(/[^A-Z0-9_:-]/gi,"_").slice(0,80);console.error("ACCOUNT_COMPATIBILITY_DRY_RUN_FAILED="+code);process.exit(1);});
+})().catch(e=>{const diagnostic=auditDiagnostics.formatFailure(e);console.error("ACCOUNT_COMPATIBILITY_DRY_RUN_FAILED="+diagnostic.code);console.error("ACCOUNT_COMPATIBILITY_DRY_RUN_ERROR_MESSAGE="+diagnostic.message);console.error("ACCOUNT_COMPATIBILITY_DRY_RUN_ERROR_STACK_BEGIN");console.error(diagnostic.stack);console.error("ACCOUNT_COMPATIBILITY_DRY_RUN_ERROR_STACK_END");process.exit(1);});

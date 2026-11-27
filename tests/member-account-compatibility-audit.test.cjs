@@ -4,6 +4,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
+const { createAuditErrorDiagnostics } = require("../scripts/audit-error-diagnostics.cjs");
 
 const auditSource = fs.readFileSync(
   path.resolve(process.cwd(), "scripts/member-account-compatibility-audit.cjs"),
@@ -161,4 +162,54 @@ Module._load = function(request, parent, isMain) {
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }
+});
+
+
+test("audit failure diagnostics preserve useful message and stack while redacting identities", () => {
+  const diagnostics = createAuditErrorDiagnostics();
+  const identities = {
+    uid: "fixture-uid-4a782c",
+    email: "amina.msuya@example.test",
+    displayName: "Amina Msuya",
+    firstName: "Amina",
+    lastName: "Msuya",
+    nested: { documentId: "fixture-member-record-91" }
+  };
+  diagnostics.registerIdentity(identities);
+
+  const error = new Error(
+    "Failed to read members/fixture-member-record-91 for Amina Msuya " +
+    "(uid=fixture-uid-4a782c, email=amina.msuya@example.test): permission denied"
+  );
+  error.code = "firestore/permission-denied";
+  error.stack =
+    "Error: " + error.message +
+    "\n    at readMemberRecords (/workspace/scripts/member-account-compatibility-audit.cjs:42:11)";
+
+  const formatted = diagnostics.formatFailure(error);
+  assert.equal(formatted.code, "firestore/permission-denied");
+  assert.match(formatted.message, /Failed to read/);
+  assert.match(formatted.message, /permission denied/);
+  assert.match(formatted.stack, /at readMemberRecords/);
+  assert.match(formatted.stack, /REDACTED/);
+  for (const secret of [
+    "fixture-uid-4a782c",
+    "amina.msuya@example.test",
+    "Amina Msuya",
+    "fixture-member-record-91"
+  ]) {
+    const escaped = secret.split("").map(character =>
+      "\\^$.*+?()[]{}|".includes(character) ? "\\" + character : character
+    ).join("");
+    assert.doesNotMatch(formatted.message, new RegExp(escaped, "i"));
+    assert.doesNotMatch(formatted.stack, new RegExp(escaped, "i"));
+  }
+});
+
+test("audit top-level failure handler emits sanitized message and stack markers", () => {
+  assert.match(auditSource, /auditDiagnostics\.formatFailure\(e\)/);
+  assert.match(auditSource, /ACCOUNT_COMPATIBILITY_DRY_RUN_ERROR_MESSAGE=/);
+  assert.match(auditSource, /ACCOUNT_COMPATIBILITY_DRY_RUN_ERROR_STACK_BEGIN/);
+  assert.match(auditSource, /ACCOUNT_COMPATIBILITY_DRY_RUN_ERROR_STACK_END/);
+  assert.doesNotMatch(auditSource, /console\.error\(e\)/);
 });
