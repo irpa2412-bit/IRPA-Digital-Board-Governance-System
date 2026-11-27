@@ -28,8 +28,12 @@ export async function getRecoveryQueue(ctx,user,{limit=25,offset=0,recordAccess=
   const safeOffset=Math.max(0,Math.min(10000,Number.isInteger(Number(offset))?Number(offset):0));
   const [legacyRows,signatureRows,firestoreLegacyRows,firestoreSignatureRows]=await Promise.all([
     ctx.meta.list("envelopes"),ctx.meta.list("signatureEnvelopes"),
-    ctx.firestore?.list?ctx.firestore.list("envelopes"):Promise.resolve([]),
-    ctx.firestore?.list?ctx.firestore.list("signatureEnvelopes"):Promise.resolve([])
+    ctx.firestore?.listOwned
+      ?ctx.firestore.listOwned("envelopes",user.uid,{admin:user.isAdmin===true})
+      :(ctx.firestore?.list?ctx.firestore.list("envelopes"):Promise.resolve([])),
+    ctx.firestore?.listOwned
+      ?ctx.firestore.listOwned("signatureEnvelopes",user.uid,{admin:user.isAdmin===true})
+      :(ctx.firestore?.list?ctx.firestore.list("signatureEnvelopes"):Promise.resolve([]))
   ]);
   const byId=new Map();
   for(const row of legacyRows||[])byId.set("envelopes/"+row.id,{...row,__collection:"envelopes",__source:"durable-object"});
