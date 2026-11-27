@@ -137,6 +137,8 @@ const allowed = new Set([
   "src/pages/MeetingRoom.jsx",
   "src/pages/OperationalGatewaysParticipants.jsx",
   "src/pages/Meetings.jsx",
+  "src/pages/Resolutions.jsx",
+  "drive-gateway/tests/meeting-services-router.test.mjs",
   "src/firebase/data.js",
   "firestore.rules",
   "tests/meeting-category-firestore-rules.test.cjs",
