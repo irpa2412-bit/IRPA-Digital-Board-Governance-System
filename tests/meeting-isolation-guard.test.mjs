@@ -8,7 +8,7 @@ const guardPath = new URL("../scripts/meeting-portal-fixture-isolation-guard.sh"
 const guardSource = fs.existsSync(guardPath) ? readFileSync(guardPath, "utf8") : "";
 const guardAvailable = guardSource.includes('BASE_REF="${GITHUB_BASE_REF:-main}"');
 const guard = guardAvailable ? guardSource : "";
-const guardTest = (name, fn) => guardTest(name, { skip: !guardAvailable }, fn);
+const guardTest = (name, fn) => test(name, { skip: !guardAvailable }, fn);
 const policy = readFileSync(new URL("../scripts/portal-repair-window-guard-policy.mjs", import.meta.url), "utf8");
 
 guardTest("isolation baseline compares against the actual fetched PR base (or main for push runs)", () => {
