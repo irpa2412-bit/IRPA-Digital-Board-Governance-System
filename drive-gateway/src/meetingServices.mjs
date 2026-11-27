@@ -152,8 +152,8 @@ async function context(ctx,env,token,claims,meetingId){
  if(!meetingId)throw Object.assign(new Error("Meeting ID is required."),{status:400});
  const meeting=await getDoc(ctx,env,token,"meetings",meetingId);
  if(!meeting)throw Object.assign(new Error("Meeting record not found."),{status:404});
- const [adminProfile,member,employee,participants]=await Promise.all([
-  getDoc(ctx,env,token,"adminProfiles",uid),getDoc(ctx,env,token,"members",uid),getDoc(ctx,env,token,"employees",uid),
+ const [member,employee,participants]=await Promise.all([
+  getDoc(ctx,env,token,"members",uid),getDoc(ctx,env,token,"employees",uid),
   listByField(ctx,env,token,"participants","meetingId",meetingId)
  ]);
  const activeRecord=r=>!!r&&["active","activated"].includes(lower(r.status||r.registrationStatus||r.employmentStatus));
