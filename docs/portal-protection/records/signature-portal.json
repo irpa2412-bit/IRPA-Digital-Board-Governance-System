@@ -32,7 +32,8 @@
       "drive-gateway/tests/signature-distribution.test.mjs",
       "docs/signature-recovery/signature-email-link-distribution-change-record-2026-11-24.md",
       "src/App.jsx",
-      "scripts/meeting-portal-fixture-isolation-guard.sh"
+      "scripts/meeting-portal-fixture-isolation-guard.sh",
+      "scripts/portal-protection-smoke.mjs"
     ],
     "expectedEffect": "The shared application shell makes the complete Meeting Portal module set available to every identity with a Members or Employees register record, regardless of active status or selected authority. It does not change this portal's own data, workflows, permissions or role controls.",
     "prohibitedChanges": [
@@ -300,6 +301,14 @@
         "drive-gateway/tests/completed-document-route.test.mjs"
       ],
       "prohibitedBehaviorUnchanged": true
+    },
+    {
+      "at": "2026-11-27T19:18:44.436Z",
+      "action": "owner-authorised shared protection-cycle diagnostic visibility extension",
+      "files": [
+        "scripts/portal-protection-smoke.mjs"
+      ],
+      "reason": "Expose complete failing portal smoke diagnostics without bypassing or weakening any portal lock tests."
     }
   ],
   "repairWindow": {
@@ -510,7 +519,8 @@
     "reason": "Owner-authorised coordinated shared-file protection cycle for src/App.jsx. This portal independently verifies the shared navigation-shell change while preserving its own authorization, data, workflow and governance boundaries.",
     "files": [
       "src/App.jsx",
-      "scripts/meeting-portal-fixture-isolation-guard.sh"
+      "scripts/meeting-portal-fixture-isolation-guard.sh",
+      "scripts/portal-protection-smoke.mjs"
     ],
     "expectedEffect": "The shared application shell makes the complete Meeting Portal module set available to every identity with a Members or Employees register record, regardless of active status or selected authority. It does not change this portal's own data, workflows, permissions or role controls.",
     "prohibitedChanges": [
