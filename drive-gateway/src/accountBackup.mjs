@@ -100,7 +100,11 @@ export function createAccountBackupRouter({ authenticateFirebaseRequest, getDriv
         if (!bytes.length || bytes.length > MAX_BACKUP_BYTES || bytes.length !== declaredSize) {
           return json({ ok:false, error:"BACKUP_READBACK_SIZE_INVALID" }, 502, headers);
         }
-        return json({ ok:true, fileId, fileName:metadata.name, byteLength:bytes.length, sha256:await sha256Hex(bytes), encryptedPayload:btoa(String.fromCharCode(...bytes)) }, 200, headers);
+        let binary = "";
+        for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+          binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+        }
+        return json({ ok:true, fileId, fileName:metadata.name, byteLength:bytes.length, sha256:await sha256Hex(bytes), encryptedPayload:btoa(binary) }, 200, headers);
       }
 
       if (pathname === "/api/account-backup/verify") {
