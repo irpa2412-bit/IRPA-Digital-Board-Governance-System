@@ -463,7 +463,7 @@ test("Meeting Worker allows universal portal initiation while retaining particip
 });
 
 test("Meeting Worker exposes public outcomes separately and never publishes raw ballots from room activity", () => {
-  assert.match(meetingServicesGovernanceSource, /\\/api\\/meeting-outcomes\\/public/);
+  assert.match(meetingServicesGovernanceSource, /\/api\/meeting-outcomes\/public/);
   assert.match(meetingServicesGovernanceSource, /meetingPublicOutcomes/);
   assert.match(meetingServicesGovernanceSource, /summarizeMeetingVotes/);
   const activity = meetingServicesGovernanceSource.match(/if\(pathname==="\/api\/meeting-room\/activity"\)\{([\s\S]*?)\n\}/)?.[1] || "";
