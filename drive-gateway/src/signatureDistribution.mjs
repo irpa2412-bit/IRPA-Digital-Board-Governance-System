@@ -79,7 +79,7 @@ export async function getSignatureDistributionSummary(ctx,envelopeId,envelope=nu
     const row=index>=0?rows[index]:null;
     if(index>=0)matched.add(index);
     const skipped=!recipient.email;
-    return{recipientKey:recipient.recipientKey,signerIds:recipient.signerIds,recipientAddress:maskAddress(recipient.email)||recipient.name||"Recipient",recipientRoles:recipient.roles,accepted:row?.acceptedByMailServer===true,status:skipped?"Skipped":row?.status||"Not Attempted",stageCode:row?.stageCode||(skipped?"RECIPIENT_EMAIL_MISSING":null),replyCategory:row?.replyCategory||"UNKNOWN",attempts:Number(row?.attempts||0),lastError:row?.lastError||null,lastAttemptAt:row?.lastAttemptAt||null,sentAt:row?.sentAt||null};
+    return{recipientKey:recipient.recipientKey,signerIds:recipient.signerIds,recipientAddress:maskAddress(recipient.email)||recipient.name||"Recipient",recipientRoles:recipient.roles,accepted:row?.acceptedByMailServer===true,status:row?.status||(skipped?"Skipped":"Not Attempted"),stageCode:row?.stageCode||(skipped?"RECIPIENT_EMAIL_MISSING":null),replyCategory:row?.replyCategory||"UNKNOWN",attempts:Number(row?.attempts||0),lastError:row?.lastError||null,lastAttemptAt:row?.lastAttemptAt||null,sentAt:row?.sentAt||null};
   });
   const deliveries=[...expectedDeliveries];
   rows.forEach((row,index)=>{if(!matched.has(index))deliveries.push({recipientAddress:row.maskedAddress||maskAddress(row.recipientEmail)||"Recipient",recipientRoles:row.recipientRoles||[],accepted:row.acceptedByMailServer===true,status:row.status,stageCode:row.stageCode||null,replyCategory:row.replyCategory||"UNKNOWN",attempts:Number(row.attempts||0),lastError:row.lastError||null,lastAttemptAt:row.lastAttemptAt||null,sentAt:row.sentAt||null});});
