@@ -101,7 +101,7 @@ jobs:
             } while(pageToken);
             const byUid=new Map(currentUsers.map(u=>[u.uid,u]));
             const byEmail=new Map();
-            for(const u of currentUsers) if(u.email){const k=u.email.toLowerCase();if(!byEmail.has(k))byEmail.set(k,[]);byEmail.get(k).push(u));}
+            for(const u of currentUsers) if(u.email){const k=u.email.toLowerCase();if(!byEmail.has(k))byEmail.set(k,[]);byEmail.get(k).push(u);}
             let authUidMatches=0,authMissing=0,authConflicts=0;
             for(const u of backup.authUsers){
               const sameUid=byUid.get(u.uid),sameEmail=u.email?(byEmail.get(u.email.toLowerCase())||[]):[];
