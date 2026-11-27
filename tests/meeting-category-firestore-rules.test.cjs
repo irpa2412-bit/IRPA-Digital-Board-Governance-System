@@ -388,7 +388,7 @@ test("ordinary governance ballots are restricted to listed Board Members and Boa
   await assertFails(castRuleTestVote(staffDb, { meetingId: "board-vote", issueId: "board-issue", uid: "staff-user", leadershipElection: false }));
 });
 
-test("active listed members and employees can vote in a Transition Committee leadership election, but only its Chair or Secretary can close the ballot", async () => {
+test("active listed members and employees can vote in a Transition Committee election; direct client ballot closure is denied", async () => {
   await testEnv.withSecurityRulesDisabled(async context => {
     const db = context.firestore();
     await db.doc("meetings/staff-election").set(meeting({
@@ -408,7 +408,8 @@ test("active listed members and employees can vote in a Transition Committee lea
   await assertFails(staffDb.doc("votingIssues/staff-election-issue").update({
     status: "Closed", result: "Passed", closedAt: new Date(), updatedAt: new Date()
   }));
-  await assertSucceeds(chairDb.doc("votingIssues/staff-election-issue").update({
+  // Ballot closure is performed by the authenticated Cloudflare Worker; direct client writes remain denied.
+  await assertFails(chairDb.doc("votingIssues/staff-election-issue").update({
     status: "Closed", result: "Passed", closedAt: new Date(), updatedAt: new Date()
   }));
 });
