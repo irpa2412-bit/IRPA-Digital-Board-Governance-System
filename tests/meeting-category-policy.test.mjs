@@ -366,6 +366,33 @@ test("production and staging Firestore rules enforce the same Meeting Portal aut
 });
 
 
+test("Meeting Worker requires a verified IRPA person and participant membership for private meeting context", () => {
+  assert.match(meetingServicesGovernanceSource, /const isAdminIdentity=claims\.admin===true/);
+  assert.match(meetingServicesGovernanceSource, /if\(isAdminIdentity&&!activeIdentity\)/);
+  assert.match(meetingServicesGovernanceSource, /if\(!explicitParticipant\)/);
+  assert.match(meetingServicesGovernanceSource, /canRead:true/);
+  assert.match(meetingServicesGovernanceSource, /isAdmin:false/);
+  assert.doesNotMatch(meetingServicesGovernanceSource, /canRead:canManage\|\|participant\|\|isAdmin/);
+  assert.match(meetingServicesGovernanceSource, /if\(!\(active\(member\)\|\|active\(employee\)\)\)return fail/);
+});
+
+test("Meeting Worker exposes public outcomes separately and never publishes raw ballots from room activity", () => {
+  assert.match(meetingServicesGovernanceSource, /\\/api\\/meeting-outcomes\\/public/);
+  assert.match(meetingServicesGovernanceSource, /meetingPublicOutcomes/);
+  assert.match(meetingServicesGovernanceSource, /summarizeMeetingVotes/);
+  const activity = meetingServicesGovernanceSource.split('if(pathname==="/api/meeting-room/activity"){')[1]?.split("\\n}")[0] || "";
+  assert.ok(activity.includes("meetingRoomEvents"));
+  assert.ok(!activity.includes('"votes"'));
+  assert.ok(!activity.includes("visibleVotes"));
+});
+
+test("Meeting Worker allows participants to retrieve archived private records without modifying archive state", () => {
+  assert.match(meetingServicesGovernanceSource, /isRetrievableMeetingRecordStatus\\(r\.status\\)/);
+  assert.match(meetingServicesGovernanceSource, /isRetrievableMeetingRecordStatus\\(record\.status\\)/);
+  assert.match(meetingServicesGovernanceSource, /return \["active","archived"\]\.includes\(lower\(status\)\)/);
+});
+
+
 const meetingServicesGovernanceSource = readFileSync(new URL("../drive-gateway/src/meetingServices.mjs", import.meta.url), "utf8");
 const meetingRoomGovernanceSource = readFileSync(new URL("../src/pages/MeetingRoom.jsx", import.meta.url), "utf8");
 const votingPageGovernanceSource = readFileSync(new URL("../src/pages/Voting.jsx", import.meta.url), "utf8");

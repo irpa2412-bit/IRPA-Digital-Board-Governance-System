@@ -49,6 +49,8 @@ test("meeting register, decision, and voting control routes require authenticate
     "/api/meeting-actions/create",
     "/api/meeting-voting/open",
     "/api/meeting-voting/close",
+    "/api/meeting-voting/participant-list",
+    "/api/meeting-outcomes/public",
     "/api/meeting-participants/create",
     "/api/meeting-participants/update",
     "/api/meeting-participants/delete",
@@ -70,6 +72,29 @@ test("meeting register, decision, and voting control routes require authenticate
     assert.equal(response.status, 401, path);
     assert.match((await response.json()).error, /sign-in/i, path);
   }
+});
+
+
+test("closed vote summaries aggregate only counts and preserve the tie result", async () => {
+  const { summarizeMeetingVotes } = await import("../src/meetingServices.mjs");
+  const summary = summarizeMeetingVotes([
+    { outcome: "For" }, { outcome: "For" }, { outcome: "Against" },
+    { outcome: "Abstain" }, { outcome: "Unknown" }
+  ]);
+  assert.deepEqual(summary, {
+    tallies: { For: 2, Against: 1, Abstain: 1, total: 4 },
+    result: "Passed"
+  });
+  assert.equal(summarizeMeetingVotes([{ outcome: "For" }, { outcome: "Against" }]).result, "Pending");
+});
+
+test("archived meeting records are retrievable without treating unknown status as active", async () => {
+  const { isRetrievableMeetingRecordStatus } = await import("../src/meetingServices.mjs");
+  assert.equal(isRetrievableMeetingRecordStatus("Active"), true);
+  assert.equal(isRetrievableMeetingRecordStatus("Archived"), true);
+  assert.equal(isRetrievableMeetingRecordStatus("ARCHIVED"), true);
+  assert.equal(isRetrievableMeetingRecordStatus("Deleted"), false);
+  assert.equal(isRetrievableMeetingRecordStatus(""), false);
 });
 
 test("direct attendance signature endpoint is retired in favour of Signature Portal email-link envelopes", async () => {
