@@ -102,7 +102,9 @@ jobs:
               const uidMatch = uid ? byUid.get(uid) : null;
               const emailMatches = email ? (byEmail.get(email) || []) : [];
               const match = uidMatch || (emailMatches.length === 1 ? emailMatches[0] : null);
-              const status = uidMatch && emailMatches.length > 1 ? "UID_MATCH_EMAIL_AMBIGUOUS"
+              const uidEmailMismatch = uidMatch && email && String(uidMatch.email || "").toLowerCase() !== email;
+              const status = uidEmailMismatch ? "UID_MATCH_EMAIL_MISMATCH"
+                : uidMatch && emailMatches.length > 1 ? "UID_MATCH_EMAIL_AMBIGUOUS"
                 : uidMatch ? "UID_MATCH"
                 : emailMatches.length === 1 ? "UNIQUE_EMAIL_MATCH_UID_REVIEW"
                 : emailMatches.length > 1 ? "AMBIGUOUS_EMAIL_MATCH"
@@ -154,6 +156,14 @@ jobs:
               plaintextSha256:plaintextDigest, ciphertext:ciphertext.toString("base64")
             });
             const encryptedBytes = Buffer.from(encryptedEnvelope, "utf8");
+            const checkEnvelope = JSON.parse(encryptedEnvelope);
+            const decipher = crypto.createDecipheriv("aes-256-gcm", key, Buffer.from(checkEnvelope.iv, "base64"));
+            decipher.setAuthTag(Buffer.from(checkEnvelope.tag, "base64"));
+            const roundTrip = Buffer.concat([decipher.update(Buffer.from(checkEnvelope.ciphertext, "base64")), decipher.final()]);
+            if (crypto.createHash("sha256").update(roundTrip).digest("hex") !== plaintextDigest ||
+                roundTrip.toString("utf8") !== plaintext) {
+              throw new Error("AES-256-GCM encryption round-trip verification failed.");
+            }
             const encryptedDigest = crypto.createHash("sha256").update(encryptedBytes).digest("hex");
             const fileName = "irpa-account-backup-" + generatedAt.replace(/[:.]/g, "-") + ".enc.json";
 
