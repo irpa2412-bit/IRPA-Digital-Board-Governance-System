@@ -86,18 +86,8 @@ export async function getFinanceTrialRecords(collectionName){const ref=collectio
 export async function getAccessibleMeetingRecords(){
   const user=auth.currentUser;
   if(!user?.uid)throw new Error("Sign in to view the meeting register.");
-  const uid=String(user.uid);
-  const email=String(user.email||"").trim().toLowerCase();
-  const ref=collection(db,COLLECTIONS.meetings);
-  const jobs=[];
-  for(const field of ["initiatorUid","createdByUid","organizerUid","organiserUid","coOrganizerUid","coOrganiserUid"])jobs.push(query(ref,where(field,"==",uid)));
-  for(const field of ["participantUids","attendeeUids","invitedUids","coOrganizerUids","coOrganiserUids"])jobs.push(query(ref,where(field,"array-contains",uid)));
-  if(email)for(const field of ["participantEmails","attendeeEmails","invitedEmails"])jobs.push(query(ref,where(field,"array-contains",email)));
-  const results=await Promise.all(jobs.map(q=>getDocs(q).catch(()=>null)));
-  const records=new Map();
-  results.forEach(snapshot=>snapshot?.docs?.forEach(item=>records.set(item.id,{id:item.id,...item.data()})));
-  const identity={uid,email};
-  return [...records.values()].filter(meeting=>canAccessMeetingCategory(meeting,identity)).sort((a,b)=>meetingCreatedAt(b)-meetingCreatedAt(a));
+  const snapshot=await getDocs(query(collection(db,"meetingPortalDirectory"),orderBy("createdAt","desc")));
+  return snapshot.docs.map(item=>({id:item.id,...item.data()}));
 }
 function meetingCreatedAt(record={}){const value=record.createdAt;return typeof value?.toMillis==="function"?value.toMillis():typeof value==="number"?value:Date.parse(value||"")||0;}
 
