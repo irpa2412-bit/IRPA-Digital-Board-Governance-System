@@ -1,0 +1,41 @@
+name: Account Backup Gateway Tests
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "drive-gateway/src/accountBackup.mjs"
+      - "drive-gateway/src/index.js"
+      - "drive-gateway/tests/account-backup.test.mjs"
+      - "drive-gateway/package.json"
+      - "drive-gateway/package-lock.json"
+      - ".github/workflows/account-backup-gateway-test.yml"
+  push:
+    branches:
+      - feat/secure-account-backup-custody-20261127
+    paths:
+      - "drive-gateway/src/accountBackup.mjs"
+      - "drive-gateway/src/index.js"
+      - "drive-gateway/tests/account-backup.test.mjs"
+      - "drive-gateway/package.json"
+      - "drive-gateway/package-lock.json"
+      - ".github/workflows/account-backup-gateway-test.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  account-backup-gateway:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: drive-gateway/package-lock.json
+      - name: Install locked Gateway dependencies
+        run: npm ci --prefix drive-gateway --no-audit --no-fund
+      - name: Run complete Drive Gateway unit suite
+        run: npm test --prefix drive-gateway
