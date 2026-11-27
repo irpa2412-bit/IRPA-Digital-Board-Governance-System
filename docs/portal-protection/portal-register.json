@@ -132,7 +132,8 @@
         "src/FieldEntryDataGate.jsx",
         "src/pages/Resolutions.jsx",
         "src/pages/Voting.jsx",
-        "tests/meeting-isolation-guard.test.mjs"
+        "tests/meeting-isolation-guard.test.mjs",
+        "scripts/meeting-portal-fixture-isolation-guard.sh"
       ],
       "sharedDependencies": [
         "src/App.jsx",
