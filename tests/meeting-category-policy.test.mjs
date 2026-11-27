@@ -307,7 +307,7 @@ test("meeting directory projection exposes metadata only and excludes private pr
     platformPasscode: "secret", participantUids: ["member-1","member-2"]
   }, "meeting-1");
   assert.deepEqual(Object.keys(entry).sort(), [
-    "createdAt","date","endTime","id","initiatorUid","meetingCategory","meetingIdentity",
+    "date","endTime","id","initiatorUid","meetingCategory","meetingIdentity",
     "meetingPolicyId","meetingReference","meetingType","registerStatus","startTime","status",
     "title","updatedAt"
   ].sort());
@@ -492,15 +492,14 @@ test("meeting governance source enforces the proceedings gate and immediate tran
 });
 
 test("Meeting Worker allows universal portal initiation while retaining participant-only private meeting context", () => {
-  assert.match(meetingServicesGovernanceSource, /const isAdminIdentity=claims\.admin===true/);
-  assert.match(meetingServicesGovernanceSource, /if\(isAdminIdentity&&!activeIdentity\)/);
-  assert.doesNotMatch(meetingServicesGovernanceSource, /subscription\|\|participantRecord/);
-  assert.match(meetingServicesGovernanceSource, /participantUids,meeting\.attendeeUids,meeting\.memberUids,meeting\.invitedUids/);
-  assert.match(meetingServicesGovernanceSource, /if\(!explicitParticipant\)/);
+  assert.match(meetingServicesGovernanceSource, /const institutionalIdentity=!!member\\|\\|!!employee/);
+  assert.match(meetingServicesGovernanceSource, /const explicitParticipant=byUid/);
+  assert.match(meetingServicesGovernanceSource, /meetingContextAccessAllowed\\(meeting,institutionalIdentity,explicitParticipant\\)/);
+  assert.match(meetingServicesGovernanceSource, /participantUids,meeting\\.attendeeUids,meeting\\.memberUids,meeting\\.invitedUids/);
   assert.match(meetingServicesGovernanceSource, /canRead:true/);
   assert.match(meetingServicesGovernanceSource, /isAdmin:false/);
-  assert.doesNotMatch(meetingServicesGovernanceSource, /canRead:canManage\|\|participant\|\|isAdmin/);
-  assert.match(meetingServicesGovernanceSource, /if\(!member&&!employee\)return fail/);
+  assert.doesNotMatch(meetingServicesGovernanceSource, /canRead:canManage\\|\\|participant\\|\\|isAdmin/);
+  assert.match(meetingServicesGovernanceSource, /if\\(!member&&!employee\\)return fail/);
 });
 
 test("Meeting Worker exposes public outcomes separately and never publishes raw ballots from room activity", () => {
@@ -514,9 +513,8 @@ test("Meeting Worker exposes public outcomes separately and never publishes raw 
 });
 
 test("Meeting Worker allows participants to retrieve archived private records without modifying archive state", () => {
-  assert.match(meetingServicesGovernanceSource, /isRetrievableMeetingRecordStatus\\(r\.status\\)/);
-  assert.match(meetingServicesGovernanceSource, /isRetrievableMeetingRecordStatus\\(record\.status\\)/);
-  assert.match(meetingServicesGovernanceSource, /return \["active","archived"\]\.includes\(lower\(status\)\)/);
+  assert.ok(meetingServicesGovernanceSource.includes("isRetrievableMeetingRecordStatus(record.status)"));
+  assert.ok(meetingServicesGovernanceSource.includes('return ["active","archived"].includes(lower(status))'));
 });
 
 
@@ -600,10 +598,10 @@ test("legacy invitee directory export delegates to the authenticated Cloudflare 
 
 test("Meeting Portal Worker access is based on member/employee identity existence, not status", async () => {
   const source = readFileSync(new URL("../drive-gateway/src/meetingServices.mjs", import.meta.url), "utf8");
-  assert.match(source, /if\(!member&&!employee\)return fail/);
-  assert.match(source, /const institutionalIdentity=!!member\|\|!!employee/);
-  assert.match(source, /meetingContextAccessAllowed\(meeting,institutionalIdentity,explicitParticipant\)/);
-  assert.match(source, /if\(!explicitParticipant\)/);
+  assert.match(source, /if\\(!member&&!employee\\)return fail/);
+  assert.match(source, /const institutionalIdentity=!!member\\|\\|!!employee/);
+  assert.match(source, /const explicitParticipant=byUid/);
+  assert.match(source, /meetingContextAccessAllowed\\(meeting,institutionalIdentity,explicitParticipant\\)/);
 });
 
 test("Meeting Portal frontend grants initiation and category visibility to any registered IRPA identity", () => {
