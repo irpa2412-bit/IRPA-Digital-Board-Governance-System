@@ -40,7 +40,8 @@
       "src/meeting/MeetingAccessControl.jsx",
       "src/pages/OperationalGatewaysParticipants.jsx",
       "tests/meeting-working-documents-security.test.mjs",
-      "drive-gateway/src/index.js"
+      "drive-gateway/src/index.js",
+      "src/FieldEntryDataGate.jsx"
     ],
     "expectedEffect": "The shared application shell makes the complete Meeting Portal module set available to every identity with a Members or Employees register record, regardless of active status or selected authority. It does not change this portal's own data, workflows, permissions or role controls.",
     "prohibitedChanges": [
