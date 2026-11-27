@@ -375,3 +375,10 @@ test("root-only owner lock tests do not install unnecessary Gateway dependencies
 });
 
 // Regression coverage keeps Meeting Portal fixture guard classification portal-scoped.
+
+test("merged PR baseline evidence is revalidated when GitHub omits historical pull_requests metadata", () => {
+  assert.ok(protectionCheckerSource.includes("record.baseline.evidencePullRequest"));
+  assert.ok(protectionCheckerSource.includes("pull.merged === true"));
+  assert.ok(protectionCheckerSource.includes("pull.base?.sha === record.baseline.commit"));
+  assert.ok(protectionCheckerSource.includes("commits.some(commit => commit.sha === run.head_sha)"));
+});
