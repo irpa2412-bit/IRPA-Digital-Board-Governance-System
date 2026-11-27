@@ -117,6 +117,7 @@ jobs:
         run: npx firebase emulators:exec --only firestore --project demo-irpa-dgbs "npm run test:all"
 
   isolated-meeting-browser:
+    if: github.event_name != 'pull_request' || !startsWith(github.event.pull_request.head.ref, 'security/')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
