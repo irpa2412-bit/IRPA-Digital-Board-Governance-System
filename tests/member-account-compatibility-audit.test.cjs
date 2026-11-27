@@ -63,7 +63,7 @@ test("mocked Auth and Firestore audit completes without a ReferenceError or remo
   fs.writeFileSync(path.join(functionsDir, "package.json"), '{"private":true}\n');
 
   const mockPath = path.join(tempRoot, "mock-firebase-admin.cjs");
-  const mockCode = String.raw\`"use strict";
+  const mockCode = String.raw`"use strict";
 const Module = require("node:module");
 const originalLoad = Module._load;
 const fixtureUser = {
@@ -137,7 +137,7 @@ Module._load = function(request, parent, isMain) {
   }
   return originalLoad.call(this, request, parent, isMain);
 };
-\`;
+`;
   fs.writeFileSync(mockPath, mockCode);
   const summaryPath = path.join(tempRoot, "step-summary.md");
   const scriptPath = path.resolve(process.cwd(), "scripts/member-account-compatibility-audit.cjs");
