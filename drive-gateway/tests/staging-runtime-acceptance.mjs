@@ -226,7 +226,7 @@ assert.equal(afterRetry.auditChainValid,true);
 console.log("STAGING_RUNTIME_CRYPTO_ACCEPTANCE=PASS");
 console.log(JSON.stringify({
   project,
-  signerUid:expectedUid,
+  signerIdentityType:"email-link",
   envelopeId:envelope.envelopeId,
   sourceHash:originalHash,
   completedHash:completedHash,
