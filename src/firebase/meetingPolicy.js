@@ -23,20 +23,42 @@ function identityRoles(identity={}){
   return new Set(values.map(NORMALIZE_ROLE).filter(Boolean));
 }
 export function canRegisterMeeting(identity={}){
-  return identity.isAdmin===true||identity.admin===true||identity.active===true;
+  return identity.memberIdentity===true||identity.employeeIdentity===true||identity.activeMember===true||identity.activeEmployee===true;
 }
 export function canAccessMeetingCategory(meeting={},identity={},options={}){
-  if(identity.isAdmin===true||identity.admin===true)return true;
-  if(options.isInvited===true||options.isRegisteredParticipant===true||options.isInitiator===true)return true;
-  if(identity.active!==true)return false;
-  const policy=resolveCategory(meeting.meetingCategory||meeting.meetingPolicyId||meeting.category||meeting.meetingType);
-  if(policy.id==="GENERAL"&&(identity.activeMember===true||identity.activeEmployee===true))return true;
-  const roles=identityRoles(identity);
-  return policy.accessRoles.some(role=>roles.has(NORMALIZE_ROLE(role)));
+  const uid=String(identity.uid||"").trim();
+  const email=String(identity.email||"").trim().toLowerCase();
+  const activeInstitutionalIdentity=identity.memberIdentity===true||identity.employeeIdentity===true||identity.activeMember===true||identity.activeEmployee===true;
+  if(activeInstitutionalIdentity)return true;
+  const listedUids=[...(Array.isArray(meeting.participantUids)?meeting.participantUids:[]),
+    ...(Array.isArray(meeting.attendeeUids)?meeting.attendeeUids:[]),
+    ...(Array.isArray(meeting.invitedUids)?meeting.invitedUids:[]),
+    ...(Array.isArray(meeting.coOrganizerUids)?meeting.coOrganizerUids:[]),
+    ...(Array.isArray(meeting.coOrganiserUids)?meeting.coOrganiserUids:[])].map(value=>String(value||"").trim());
+  const listedEmails=[...(Array.isArray(meeting.participantEmails)?meeting.participantEmails:[]),
+    ...(Array.isArray(meeting.attendeeEmails)?meeting.attendeeEmails:[]),
+    ...(Array.isArray(meeting.invitedEmails)?meeting.invitedEmails:[])].map(value=>String(value||"").trim().toLowerCase());
+  const personRows=[...(Array.isArray(meeting.participants)?meeting.participants:[]),
+    ...(Array.isArray(meeting.attendees)?meeting.attendees:[])];
+  const personMatch=personRows.some(person=>
+    (uid&&[person?.uid,person?.userId,person?.memberUid,person?.participantUid].some(value=>String(value||"")===uid))||
+    (email&&[person?.email,person?.participantEmail].some(value=>String(value||"").trim().toLowerCase()===email)));
+  const organiserUids=[meeting.initiatorUid,meeting.createdByUid,meeting.organizerUid,meeting.organiserUid,
+    meeting.coOrganizerUid,meeting.coOrganiserUid].map(value=>String(value||"").trim()).filter(Boolean);
+  const isListed=Boolean(uid&&([...listedUids,...organiserUids].includes(uid)))||
+    Boolean(email&&listedEmails.includes(email))||personMatch;
+  return options.isInvited===true||options.isRegisteredParticipant===true||options.isInitiator===true||isListed;
 }
 export function canEditMeeting(meeting={},identity={}){
-  if(identity.isAdmin===true||identity.admin===true)return true;
-  if(identity.active!==true||!identity.uid||String(meeting.initiatorUid||"")!==String(identity.uid))return false;
+  if(!canRegisterMeeting(identity)||!identity.uid)return false;
+  const uid=String(identity.uid);
+  const authorityUids=[meeting.initiatorUid,meeting.createdByUid,meeting.organizerUid,meeting.organiserUid,
+    meeting.coOrganizerUid,meeting.coOrganiserUid,meeting.meetingChairpersonUid,meeting.meetingSecretaryUid,
+    meeting.meetingAdministratorUid,meeting.transitionChairpersonUid,meeting.transitionSecretaryUid,
+    meeting.transitionAdministratorUid].map(value=>String(value||"").trim()).filter(Boolean);
+  const coOrganisers=[...(Array.isArray(meeting.coOrganizerUids)?meeting.coOrganizerUids:[]),
+    ...(Array.isArray(meeting.coOrganiserUids)?meeting.coOrganiserUids:[])].map(value=>String(value||"").trim());
+  if(!authorityUids.includes(uid)&&!coOrganisers.includes(uid))return false;
   return !["in progress","completed","cancelled","canceled"].includes(String(meeting.status||"").trim().toLowerCase())&&
     String(meeting.proceedingsStatus||"").trim().toLowerCase()!=="in progress";
 }

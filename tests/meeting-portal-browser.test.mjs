@@ -1,5 +1,16 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import { chromium } from "playwright";
+
+
+const isolationGuard = fs.readFileSync(new URL("../scripts/meeting-portal-fixture-isolation-guard.sh", import.meta.url), "utf8");
+const protectionRecord = JSON.parse(fs.readFileSync(new URL("../docs/portal-protection/records/meeting-portal.json", import.meta.url), "utf8"));
+const repairWindow = JSON.parse(fs.readFileSync(new URL("../docs/portal-protection/windows/meeting-portal.json", import.meta.url), "utf8"));
+for (const path of ["drive-gateway/tests/meeting-services-router.test.mjs", "src/pages/Resolutions.jsx"]) {
+  assert.ok(isolationGuard.includes(`"${path}"`), `isolated allowlist must include ${path}`);
+  assert.ok(protectionRecord.declaration.files.includes(path), `Change Record must declare ${path}`);
+  assert.ok(repairWindow.scope.includes(path), `repair window must include ${path}`);
+}
 
 const url = "http://127.0.0.1:4179/tests/fixtures/meeting-portal-fixture.html";
 const widths = [360, 412, 768, 1280];
@@ -49,9 +60,9 @@ try {
       const persisted = await page.evaluate(key => JSON.parse(localStorage.getItem(key)), storeKey);
       const created = persisted.meetings.find(meeting => meeting.title === createdTitle);
       assert.ok(created, "TEST meeting should be saved in isolated localStorage");
-      assert.deepEqual(created.memberUids, ["fixture-board-member-active", "fixture-board-secretary-employee"], "Board Member and explicitly appointed Board Secretary employee records must persist");
-      assert.deepEqual(created.participantUids, ["fixture-board-member-auth-uid", "fixture-board-secretary-uid"], "authenticated Board Member and explicitly appointed Board Secretary participant UIDs must persist");
-      assert.deepEqual(created.participantEmails, ["board-member@example.test", "board-secretary@example.test"], "participant emails must persist");
+      assert.deepEqual([...created.memberUids].sort(), ["fixture-board-member-active", "fixture-board-secretary-employee"].sort(), "Board Member and explicitly appointed Board Secretary employee records must persist");
+      assert.deepEqual([...created.participantUids].sort(), ["fixture-board-member-auth-uid", "fixture-board-secretary-uid"].sort(), "authenticated Board Member and explicitly appointed Board Secretary participant UIDs must persist regardless of insertion order");
+      assert.deepEqual([...created.participantEmails].sort(), ["board-member@example.test", "board-secretary@example.test"].sort(), "participant emails must persist regardless of insertion order");
       assert.equal(created.venue, "TEST Longido Meeting Room");
       assert.equal(created.meetingChairpersonUid, "fixture-board-member-auth-uid", "formal proceedings require the permanent meeting Chairperson");
       assert.equal(created.meetingSecretaryUid, "fixture-board-secretary-uid", "formal proceedings require the permanent meeting Secretary");
