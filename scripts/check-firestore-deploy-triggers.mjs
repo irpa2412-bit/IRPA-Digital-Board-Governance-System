@@ -31,9 +31,10 @@ for (const name of files) {
       failures.push(name + ': Firestore deploy target is not statically proven production or isolated staging; review and pin the target.');
       continue;
     }
+    const requiredConfirmation = name === 'firestore-production-no-billing.yml' ? 'DEPLOY RULES' : 'yes';
     if (!condition.includes("github.event_name == 'workflow_dispatch'") ||
-        !condition.includes("inputs.confirm_production_firestore_rules_deployment == 'DEPLOY RULES'")) {
-      failures.push(name + ': production Firestore deployment lacks manual workflow_dispatch and exact DEPLOY RULES confirmation.');
+        !condition.includes("inputs.confirm_production_firestore_rules_deployment == '" + requiredConfirmation + "'")) {
+      failures.push(name + ': production Firestore deployment lacks manual workflow_dispatch and its required explicit confirmation (' + requiredConfirmation + ').');
     }
   }
 }
