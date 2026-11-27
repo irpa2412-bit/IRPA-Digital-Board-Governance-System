@@ -3,7 +3,7 @@ import { auth, db, applicantAuth, applicantDb, applicantApp } from "./config";
 import { getGoogleDriveGatewayUrl } from "./gatewayUrl";
 import { sendEmployeeRegistrationEmail } from "./employeeRegistrationEmail";
 import { getFunctions, httpsCallable } from "firebase/functions";
-import { canAccessMeetingCategory, MEETING_CATEGORIES } from "./meetingPolicy.js";
+import { canAccessMeetingCategory } from "./meetingPolicy.js";
 import { listLifecycleDocuments } from "./documentLifecycle.js";
 import { reconcileRegisteredIdentityUidsViaGateway } from "./registeredIdentityReconciliation";
 import { listMeetingInviteeDirectory as listMeetingInviteeDirectoryViaGateway } from "./meetingGatewayApi";
