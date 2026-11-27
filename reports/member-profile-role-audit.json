@@ -1,5 +1,10 @@
 {
-  "profiles_scanned": 12,
-  "profiles_with_role_entries": 0,
-  "profiles_with_role_entries_lacking_legitimate_grant": 0
+  "audit_status": "NOT_RUN_AFTER_AUTHORIZATION_GRANTS_SCOPE_EXTENSION",
+  "profiles_scanned": null,
+  "profiles_with_role_entries": null,
+  "authorization_grants_scanned": null,
+  "active_authorization_grants": null,
+  "unique_targets_with_active_authorization_grants": null,
+  "profiles_with_role_entries_lacking_legitimate_grant": null,
+  "role_array_authorization_assessment": "NOT_DETERMINED: authorizationGrants records direct permission grants, not institutional role assignments."
 }

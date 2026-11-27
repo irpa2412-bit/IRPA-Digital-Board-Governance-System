@@ -27,32 +27,62 @@ beforeEach(async () => {
   });
 });
 
-test("member with invitationId cannot self-assign role arrays under staging rules", async () => {
+test("staging members cannot self-edit institutional profile fields", async () => {
   const uid = "member-profile-with-invitation";
   const email = "member-profile-with-invitation@example.test";
   await env.withSecurityRulesDisabled(async context => {
     await context.firestore().doc(`members/${uid}`).set({
-      uid,
-      email,
-      status: "Active",
-      role: "Member",
-      invitationId: "TEST-INVITATION-ID"
+      uid, email, status: "Active", role: "Member",
+      memberType: "Governance Member", invitationId: "TEST-INVITATION-ID"
     });
   });
 
   const member = env.authenticatedContext(uid, { email }).firestore();
-  await assertSucceeds(member.doc(`members/${uid}`).update({
-    displayName: "Updated member display name"
-  }));
-  for (const field of ["roles", "assignedRoles", "selectedRoles"]) {
-    await assertFails(member.doc(`members/${uid}`).update({
-      [field]: ["Executive Director"]
+  const memberProfile = member.doc(`members/${uid}`);
+  for (const [field,value] of [
+    ["displayName","No profile edit"],["phone","+255700000000"],
+    ["role","Executive Director"],["roles",["Executive Director"]],
+    ["assignedRoles",["Executive Director"]],["selectedRoles",["Executive Director"]],
+    ["accountActivated",true],["registrationStatus","Activated"],
+    ["activatedAt",new Date("2026-11-27T07:00:00.000Z")]
+  ]) {
+    await assertFails(memberProfile.update({ [field]: value }));
+  }
+});
+
+test("staging member can save and replace only Signature Profile fields", async () => {
+  const uid = "member-profile-with-invitation";
+  const email = "member-profile-with-invitation@example.test";
+  const member = env.authenticatedContext(uid, { email }).firestore();
+  const profileRef = member.doc(`signatureProfiles/${uid}`);
+  const profile = {
+    uid, email, displayName: "Staging Test Signer", initials: "STS",
+    method: "Upload", pathwayVersion: "IRPA-SIGNATURE-PATHWAY-V3",
+    driveSignatureFolderId: "staging-folder", driveSignatureFolderName: "IRPA Signature Profile",
+    driveSignatureFolderPath: "IRPA/Signature Profiles/staging", driveSignatureFolderUid: uid,
+    completedDocumentsFolderId: "staging-completed-folder",
+    completedDocumentsFolderLink: "https://drive.example.test/staging-completed",
+    completedDocumentsFolderPath: "IRPA/Completed Documents/staging",
+    signaturePath: "signatureProfiles/staging/signature.png",
+    signatureUrl: "data:image/png;base64,aGVsbG8=",
+    signatureDriveUrl: "https://drive.example.test/staging-signature",
+    signatureSha256: "c".repeat(64),
+    initialsPath: null, initialsUrl: null, initialsDriveUrl: null, initialsSha256: null,
+    status: "Active", adoptionDate: new Date("2026-11-27T07:00:00.000Z"),
+    updatedAt: new Date("2026-11-27T07:00:00.000Z")
+  };
+  await assertSucceeds(profileRef.set(profile, { merge: true }));
+  await assertSucceeds(profileRef.set({
+    ...profile, signatureSha256: "d".repeat(64),
+    signatureUrl: "data:image/png;base64,dXBkYXRlZA=="
+  }, { merge: true }));
+  for (const field of ["role","roles","assignedRoles","selectedRoles"]) {
+    await assertFails(profileRef.update({
+      [field]: field === "role" ? "Executive Director" : ["Executive Director"]
     }));
   }
-  await assertFails(member.doc(`members/${uid}`).update({
-    role: "Executive Director"
-  }));
 });
+
 
 async function seedMeeting(id) {
   await env.withSecurityRulesDisabled(async context => {

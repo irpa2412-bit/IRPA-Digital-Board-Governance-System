@@ -64,50 +64,115 @@ beforeEach(async () => {
 });
 
 
-test("member self-profile allowlist preserves displayName and denies role-array self-assignment", async () => {
-  const withInvitationUid = "profile-editor-with-invitation";
-  const withoutInvitationUid = "profile-editor-without-invitation";
-
+test("members cannot self-edit their institutional profile; administrator role changes remain available", async () => {
+  const uid = "profile-editor-with-invitation";
+  const email = "profile-editor-with-invitation@example.test";
   await testEnv.withSecurityRulesDisabled(async context => {
-    const db = context.firestore();
-    await db.doc("members/" + withInvitationUid).set({
-      uid: withInvitationUid,
-      email: "profile-editor-with-invitation@example.test",
-      status: "Active",
-      role: "Member",
-      invitationId: "PRODUCTION_ACCESS_VERIFICATION_TEST_ONLY"
-    });
-    await db.doc("members/" + withoutInvitationUid).set({
-      uid: withoutInvitationUid,
-      email: "profile-editor-without-invitation@example.test",
-      status: "Active",
-      role: "Member"
+    await context.firestore().doc("members/" + uid).set({
+      uid, email, status: "Active", role: "Member",
+      memberType: "Governance Member", invitationId: "TEST-INVITATION-ID"
     });
   });
 
-  const permittedDb = testEnv.authenticatedContext(withInvitationUid, {
-    email: "profile-editor-with-invitation@example.test"
-  }).firestore();
-  await assertSucceeds(permittedDb.doc("members/" + withInvitationUid).update({
-    displayName: "Updated self-service display name"
-  }));
-
-  // Only the documented self-service field remains writable. Role-bearing
-  // arrays must be provisioned through the administrator-controlled register.
-  for (const field of ["roles", "assignedRoles", "selectedRoles"]) {
-    await assertFails(permittedDb.doc("members/" + withInvitationUid).update({
-      [field]: ["Executive Director"]
-    }));
+  const memberDb = testEnv.authenticatedContext(uid, { email }).firestore();
+  const profile = memberDb.doc("members/" + uid);
+  for (const [field,value] of [
+    ["displayName","No member profile edit"],
+    ["phone","+255700000000"],
+    ["role","Executive Director"],
+    ["roles",["Executive Director"]],
+    ["assignedRoles",["Executive Director"]],
+    ["selectedRoles",["Executive Director"]],
+    ["accountActivated",true],
+    ["registrationStatus","Activated"],
+    ["activatedAt",new Date("2026-11-27T07:00:00.000Z")],
+    ["invitationId","REPLACED-INVITATION-ID"]
+  ]) {
+    await assertFails(profile.update({ [field]: value }));
   }
 
-  await assertFails(permittedDb.doc("members/" + withInvitationUid).update({
-    role: "Executive Director"
-  }));
-  const missingInvitationDb = testEnv.authenticatedContext(withoutInvitationUid, {
-    email: "profile-editor-without-invitation@example.test"
+  const adminDb = testEnv.authenticatedContext("admin-user", {
+    email: "admin@example.test"
   }).firestore();
-  await assertFails(missingInvitationDb.doc("members/" + withoutInvitationUid).update({
-    displayName: "This update has no immutable invitationId precondition"
+  await assertSucceeds(adminDb.doc("members/" + uid).update({
+    role: "Finance Manager",
+    roles: ["Finance Manager"],
+    assignedRoles: ["Finance Manager"],
+    selectedRoles: ["Finance Manager"]
+  }));
+  const saved = await adminDb.doc("members/" + uid).get();
+  assert.equal(saved.data().role, "Finance Manager");
+  assert.deepEqual(saved.data().roles, ["Finance Manager"]);
+  assert.deepEqual(saved.data().assignedRoles, ["Finance Manager"]);
+  assert.deepEqual(saved.data().selectedRoles, ["Finance Manager"]);
+});
+
+test("member can create and update only the explicit Signature Profile fields", async () => {
+  const uid = "member-user";
+  const email = "member@example.test";
+  const memberDb = testEnv.authenticatedContext(uid, { email }).firestore();
+  const profileRef = memberDb.doc("signatureProfiles/" + uid);
+  const profile = {
+    uid,
+    email,
+    displayName: "IRPA Test Signer",
+    initials: "ITS",
+    method: "Upload",
+    pathwayVersion: "IRPA-SIGNATURE-PATHWAY-V3",
+    driveSignatureFolderId: "test-drive-folder",
+    driveSignatureFolderName: "IRPA Signature Profile",
+    driveSignatureFolderPath: "IRPA/Signature Profiles/member-user",
+    driveSignatureFolderUid: uid,
+    completedDocumentsFolderId: "test-completed-folder",
+    completedDocumentsFolderLink: "https://drive.example.test/completed",
+    completedDocumentsFolderPath: "IRPA/Completed Documents/member-user",
+    signaturePath: "signatureProfiles/member-user/signature-test.png",
+    signatureUrl: "data:image/png;base64,aGVsbG8=",
+    signatureDriveUrl: "https://drive.example.test/signature-test",
+    signatureSha256: "a".repeat(64),
+    initialsPath: null,
+    initialsUrl: null,
+    initialsDriveUrl: null,
+    initialsSha256: null,
+    status: "Active",
+    adoptionDate: new Date("2026-11-27T07:00:00.000Z"),
+    updatedAt: new Date("2026-11-27T07:00:00.000Z")
+  };
+
+  // This mirrors saveMySignatureProfile(): setDoc(profileRef, payload, {merge:true}).
+  await assertSucceeds(profileRef.set(profile, { merge: true }));
+
+  // Existing legacy metadata must survive a merge-style specimen replacement.
+  await testEnv.withSecurityRulesDisabled(async context => {
+    await context.firestore().doc("signatureProfiles/" + uid).update({
+      legacyMigrationMarker: "preserve-existing-record"
+    });
+  });
+  await assertSucceeds(profileRef.set({
+    ...profile,
+    signatureUrl: "data:image/png;base64,dXBkYXRlZA==",
+    signatureSha256: "b".repeat(64),
+    updatedAt: new Date("2026-11-27T07:01:00.000Z")
+  }, { merge: true }));
+  const saved = await profileRef.get();
+  assert.equal(saved.data().signatureSha256, "b".repeat(64));
+  assert.equal(saved.data().legacyMigrationMarker, "preserve-existing-record");
+
+  for (const field of ["role","roles","assignedRoles","selectedRoles","permissions","grantedClaims"]) {
+    await assertFails(profileRef.update({
+      [field]: field === "role" ? "Executive Director" : ["Executive Director"]
+    }));
+  }
+  await assertFails(profileRef.set({
+    ...profile,
+    roles: ["Executive Director"]
+  }, { merge: true }));
+
+  const adminDb = testEnv.authenticatedContext("admin-user", {
+    email: "admin@example.test"
+  }).firestore();
+  await assertFails(adminDb.doc("signatureProfiles/" + uid).update({
+    roles: ["Administrator"]
   }));
 });
 
