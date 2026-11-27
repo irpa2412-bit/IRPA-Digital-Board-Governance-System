@@ -375,17 +375,19 @@ test("active members can initiate meetings without a management title", async ()
   assert.equal(result.meetingWrites, 1);
 });
 
-test("inactive institutional identities cannot initiate meetings through the Worker", async () => {
-  const result = await createMeetingAsInstitutionalIdentity({
-    uid: "inactive-user", email: "inactive@example.test",
-    employee: { uid: "inactive-user", email: "inactive@example.test", status: "Suspended", role: "Staff" },
-    category: "GENERAL"
-  });
-  assert.equal(result.response.status, 403);
-  assert.equal(result.body.ok, false);
-  assert.equal(result.meetingWrites, 0);
+test("inactive member and employee identities can initiate meetings through the Worker", async () => {
+  for (const [identity, record] of [
+    ["inactive-member", { member: { uid:"inactive-member", email:"inactive-member@example.test", status:"Suspended", role:"Member" } }],
+    ["former-employee", { employee: { uid:"former-employee", email:"former-employee@example.test", status:"Former", role:"Staff" } }]
+  ]) {
+    const result = await createMeetingAsInstitutionalIdentity({
+      uid: identity, email: record.member?.email||record.employee?.email, ...record, category:"GENERAL"
+    });
+    assert.equal(result.response.status,200,identity);
+    assert.equal(result.body.ok,true,identity);
+    assert.equal(result.meetingWrites,1,identity);
+  }
 });
-
 
 test("meeting registration keeps all three permanent appointments optional", async () => {
   const result = await createMeetingAsInstitutionalIdentity({
@@ -498,7 +500,7 @@ test("Meeting Worker allows universal portal initiation while retaining particip
   assert.match(meetingServicesGovernanceSource, /canRead:true/);
   assert.match(meetingServicesGovernanceSource, /isAdmin:false/);
   assert.doesNotMatch(meetingServicesGovernanceSource, /canRead:canManage\|\|participant\|\|isAdmin/);
-  assert.match(meetingServicesGovernanceSource, /if\(!\(active\(member\)\|\|active\(employee\)\)\)return fail/);
+  assert.match(meetingServicesGovernanceSource, /if\(!member&&!employee\)return fail/);
 });
 
 test("Meeting Worker exposes public outcomes separately and never publishes raw ballots from room activity", () => {
