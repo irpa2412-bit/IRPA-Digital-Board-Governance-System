@@ -52,6 +52,7 @@ jobs:
   # Evidence jobs deliberately check out pull_request.base.sha, never the PR head.
   # Push a fresh PR revision after main advances so the evidence event captures the new base SHA.
   baseline-protection-smoke:
+    name: baseline-protection-smoke-${{ github.event.pull_request.base.sha }}
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 30
