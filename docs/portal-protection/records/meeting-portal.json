@@ -76,11 +76,11 @@
     "rollbackCommit": "494812a1339afcacfa6b47807c1b7e7b0503563a"
   },
   "validation": {
-    "baselineSmoke": "PENDING",
+    "baselineSmoke": "PASS",
     "portalSmoke": {
-      "Meeting Portal": "PENDING"
+      "Meeting Portal": "PASS"
     },
-    "fullRegression": "PENDING",
+    "fullRegression": "PASS",
     "behaviourDifferences": [
       "Every IRPA member or employee with an existing Members or Employees register record receives full Meeting Portal access and may initiate meetings regardless of status, title, department, invitation or participant listing.",
       "Access to ongoing meetings, live-room admission, meeting-specific leadership, voting, quorum, resolutions, formal approvals and Board-restricted records remain governed by their existing meeting-specific controls; external invitees remain limited to their invited meeting.",
@@ -111,7 +111,10 @@
       "Meeting Portal portal smoke on exact baseline c8234bdd7921756e812fa5ab98a20706e4c55d90: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/46057862889/job/140704635578",
       "baseline smoke for Meeting Portal on exact baseline c8234bdd7921756e812fa5ab98a20706e4c55d90: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/46060508563/job/140713488550",
       "full regression for Meeting Portal on exact baseline c8234bdd7921756e812fa5ab98a20706e4c55d90: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/46060508563/job/140713488952",
-      "Meeting Portal portal smoke on exact baseline c8234bdd7921756e812fa5ab98a20706e4c55d90: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/46060508563/job/140713488550"
+      "Meeting Portal portal smoke on exact baseline c8234bdd7921756e812fa5ab98a20706e4c55d90: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/46060508563/job/140713488550",
+      "Baseline smoke PASS on exact PR #1009 pre-change base 494812a1339afcacfa6b47807c1b7e7b0503563a: run 46065345848, job 140729546651 checked out the exact baseline and completed the registered protected-portal smoke successfully.",
+      "Full regression PASS on exact PR #1009 pre-change base 494812a1339afcacfa6b47807c1b7e7b0503563a: run 46065345848, job 140729546755 checked out the exact baseline and completed the full root regression suite in the Firestore emulator successfully.",
+      "Meeting Portal portal smoke PASS on exact PR #1009 pre-change base 494812a1339afcacfa6b47807c1b7e7b0503563a: run 46065345848, job 140729546651 completed the registered protected-portal smoke successfully."
     ]
   },
   "renewals": [
