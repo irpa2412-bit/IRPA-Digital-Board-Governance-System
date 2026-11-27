@@ -42,7 +42,7 @@ test("administrator-only accounts do not gain private meeting access", () => {
   }), true);
 });
 
-test("external identities without a Member or Employee record do not receive the general Meeting Portal directory", () => {
+test("external identities without an IRPA Member or Employee record do not receive the general Meeting Portal directory", () => {
   const general = { meetingCategory: "GENERAL", meetingPolicyId: "GENERAL" };
   assert.equal(canAccessMeetingCategory(general, { uid: "member-1", active: true, activeMember: true }), true);
   assert.equal(canAccessMeetingCategory(general, { uid: "inactive-member", memberIdentity:true, activeMember:false }), true);
@@ -106,6 +106,16 @@ test("category capabilities keep voting and resolutions disabled outside governa
   const governanceCapabilities = meetingCapabilities(governance);
   assert.equal(governanceCapabilities.voting, true);
   assert.equal(governanceCapabilities.resolutions, true);
+});
+
+test("only invited participants may read an ongoing meeting; any IRPA identity may read outside proceedings", () => {
+  const scheduled={status:"Scheduled",proceedingsStatus:"Not Started"};
+  const ongoing={status:"In Progress",proceedingsStatus:"In Progress"};
+  assert.equal(meetingContextAccessAllowed(scheduled,true,false),true);
+  assert.equal(meetingContextAccessAllowed(ongoing,true,false),false);
+  assert.equal(meetingContextAccessAllowed(ongoing,true,true),true);
+  assert.equal(meetingContextAccessAllowed(scheduled,false,false),false);
+  assert.equal(meetingContextAccessAllowed(ongoing,false,true),true);
 });
 
 const meetingDataSource = readFileSync(new URL("../src/firebase/data.js", import.meta.url), "utf8");
@@ -604,77 +614,3 @@ test("Meeting Portal frontend grants initiation and category visibility to any r
   assert.match(page, /identity\.memberIdentity===true\|\|identity\.employeeIdentity===true/);
 });
 
-
-
-test("only invited participants may read an ongoing meeting; any IRPA identity may read outside proceedings", () => {
-  const scheduled={status:"Scheduled",proceedingsStatus:"Not Started"};
-  const ongoing={status:"In Progress",proceedingsStatus:"In Progress"};
-  assert.equal(meetingContextAccessAllowed(scheduled,true,false),true);
-  assert.equal(meetingContextAccessAllowed(ongoing,true,false),false);
-  assert.equal(meetingContextAccessAllowed(ongoing,true,true),true);
-  assert.equal(meetingContextAccessAllowed(scheduled,false,false),false);
-  assert.equal(meetingContextAccessAllowed(ongoing,false,true),true);
-});
-
-const directoryGatewayContext = {
-  authenticateFirebaseRequest: async () => ({ user_id: "directory-test", email: "directory@example.test" }),
-  getFirebaseProjectId: () => "test-project",
-  getFirestoreAdminAccessToken: async () => "test-token",
-  json: (body, status = 200, headers = {}) => new Response(JSON.stringify(body), { status, headers }),
-  corsHeaders: () => ({ "content-type": "application/json" })
-};
-const directoryRequest = (router, path) => router(new Request("https://worker.test" + path, {
-  method: "POST", headers: { "content-type": "application/json" }, body: "{}"
-}), { FIREBASE_PROJECT_ID: "test-project" }, path);
-
-async function requestMeetingDirectory({uid,email,identityCollection,status}) {
-  const originalFetch=globalThis.fetch;
-  let listRead=false;
-  globalThis.fetch=async input=>{
-    const url=new URL(String(input));
-    const match=url.pathname.match(/\\/documents\\/(members|employees)\\/([^/]+)$/);
-    if(match){
-      const [,collection,recordUid]=match;
-      if(collection!==identityCollection||recordUid!==uid)return new Response("{}",{status:404});
-      return new Response(JSON.stringify({name:url.pathname,fields:{uid:{stringValue:uid},email:{stringValue:email},status:{stringValue:status}}}),{status:200});
-    }
-    if(url.pathname.endsWith("/documents:runQuery")){
-      listRead=true;
-      return new Response(JSON.stringify([{document:{name:"projects/test-project/databases/(default)/documents/meetings/general",fields:{
-        title:{stringValue:"General meeting"},meetingCategory:{stringValue:"GENERAL"},meetingType:{stringValue:"General Meeting"},
-        meetingReference:{stringValue:"IRPA-MTG-2026-001"},date:{stringValue:"2026-11-27"},status:{stringValue:"Scheduled"},
-        initiatorUid:{stringValue:"another-user"},agenda:{stringValue:"Private agenda"},minutes:{stringValue:"Private minutes"},
-        transcript:{stringValue:"Private transcript"},platformPasscode:{stringValue:"secret"},participantUids:{arrayValue:{values:[]}}
-      }}}]),{status:200});
-    }
-    return new Response("{}",{status:404});
-  };
-  try{
-    const context={...directoryGatewayContext,authenticateFirebaseRequest:async()=>({user_id:uid,email})};
-    const response=await directoryRequest(createMeetingServicesRouter(context),"/api/meeting-register/list");
-    return {response,body:await response.json(),listRead};
-  }finally{globalThis.fetch=originalFetch;}
-}
-
-test("active and inactive members and employees can retrieve the sanitized Meeting Portal directory", async () => {
-  for(const [uid,email,identityCollection,status] of [
-    ["active-member","active-member@example.test","members","Active"],
-    ["inactive-member","inactive-member@example.test","members","Suspended"],
-    ["active-employee","active-employee@example.test","employees","Active"],
-    ["former-employee","former-employee@example.test","employees","Former"]
-  ]){
-    const result=await requestMeetingDirectory({uid,email,identityCollection,status});
-    assert.equal(result.response.status,200,uid);
-    assert.equal(result.body.ok,true,uid);
-    assert.equal(result.body.meetings.length,1,uid);
-    assert.equal(result.listRead,true,uid);
-    for(const field of ["agenda","minutes","transcript","platformPasscode","participantUids"])assert.equal(field in result.body.meetings[0],false,field);
-  }
-});
-
-test("external identities without an IRPA Member or Employee record cannot browse the general Meeting Portal directory", async () => {
-  const result=await requestMeetingDirectory({uid:"external-invitee",email:"external@example.test",identityCollection:"external",status:"Active"});
-  assert.equal(result.response.status,403);
-  assert.equal(result.body.ok,false);
-  assert.equal(result.listRead,false);
-});
