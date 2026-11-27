@@ -52,9 +52,14 @@ export function canAccessMeetingCategory(meeting={},identity={},options={}){
 }
 export function canEditMeeting(meeting={},identity={}){
   if(!canRegisterMeeting(identity)||!identity.uid)return false;
-  const ownerUids=[meeting.initiatorUid,meeting.createdByUid,meeting.organizerUid,meeting.organiserUid]
-    .map(value=>String(value||"").trim()).filter(Boolean);
-  if(!ownerUids.includes(String(identity.uid)))return false;
+  const uid=String(identity.uid);
+  const authorityUids=[meeting.initiatorUid,meeting.createdByUid,meeting.organizerUid,meeting.organiserUid,
+    meeting.coOrganizerUid,meeting.coOrganiserUid,meeting.meetingChairpersonUid,meeting.meetingSecretaryUid,
+    meeting.meetingAdministratorUid,meeting.transitionChairpersonUid,meeting.transitionSecretaryUid,
+    meeting.transitionAdministratorUid].map(value=>String(value||"").trim()).filter(Boolean);
+  const coOrganisers=[...(Array.isArray(meeting.coOrganizerUids)?meeting.coOrganizerUids:[]),
+    ...(Array.isArray(meeting.coOrganiserUids)?meeting.coOrganiserUids:[])].map(value=>String(value||"").trim());
+  if(!authorityUids.includes(uid)&&!coOrganisers.includes(uid))return false;
   return !["in progress","completed","cancelled","canceled"].includes(String(meeting.status||"").trim().toLowerCase())&&
     String(meeting.proceedingsStatus||"").trim().toLowerCase()!=="in progress";
 }
