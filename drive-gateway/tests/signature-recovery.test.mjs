@@ -40,6 +40,27 @@ test("recovery queue is owner-scoped and paginated",async()=>{
   assert.equal((await getRecoveryQueue(f.ctx,f.other)).total,0);
   await assert.rejects(()=>assessRecoveryEvidence(f.ctx,f.other,"ENV-REC-1"),{status:403});
 });
+test("recovery queue uses owner-scoped Firestore reads and rechecks ownership",async()=>{
+  const f=await fixture();
+  const base=await f.ctx.meta.get("envelopes","ENV-REC-1");
+  f.ctx.meta.list=async()=>[];
+  const owned={...base,id:"FIRESTORE-OWNED",ownerUid:f.user.uid,status:"CompletionFailed"};
+  const other={...base,id:"FIRESTORE-OTHER",ownerUid:f.other.uid,status:"CompletionFailed"};
+  const calls=[];
+  f.ctx.firestore={
+    list:async()=>{throw new Error("unscoped Firestore collection listing must not be used");},
+    listOwned:async(collection,uid,options)=>{
+      calls.push({collection,uid,options});
+      return collection==="envelopes"?[owned,other]:[];
+    }
+  };
+  const queue=await getRecoveryQueue(f.ctx,f.user,{recordAccess:false});
+  assert.deepEqual(queue.items.map(item=>item.envelopeId),["FIRESTORE-OWNED"]);
+  assert.deepEqual(calls,[
+    {collection:"envelopes",uid:f.user.uid,options:{admin:false}},
+    {collection:"signatureEnvelopes",uid:f.user.uid,options:{admin:false}}
+  ]);
+});
 test("owner queue includes all non-completed envelopes across owner field aliases",async()=>{
  const f=await fixture();const base=await f.ctx.meta.get("envelopes","ENV-REC-1");
  await f.ctx.meta.create("envelopes","ENV-CREATED-BY-UID",{...base,id:"ENV-CREATED-BY-UID",createdBy:undefined,createdByUid:"owner-1",status:"Sent"});
