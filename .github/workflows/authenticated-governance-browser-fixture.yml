@@ -69,9 +69,10 @@ jobs:
           PLAYWRIGHT_PREFIX="$RUNNER_TEMP/irpa-playwright"
           mkdir -p "$PLAYWRIGHT_PREFIX"
           npm install --prefix "$PLAYWRIGHT_PREFIX" --no-save --package-lock=false @playwright/test@1.56.1
-          mkdir -p node_modules/@playwright
+          mkdir -p node_modules/@playwright node_modules/.bin
           ln -sfn "$PLAYWRIGHT_PREFIX/node_modules/@playwright/test" node_modules/@playwright/test
           ln -sfn "$PLAYWRIGHT_PREFIX/node_modules/playwright" node_modules/playwright
+          ln -sfn "$PLAYWRIGHT_PREFIX/node_modules/.bin/playwright" node_modules/.bin/playwright
           "$PLAYWRIGHT_PREFIX/node_modules/.bin/playwright" install --with-deps chromium
       - name: Reproduce upload pathway against unminified bundle and source maps
         env:
