@@ -77,7 +77,8 @@
     "behaviourDifferences": [
       "Environment is immutable after creation.",
       "Only the exact TRIAL marker at creation qualifies; REAL, missing, invalid, lowercase or whitespace-padded values are non-deletable.",
-      "The shared application shell exposes Meeting Portal navigation to all Members/Employees register identities independent of status or selected authority; no internal portal workflow or authorization boundary is changed."
+      "The shared application shell exposes Meeting Portal navigation to all Members/Employees register identities independent of status or selected authority; no internal portal workflow or authorization boundary is changed.",
+      "The cross-portal browser fixture isolation guard is a shared validation dependency and changes no runtime portal behavior."
     ],
     "evidence": [
       "Owner's exact conditional approval is recorded in PR #845 issue comment 7068716176.",
@@ -304,7 +305,8 @@
     ],
     "reason": "Owner-authorised coordinated shared-file protection cycle for src/App.jsx. This portal independently verifies the shared navigation-shell change while preserving its own authorization, data, workflow and governance boundaries.",
     "files": [
-      "src/App.jsx"
+      "src/App.jsx",
+      "scripts/meeting-portal-fixture-isolation-guard.sh"
     ],
     "expectedEffect": "The shared application shell makes the complete Meeting Portal module set available to every identity with a Members or Employees register record, regardless of active status or selected authority. It does not change this portal's own data, workflows, permissions or role controls.",
     "prohibitedChanges": [
