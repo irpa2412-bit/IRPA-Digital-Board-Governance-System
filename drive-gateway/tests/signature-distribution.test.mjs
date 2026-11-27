@@ -241,7 +241,7 @@ test("summary counts every expected recipient even when an earlier failure leave
   assert.equal(summary.sent,1);
   assert.equal(summary.pending,2,"missing distribution rows must remain pending");
   assert.equal(summary.complete,false,"partial record persistence must never look complete");
-  assert.equal(summary.status,"InProgress");
+  assert.equal(summary.status,"PartiallyDelivered");
   assert.deepEqual(summary.deliveries.map(row=>row.status),["Sent","Not Attempted","Not Attempted"]);
 });
 
