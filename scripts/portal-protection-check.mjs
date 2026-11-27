@@ -93,15 +93,26 @@ async function verifyRealRunEvidence(record, affected) {
   const headers = { authorization: `Bearer ${token}`, accept: "application/vnd.github+json", "x-github-api-version": "2022-11-28" };
   for (const label of labels) {
     const candidates = evidence.filter(item => String(item).toLowerCase().includes(label.toLowerCase()) && String(item).includes(record.baseline.commit));
+    const diagnostics = [];
     let verified = false;
     for (const item of candidates) {
       const ref = parseGitHubJobEvidence(item);
-      if (!ref || ref.repository.toLowerCase() !== repository.toLowerCase()) continue;
-      const [jobResponse, logsResponse] = await Promise.all([
-        fetch(`${api}/repos/${repository}/actions/jobs/${ref.jobId}`, { headers }),
-        fetch(`${api}/repos/${repository}/actions/jobs/${ref.jobId}/logs`, { headers })
-      ]);
-      if (!jobResponse.ok || !logsResponse.ok) continue;
+      if (!ref) { diagnostics.push("candidate URL could not be parsed"); continue; }
+      if (ref.repository.toLowerCase() !== repository.toLowerCase()) { diagnostics.push("candidate repository does not match workflow repository"); continue; }
+      let jobResponse, logsResponse;
+      try {
+        [jobResponse, logsResponse] = await Promise.all([
+          fetch(`${api}/repos/${repository}/actions/jobs/${ref.jobId}`, { headers }),
+          fetch(`${api}/repos/${repository}/actions/jobs/${ref.jobId}/logs`, { headers })
+        ]);
+      } catch (error) {
+        diagnostics.push(`GitHub Actions API request failed: ${error instanceof Error ? error.message : String(error)}`);
+        continue;
+      }
+      if (!jobResponse.ok || !logsResponse.ok) {
+        diagnostics.push(`job API HTTP ${jobResponse.status}; logs API HTTP ${logsResponse.status}`);
+        continue;
+      }
       const job = await jobResponse.json();
       const logs = await logsResponse.text();
       const checkedOutBaseline = logs.includes(`git checkout --progress --force ${record.baseline.commit}`) ||
@@ -110,8 +121,14 @@ async function verifyRealRunEvidence(record, affected) {
         verified = true;
         break;
       }
+      diagnostics.push(`run ${job.run_id} (expected ${ref.runId}); status ${job.status}; conclusion ${job.conclusion}; baseline checkout ${checkedOutBaseline}`);
     }
-    if (!verified) return { ok: false, reason: `No completed successful GitHub Actions job verifies ${label} on baseline ${record.baseline.commit}.` };
+    if (!verified) {
+      return {
+        ok: false,
+        reason: `No completed successful GitHub Actions job verifies ${label} on baseline ${record.baseline.commit}. Evidence candidates: ${candidates.length}. ${diagnostics.join(" | ") || "No usable evidence candidate was found."}`
+      };
+    }
   }
   return { ok: true };
 }
