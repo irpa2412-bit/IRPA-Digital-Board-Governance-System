@@ -202,7 +202,7 @@ async function requestMeetingDirectory({ uid, email, identityCollection, status 
   }
 }
 
-test("active members can retrieve the Meeting Portal directory without receiving private meeting content", async () => {
+test("members can retrieve the Meeting Portal directory regardless of status without receiving private meeting content", async () => {
   const result = await requestMeetingDirectory({
     uid: "directory-member", email: "member@example.test",
     identityCollection: "members", status: "Active"
@@ -217,7 +217,7 @@ test("active members can retrieve the Meeting Portal directory without receiving
   assert.equal(result.listRead, true);
 });
 
-test("active employees can retrieve the Meeting Portal directory", async () => {
+test("employees can retrieve the Meeting Portal directory regardless of status", async () => {
   const result = await requestMeetingDirectory({
     uid: "directory-employee", email: "employee@example.test",
     identityCollection: "employees", status: "Active"
@@ -226,14 +226,18 @@ test("active employees can retrieve the Meeting Portal directory", async () => {
   assert.equal(result.body.meetings.length, 1);
 });
 
-test("inactive members and employees are denied the Meeting Portal directory", async () => {
-  const result = await requestMeetingDirectory({
-    uid: "inactive-directory-user", email: "inactive@example.test",
-    identityCollection: "members", status: "Suspended"
-  });
-  assert.equal(result.response.status, 403);
-  assert.equal(result.body.ok, false);
-  assert.equal(result.listRead, false);
+test("inactive members and employees retain universal Meeting Portal directory access", async () => {
+  const member = await requestMeetingDirectory({uid:"inactive-member",email:"inactive-member@example.test",identityCollection:"members",status:"Suspended"});
+  const employee = await requestMeetingDirectory({uid:"inactive-employee",email:"inactive-employee@example.test",identityCollection:"employees",status:"Former",});
+  assert.equal(member.response.status,200); assert.equal(member.body.meetings.length,1);
+  assert.equal(employee.response.status,200); assert.equal(employee.body.meetings.length,1);
+});
+
+test("external identities without a member or employee record cannot browse the general Meeting Portal directory", async () => {
+  const result = await requestMeetingDirectory({uid:"external-invitee",email:"external@example.test",identityCollection:"external",status:"Active"});
+  assert.equal(result.response.status,403);
+  assert.equal(result.body.ok,false);
+  assert.equal(result.listRead,false);
 });
 
 
