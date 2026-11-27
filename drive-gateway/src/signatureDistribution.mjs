@@ -86,13 +86,14 @@ export async function getSignatureDistributionSummary(ctx,envelopeId,envelope=nu
   // Count expected recipients, not only records that happened to be persisted.
   // This prevents a partial write/early exception from falsely reporting complete.
   const countedDeliveries=envelope?expectedDeliveries:deliveries;
-  const counts={total:countedDeliveries.length,sent:0,failed:0,pending:0,sending:0,unknown:0,skipped:0};
+  const counts={total:countedDeliveries.length,sent:0,failed:0,pending:0,notAttempted:0,sending:0,unknown:0,skipped:0};
   for(const delivery of countedDeliveries){
     if(delivery.status==="Sent")counts.sent++;
     else if(delivery.status==="Failed")counts.failed++;
     else if(delivery.status==="Sending")counts.sending++;
     else if(delivery.status==="Unknown")counts.unknown++;
     else if(delivery.status==="Skipped")counts.skipped++;
+    else if(delivery.status==="Not Attempted")counts.notAttempted++;
     else counts.pending++;
   }
   const complete=counts.total>0&&counts.sent===counts.total;
@@ -102,7 +103,8 @@ export async function getSignatureDistributionSummary(ctx,envelopeId,envelope=nu
     :counts.unknown===counts.total?"Unknown"
     :counts.failed>0&&counts.sent>0?"PartiallyFailed"
     :counts.failed>0||counts.skipped>0?"PartiallyFailed"
-    :counts.sent>0&&(counts.unknown>0||counts.pending>0||counts.sending>0||counts.skipped>0)?"PartiallyDelivered"
+    :counts.notAttempted===counts.total?"NotStarted"
+    :counts.sent>0&&(counts.unknown>0||counts.pending>0||counts.sending>0||counts.notAttempted>0||counts.skipped>0)?"PartiallyDelivered"
     :counts.unknown>0&&counts.sent===0?"Unknown"
     :counts.pending>0||counts.sending>0?"InProgress"
     :"NotStarted";
