@@ -2,6 +2,15 @@ name: Member account compatibility dry run (read only)
 
 on:
   workflow_dispatch:
+    inputs:
+      owner_confirmation:
+        description: Explicit owner authorization for this sensitive identity audit
+        required: true
+        type: choice
+        options:
+          - NO
+          - I_AUTHORIZE_IRPA_MEMBER_IDENTITY_AUDIT
+        default: NO
 
 permissions:
   contents: read
@@ -12,34 +21,37 @@ concurrency:
 
 jobs:
   audit:
-    name: Read every Auth user and member record
-    environment: production
+    if: github.actor == 'irpa2412-bit' && github.triggering_actor == 'irpa2412-bit' && inputs.owner_confirmation == 'I_AUTHORIZE_IRPA_MEMBER_IDENTITY_AUDIT'
+    name: Read and encrypt owner-only account findings
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - name: Checkout main
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.ref }}
+          ref: refs/heads/main
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
-      - name: Verify workflow is running from main
+      - name: Verify owner authorization and main branch
         shell: bash
         run: |
           set -euo pipefail
-          if [[ "$GITHUB_REF" != "refs/heads/main" ]]; then
-            echo "::error::This production compatibility audit may run only from main."
-            exit 1
-          fi
-
-      - name: Syntax-check read-only audit script
-        run: node --check scripts/member-account-compatibility-audit.cjs
-
-      - name: Test read-only audit safeguards
+          test "$GITHUB_REF" = "refs/heads/main"
+          test "$GITHUB_ACTOR" = "irpa2412-bit"
+          test "${{ github.triggering_actor }}" = "irpa2412-bit"
+          test "${{ inputs.owner_confirmation }}" = "I_AUTHORIZE_IRPA_MEMBER_IDENTITY_AUDIT"
+      - name: Validate owner-controlled report public key before reading production
+        env:
+          IRPA_MEMBER_AUDIT_REPORT_PUBLIC_KEY: ${{ vars.IRPA_MEMBER_AUDIT_REPORT_PUBLIC_KEY }}
+        run: node scripts/encrypt-member-account-report.cjs --check
+      - name: Syntax-check audit and encryption scripts
+        run: |
+          node --check scripts/member-account-compatibility-audit.cjs
+          node --check scripts/encrypt-member-account-report.cjs
+      - name: Test audit and encryption safeguards
         run: node --test tests/member-account-compatibility-audit.test.cjs
-
       - name: Install Firebase Admin SDK
         run: npm install --prefix functions --no-save --no-package-lock --ignore-scripts firebase-admin@13.5.0
       - name: Run read-only account compatibility audit
@@ -47,33 +59,20 @@ jobs:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
           GITHUB_STEP_SUMMARY: ${{ github.step_summary }}
         run: node scripts/member-account-compatibility-audit.cjs
-      - name: Check repository visibility before publishing per-account report
-        id: report_access
+      - name: Encrypt detailed report for owner and destroy plaintext
         env:
-          GH_TOKEN: ${{ github.token }}
+          IRPA_MEMBER_AUDIT_REPORT_PUBLIC_KEY: ${{ vars.IRPA_MEMBER_AUDIT_REPORT_PUBLIC_KEY }}
+        run: node scripts/encrypt-member-account-report.cjs reports/member-account-compatibility-dry-run.json reports/member-account-compatibility-dry-run.enc.json
+      - name: Assert plaintext report is absent
         shell: bash
         run: |
           set -euo pipefail
-          visibility="$(gh api "repos/${GITHUB_REPOSITORY}" --jq '.visibility')"
-          if [[ "$visibility" == "private" ]]; then
-            echo "private=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "private=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::Repository visibility is $visibility. The per-account report is withheld; GitHub Actions artifacts are downloadable by anyone with repository read access."
-            rm -f reports/member-account-compatibility-dry-run.json
-            {
-              echo ""
-              echo "### Per-account report"
-              echo "WITHHELD: repository visibility is `$visibility`. No account-level artifact was published."
-              echo "Only aggregate category and reason-code counts are shown above."
-            } >> "$GITHUB_STEP_SUMMARY"
-          fi
-
-      - name: Upload pseudonymous per-account report (one-day retention)
-        if: always() && steps.report_access.outputs.private == 'true' && hashFiles('reports/member-account-compatibility-dry-run.json') != ''
+          test ! -e reports/member-account-compatibility-dry-run.json
+          test -s reports/member-account-compatibility-dry-run.enc.json
+      - name: Upload encrypted owner report (ciphertext only; one-day retention)
         uses: actions/upload-artifact@v4
         with:
-          name: irpa-member-account-compatibility-dry-run
-          path: reports/member-account-compatibility-dry-run.json
+          name: irpa-member-account-compatibility-owner-encrypted
+          path: reports/member-account-compatibility-dry-run.enc.json
           retention-days: 1
           if-no-files-found: error
