@@ -145,11 +145,15 @@ async function verifyRealRunEvidence(record, affected) {
               ...commitResponses.map(response => response.json())
             ]);
             const commits = commitPages.flat();
+            const commitFound = Array.isArray(commits) && commits.some(commit => commit.sha === run.head_sha);
             baseCommitVerified = pull.merged === true &&
               pull.base?.sha === record.baseline.commit &&
               pull.head?.ref === run.head_branch &&
               pull.head?.repo?.full_name?.toLowerCase() === repository.toLowerCase() &&
-              Array.isArray(commits) && commits.some(commit => commit.sha === run.head_sha);
+              commitFound;
+            if (!baseCommitVerified) diagnostics.push(`merged PR ${pullNumber} evidence: merged=${pull.merged}; base=${pull.base?.sha ?? "missing"}; expectedBase=${record.baseline.commit}; headRef=${pull.head?.ref ?? "missing"}; runBranch=${run.head_branch}; headRepo=${pull.head?.repo?.full_name ?? "missing"}; commitFound=${commitFound}; commitsChecked=${commits.length}`);
+          } else {
+            diagnostics.push(`merged PR evidence HTTP: pull=${pullResponse.status}; commitPages=${commitResponses.map(response => response.status).join(",")}`);
           }
         } catch {
           baseCommitVerified = false;
