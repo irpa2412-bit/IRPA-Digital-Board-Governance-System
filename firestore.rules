@@ -839,6 +839,7 @@ service cloud.firestore {
       request.resource.data.get("status","")=="ASSIGNED" &&
       request.resource.data.get("permissionsActivated",true)==false &&
       request.resource.data.get("grantedClaims",[])==[] &&
+      request.resource.data.get("recordOrigin","")=="ACTUAL" &&
       exists(/databases/$(database)/documents/organisationalWorkingRelationships/$(request.resource.data.get("relationshipId",""))) &&
       relationshipIsCurrent(get(/databases/$(database)/documents/organisationalWorkingRelationships/$(request.resource.data.get("relationshipId",""))).data) &&
       get(/databases/$(database)/documents/organisationalWorkingRelationships/$(request.resource.data.get("relationshipId",""))).data.get("supervisorUid","")==request.auth.uid &&
@@ -863,6 +864,7 @@ service cloud.firestore {
       request.resource.data.get("status","")=="SUBMITTED" &&
       request.resource.data.get("permissionsActivated",true)==false &&
       request.resource.data.get("grantedClaims",[])==[] &&
+      request.resource.data.get("recordOrigin","")=="ACTUAL" &&
       exists(/databases/$(database)/documents/organisationalResponsibilities/$(request.resource.data.get("responsibilityId",""))) &&
       get(/databases/$(database)/documents/organisationalResponsibilities/$(request.resource.data.get("responsibilityId",""))).data.get("status","")=="ASSIGNED" &&
       get(/databases/$(database)/documents/organisationalResponsibilities/$(request.resource.data.get("responsibilityId",""))).data.get("assigneeUid","")==request.auth.uid &&
