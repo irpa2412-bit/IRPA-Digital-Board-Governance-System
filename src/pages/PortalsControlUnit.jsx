@@ -14,7 +14,10 @@ export default function PortalsControlUnit({user,isAdmin=false}){
   const [t,n,e,d,a,memberActive,memberActivated,memberRegistration,employeeActive,employeeEmploymentActive,employeeActivated]=await Promise.all([getDoc(doc(db,base)),getDocs(collection(db,base,"nodes")),getDocs(collection(db,base,"reportingEdges")),getDocs(collection(db,base,"duties")),getDocs(collection(db,base,"dutyAssignments")),getDocs(query(collection(db,"members"),where("status","==","Active"))),getDocs(query(collection(db,"members"),where("status","==","Activated"))),getDocs(query(collection(db,"members"),where("registrationStatus","==","Activated"))),getDocs(query(collection(db,"employees"),where("status","==","Active"))),getDocs(query(collection(db,"employees"),where("employmentStatus","==","Active"))),getDocs(query(collection(db,"employees"),where("registrationStatus","==","Activated")))]);
   if(t.exists()){const cfg={...t.data(),nodes:n.docs.map(x=>({id:x.id,...x.data()})),reportingEdges:e.docs.map(x=>({id:x.id,...x.data()}))};validateOrganisation(cfg);setOrg(cfg);}else setOrg(null);
   setDuties(d.docs.map(x=>({id:x.id,...x.data()})));setAssignments(a.docs.map(x=>({id:x.id,...x.data()})));
-  const memberDocs=[...new Map([...memberActive.docs,...memberActivated.docs,...memberRegistration.docs].map(x=>[x.id,x])).values()];\n  const employeeDocs=[...new Map([...employeeActive.docs,...employeeEmploymentActive.docs,...employeeActivated.docs].map(x=>[x.id,x])).values()];\n  const eligible=[...memberDocs.map(x=>({id:x.id,...x.data(),recordKind:"members",recordLabel:"Member"})),...employeeDocs.map(x=>({id:x.id,...x.data(),recordKind:"employees",recordLabel:"Employee"}))].filter(x=>isActiveIdentity(x)&&typeof x.uid==="string"&&x.uid.trim()&&x.firebaseAuthDisabled!==true&&typeof x.name==="string"&&x.name.trim());\n  setStaff([...new Map(eligible.map(x=>[x.uid,x])).values()].sort((x,y)=>x.name.localeCompare(y.name)));
+  const memberDocs=[...new Map([...memberActive.docs,...memberActivated.docs,...memberRegistration.docs].map(x=>[x.id,x])).values()];
+  const employeeDocs=[...new Map([...employeeActive.docs,...employeeEmploymentActive.docs,...employeeActivated.docs].map(x=>[x.id,x])).values()];
+  const eligible=[...memberDocs.map(x=>({id:x.id,...x.data(),recordKind:"members",recordLabel:"Member"})),...employeeDocs.map(x=>({id:x.id,...x.data(),recordKind:"employees",recordLabel:"Employee"}))].filter(x=>isActiveIdentity(x)&&typeof x.uid==="string"&&x.uid.trim()&&x.firebaseAuthDisabled!==true&&typeof x.name==="string"&&x.name.trim());
+  setStaff([...new Map(eligible.map(x=>[x.uid,x])).values()].sort((x,y)=>x.name.localeCompare(y.name)));
  }catch(x){setError(x.message||"PCU records could not be loaded.");}finally{setBusy(false);}};
  useEffect(()=>{if(isAdmin&&user?.uid)load();},[isAdmin,user?.uid]);
  const seedOrg=async()=>{setBusy(true);setError("");try{
@@ -32,7 +35,8 @@ export default function PortalsControlUnit({user,isAdmin=false}){
  }catch(x){setError(x.message||"Duty creation failed.");}finally{setBusy(false);}};
  const assign=async()=>{setBusy(true);setError("");try{
   if(!duties.some(x=>x.id===dutyId))throw Error("Select an existing duty.");
-  if(assigneeType==="ORG_NODE"&&!org.nodes.some(x=>x.id===assigneeId))throw Error("Select an existing node.");\n  if(assigneeType==="IDENTITY"&&!staff.some(x=>x.uid===assigneeId))throw Error("Select an active, UID-linked staff or member record.");
+  if(assigneeType==="ORG_NODE"&&!org.nodes.some(x=>x.id===assigneeId))throw Error("Select an existing node.");
+  if(assigneeType==="IDENTITY"&&!staff.some(x=>x.uid===assigneeId))throw Error("Select an active, UID-linked staff or member record.");
   const id=crypto.randomUUID(),item=createDutyAssignment({id,tenantId:tenant,assigneeType,assigneeId,dutyId,createdBy:user.uid,effectiveFrom:new Date().toISOString()});
   await setDoc(doc(db,base,"dutyAssignments",id),{...item,createdAt:serverTimestamp(),recordOrigin:"ACTUAL"});await audit("DUTY_ASSIGNED","DUTY_ASSIGNMENT",id,{dutyId,assigneeType,assigneeId,permissionsActivated:false});setMessage("Duty assigned. No application permissions or authority are granted.");await load();
  }catch(x){setError(x.message||"Duty assignment failed.");}finally{setBusy(false);}};
