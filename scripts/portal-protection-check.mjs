@@ -155,9 +155,12 @@ async function verifyRealRunEvidence(record, affected) {
           } else {
             diagnostics.push(`merged PR evidence HTTP: pull=${pullResponse.status}; commitPages=${commitResponses.map(response => response.status).join(",")}`);
           }
-        } catch {
+        } catch (error) {
           baseCommitVerified = false;
+          diagnostics.push(`merged PR ${pullNumber} evidence lookup failed: ${error instanceof Error ? error.message : String(error)}`);
         }
+      } else if (!baseCommitVerified) {
+        diagnostics.push(`merged PR fallback not eligible: event=${run.event}; evidencePullRequest=${record.baseline.evidencePullRequest ?? "missing"}`);
       }
       if (run.id === ref.runId && run.event === "pull_request" && baseCommitVerified &&
           job?.run_id === ref.runId && job.name === expectedJobName &&
