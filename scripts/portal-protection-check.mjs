@@ -99,15 +99,15 @@ async function verifyRealRunEvidence(record, affected) {
       const ref = parseGitHubJobEvidence(item);
       if (!ref) { diagnostics.push("candidate URL could not be parsed"); continue; }
       if (ref.repository.toLowerCase() !== repository.toLowerCase()) { diagnostics.push("candidate repository does not match workflow repository"); continue; }
+      // Retry public, read-only Actions evidence without a token when GitHub restricts workflow-token access.
+      // Run identity, PR base SHA, job status and conclusion are still verified below.
+      const readEvidence = async url => {
+        let response = await fetch(url, { headers });
+        if (response.status === 403) response = await fetch(url, { headers: { accept: "application/vnd.github+json", "x-github-api-version": "2022-11-28" } });
+        return response;
+      };
       let runResponse, jobsResponse;
       try {
-        // Retry public, read-only Actions evidence without a token when GitHub restricts workflow-token access.
-        // Run identity, PR base SHA, job status and conclusion are still verified below.
-        const readEvidence = async url => {
-          let response = await fetch(url, { headers });
-          if (response.status === 403) response = await fetch(url, { headers: { accept: "application/vnd.github+json", "x-github-api-version": "2022-11-28" } });
-          return response;
-        };
         [runResponse, jobsResponse] = await Promise.all([
           readEvidence(`${api}/repos/${repository}/actions/runs/${ref.runId}`),
           readEvidence(`${api}/repos/${repository}/actions/runs/${ref.runId}/jobs?per_page=100`)
