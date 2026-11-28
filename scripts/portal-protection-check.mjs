@@ -135,12 +135,16 @@ async function verifyRealRunEvidence(record, affected) {
       if (!baseCommitVerified && run.event === "pull_request" && Number.isInteger(Number(record.baseline.evidencePullRequest))) {
         const pullNumber = Number(record.baseline.evidencePullRequest);
         try {
-          const [pullResponse, commitsResponse] = await Promise.all([
+          const [pullResponse, ...commitResponses] = await Promise.all([
             readEvidence(`${api}/repos/${repository}/pulls/${pullNumber}`),
-            readEvidence(`${api}/repos/${repository}/pulls/${pullNumber}/commits?per_page=250`)
+            ...[1, 2, 3].map(page => readEvidence(`${api}/repos/${repository}/pulls/${pullNumber}/commits?per_page=100&page=${page}`))
           ]);
-          if (pullResponse.ok && commitsResponse.ok) {
-            const [pull, commits] = await Promise.all([pullResponse.json(), commitsResponse.json()]);
+          if (pullResponse.ok && commitResponses.every(response => response.ok)) {
+            const [pull, ...commitPages] = await Promise.all([
+              pullResponse.json(),
+              ...commitResponses.map(response => response.json())
+            ]);
+            const commits = commitPages.flat();
             baseCommitVerified = pull.merged === true &&
               pull.base?.sha === record.baseline.commit &&
               pull.head?.ref === run.head_branch &&
