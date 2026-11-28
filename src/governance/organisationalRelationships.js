@@ -12,7 +12,7 @@ export function createResponsibility(x){
  const relationshipId=id(x.relationshipId),supervisorUid=id(x.supervisorUid),assigneeUid=id(x.assigneeUid),title=clean(x.title),description=clean(x.description),dueDate=clean(x.dueDate);
  if(supervisorUid===assigneeUid)throw Object.assign(new Error("A person cannot assign work to themselves as their own supervisor"),{code:"SELF_ASSIGNMENT"});
  if(!title||title.length>180||!description||description.length>5000)throw Object.assign(new Error("Title and description are required"),{code:"INVALID_RESPONSIBILITY"});
- if(dueDate&&!/^\\d{4}-\\d{2}-\\d{2}$/.test(dueDate))throw Object.assign(new Error("Invalid due date"),{code:"INVALID_DUE_DATE"});
+ if(dueDate&&!/^\d{4}-\d{2}-\d{2}$/.test(dueDate))throw Object.assign(new Error("Invalid due date"),{code:"INVALID_DUE_DATE"});
  return Object.freeze({id:id(x.id),relationshipId,supervisorUid,assigneeUid,title,description,dueDate:dueDate||null,cadence:clean(x.cadence)||"AD_HOC",status:"ASSIGNED",createdByUid:supervisorUid,permissionsActivated:false,grantedClaims:[]});
 }
 export function createResponsibilityReport(x){
