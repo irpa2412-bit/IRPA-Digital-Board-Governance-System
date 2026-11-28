@@ -4,6 +4,7 @@ import {db} from "../firebase/config";
 import seed from "../../config/pcu/irpa-organisation.seed.json";
 import {validateOrganisation,createDutyDefinition,createDutyAssignment} from "../governance/pcuEngine";
 import PcuGovernanceConsole from "./PcuGovernanceConsole";
+import PcuMandateJobDescriptionManager from "./PcuMandateJobDescriptionManager";
 const tenant="irpa",base="pcuTenants/"+tenant;
 const isActiveIdentity=record=>{const status=String(record.status||record.employmentStatus||"");return status==="Active"||status==="Activated"||(!status&&record.registrationStatus==="Activated");};
 export default function PortalsControlUnit({user,isAdmin=false}){
@@ -49,6 +50,7 @@ export default function PortalsControlUnit({user,isAdmin=false}){
  <section><h2>Duty catalogue</h2><ul>{duties.map(d=><li key={d.id}>{d.title} · {d.cadence} · v{d.version}</li>)}</ul><label>Title <input value={title} onChange={e=>setTitle(e.target.value)} maxLength={180}/></label><label>Description <textarea value={description} onChange={e=>setDescription(e.target.value)}/></label><label>Cadence <select value={cadence} onChange={e=>setCadence(e.target.value)}>{["AD_HOC","DAILY","WEEKLY","MONTHLY","QUARTERLY","ANNUALLY"].map(x=><option key={x}>{x}</option>)}</select></label><button disabled={busy||!title.trim()} onClick={addDuty}>Create duty</button></section>
  <section><h2>Duty assignments</h2><label>Duty <select value={dutyId} onChange={e=>setDutyId(e.target.value)}><option value="">Select</option>{duties.map(d=><option key={d.id} value={d.id}>{d.title}</option>)}</select></label><label>Assignee type <select value={assigneeType} onChange={e=>{setAssigneeType(e.target.value);setAssigneeId("");}}><option value="ORG_NODE">Organisation node</option><option value="IDENTITY">Named staff / member</option></select></label>{assigneeType==="ORG_NODE"?<label>Organisation node <select value={assigneeId} onChange={e=>setAssigneeId(e.target.value)}><option value="">Select organisation node</option>{org.nodes.map(n=><option key={n.id} value={n.id}>{n.name} — {org.nodeTypes.find(t=>t.id===n.typeId)?.label||n.typeId}</option>)}</select></label>:<label>Named staff / member <select value={assigneeId} onChange={e=>setAssigneeId(e.target.value)}><option value="">Select active, linked person</option>{staff.map(person=><option key={person.uid} value={person.uid}>{person.name} — {person.recordLabel}{person.department?` · ${person.department}`:""}</option>)}</select><small>Only active records with a verified linked Firebase UID are available. {staff.length} eligible record(s).</small></label>}<button disabled={busy||!dutyId||!assigneeId} onClick={assign}>Assign duty</button><ul>{assignments.map(a=><li key={a.id}>{a.dutyId} → {a.assigneeType} {a.assigneeId} · {a.status} · permissions: No</li>)}</ul></section>
  </>}
+ <PcuMandateJobDescriptionManager user={user} isAdmin={isAdmin}/>
  <PcuGovernanceConsole user={user} isAdmin={isAdmin}/>
  </main>;
 }
