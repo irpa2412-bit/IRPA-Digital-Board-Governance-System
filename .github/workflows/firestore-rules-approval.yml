@@ -30,6 +30,7 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           persist-credentials: false
+          fetch-depth: 0
       - name: Run offline approval decision fixtures
         run: node --test tests/firestore-rules-approval.test.mjs
 
@@ -54,5 +55,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_LABELS: ${{ toJson(github.event.pull_request.labels) }}
         run: node scripts/firestore-rules-approval.mjs
 
