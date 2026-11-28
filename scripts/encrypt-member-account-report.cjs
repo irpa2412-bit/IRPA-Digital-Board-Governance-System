@@ -11,9 +11,9 @@ function loadKey() {
 }
 try {
   const key = loadKey();
-  if (process.argv.includes("--check")) { process.stdout.write("OWNER_REPORT_PUBLIC_KEY_VALID\\n"); process.exit(0); }
+  if (process.argv.includes("--check")) { process.stdout.write("OWNER_REPORT_PUBLIC_KEY_VALID\n"); process.exit(0); }
   const input = path.resolve(process.argv[2] || "reports/member-account-compatibility-dry-run.json");
-  const output = path.resolve(process.argv[3] || input.replace(/\\.json$/, ".enc.json"));
+  const output = path.resolve(process.argv[3] || input.replace(/\.json$/, ".enc.json"));
   try {
     const plaintext = fs.readFileSync(input);
     const aesKey = crypto.randomBytes(32), iv = crypto.randomBytes(12);
@@ -21,10 +21,10 @@ try {
     const ciphertext = Buffer.concat([cipher.update(plaintext), cipher.final()]);
     const wrappedKey = crypto.publicEncrypt({key, oaepHash:"sha256", padding:crypto.constants.RSA_PKCS1_OAEP_PADDING}, aesKey);
     const envelope = {schemaVersion:1, algorithm:"RSA-OAEP-SHA256+A256GCM", wrappedKey:wrappedKey.toString("base64"), iv:iv.toString("base64"), authTag:cipher.getAuthTag().toString("base64"), ciphertext:ciphertext.toString("base64")};
-    fs.writeFileSync(output, JSON.stringify(envelope) + "\\n", {mode:0o600, flag:"wx"});
-    process.stdout.write("ENCRYPTED_OWNER_REPORT_CREATED\\n");
+    fs.writeFileSync(output, JSON.stringify(envelope) + "\n", {mode:0o600, flag:"wx"});
+    process.stdout.write("ENCRYPTED_OWNER_REPORT_CREATED\n");
   } finally { try { fs.rmSync(input, {force:true}); } catch {} }
 } catch (e) {
   const code = String(e && e.message || "ENCRYPTION_FAILED").replace(/[^A-Z0-9_:-]/gi, "_").slice(0,100);
-  process.stderr.write("OWNER_REPORT_ENCRYPTION_FAILED=" + code + "\\n"); process.exit(1);
+  process.stderr.write("OWNER_REPORT_ENCRYPTION_FAILED=" + code + "\n"); process.exit(1);
 }
