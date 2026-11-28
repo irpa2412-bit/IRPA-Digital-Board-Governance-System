@@ -5,7 +5,7 @@ import seed from "../../config/pcu/irpa-organisation.seed.json";
 import {validateOrganisation,createDutyDefinition,createDutyAssignment} from "../governance/pcuEngine";
 import PcuGovernanceConsole from "./PcuGovernanceConsole";
 const tenant="irpa",base="pcuTenants/"+tenant;
-const isActiveIdentity=(record,kind)=>kind==="members" ? (["Active","Activated"].includes(String(record.status||""))||record.registrationStatus==="Activated") : (["Active","Activated"].includes(String(record.status||record.employmentStatus||""))||record.employmentStatus==="Active"||record.registrationStatus==="Activated");
+const isActiveIdentity=record=>{const status=String(record.status||record.employmentStatus||"");return status==="Active"||status==="Activated"||(!status&&record.registrationStatus==="Activated");};
 export default function PortalsControlUnit({user,isAdmin=false}){
  const [org,setOrg]=useState(null),[duties,setDuties]=useState([]),[assignments,setAssignments]=useState([]),[staff,setStaff]=useState([]),[busy,setBusy]=useState(false),[error,setError]=useState(""),[message,setMessage]=useState("");
  const [name,setName]=useState(""),[type,setType]=useState("department"),[parent,setParent]=useState(""),[title,setTitle]=useState(""),[description,setDescription]=useState(""),[cadence,setCadence]=useState("AD_HOC"),[dutyId,setDutyId]=useState(""),[assigneeType,setAssigneeType]=useState("ORG_NODE"),[assigneeId,setAssigneeId]=useState("");
@@ -13,7 +13,7 @@ export default function PortalsControlUnit({user,isAdmin=false}){
  const load=async()=>{setBusy(true);setError("");try{
   const [t,n,e,d,a,members,employees]=await Promise.all([getDoc(doc(db,base)),getDocs(collection(db,base,"nodes")),getDocs(collection(db,base,"reportingEdges")),getDocs(collection(db,base,"duties")),getDocs(collection(db,base,"dutyAssignments")),getDocs(collection(db,"members")),getDocs(collection(db,"employees"))]);
   if(t.exists()){const cfg={...t.data(),nodes:n.docs.map(x=>({id:x.id,...x.data()})),reportingEdges:e.docs.map(x=>({id:x.id,...x.data()}))};validateOrganisation(cfg);setOrg(cfg);}else setOrg(null);
-  setDuties(d.docs.map(x=>({id:x.id,...x.data()})));setAssignments(a.docs.map(x=>({id:x.id,...x.data()})));\n  const eligible=[...members.docs.map(x=>({id:x.id,...x.data(),recordKind:"members",recordLabel:"Member"})),...employees.docs.map(x=>({id:x.id,...x.data(),recordKind:"employees",recordLabel:"Employee"}))].filter(x=>isActiveIdentity(x,x.recordKind)&&typeof x.uid==="string"&&x.uid.trim()&&x.firebaseAuthDisabled!==true&&typeof x.name==="string"&&x.name.trim());\n  setStaff([...new Map(eligible.map(x=>[x.uid,x])).values()].sort((x,y)=>x.name.localeCompare(y.name)));
+  setDuties(d.docs.map(x=>({id:x.id,...x.data()})));setAssignments(a.docs.map(x=>({id:x.id,...x.data()})));\n  const eligible=[...members.docs.map(x=>({id:x.id,...x.data(),recordKind:"members",recordLabel:"Member"})),...employees.docs.map(x=>({id:x.id,...x.data(),recordKind:"employees",recordLabel:"Employee"}))].filter(x=>isActiveIdentity(x)&&typeof x.uid==="string"&&x.uid.trim()&&x.firebaseAuthDisabled!==true&&typeof x.name==="string"&&x.name.trim());\n  setStaff([...new Map(eligible.map(x=>[x.uid,x])).values()].sort((x,y)=>x.name.localeCompare(y.name)));
  }catch(x){setError(x.message||"PCU records could not be loaded.");}finally{setBusy(false);}};
  useEffect(()=>{if(isAdmin&&user?.uid)load();},[isAdmin,user?.uid]);
  const seedOrg=async()=>{setBusy(true);setError("");try{
