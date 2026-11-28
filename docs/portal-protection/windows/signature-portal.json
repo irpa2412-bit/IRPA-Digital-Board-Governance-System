@@ -43,7 +43,13 @@
     "src/App.jsx",
     "scripts/meeting-portal-fixture-isolation-guard.sh",
     "scripts/portal-protection-smoke.mjs",
-    "src/components/OrganisationalRelationshipSupport.jsx"
+    "src/components/OrganisationalRelationshipSupport.jsx",
+    "firestore.rules",
+    "src/pages/OrganisationalWorkingRelationships.jsx",
+    "src/governance/organisationalRelationships.js",
+    "src/pages/AuthorizationWorkflow.jsx",
+    "src/firebase/authorizationWorkflow.js",
+    "src/firebase/workflowLinks.js"
   ],
   "activityLog": [
     {
