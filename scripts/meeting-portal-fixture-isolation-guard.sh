@@ -36,6 +36,7 @@ const allowed = new Set([
   "scripts/meeting-portal-fixture-isolation-guard.sh",
   ".github/workflows/firestore-rules-approval.yml",
   "scripts/firestore-rules-approval.mjs",
+  "tests/firestore-rules-approval.test.mjs",
   "scripts/portal-repair-window-guard-policy.mjs",
   ".github/workflows/finance-production-reset.yml",
   "docs/ACTUAL_DATA_ACCESS_GATE.md",
