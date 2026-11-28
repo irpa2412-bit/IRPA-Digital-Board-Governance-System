@@ -15,7 +15,7 @@ export const LINK_DEFINITIONS = [
   ["reportId", "reportReference", "Reports"],
   ["researchStudyId", "researchReference", "Research, Statistics and Knowledge"],
   ["researchDatasetId", "datasetReference", "Research, Statistics and Knowledge"],
-  ["workingRelationshipId", "workingRelationshipReference", "Job Description Administration"]
+  ["workingRelationshipId", "workingRelationshipReference", "Authorization & Approvals"]
 ];
 
 export const LINK_FIELDS = LINK_DEFINITIONS.flatMap(([idField, referenceField]) => [idField, referenceField]);
