@@ -310,6 +310,19 @@
         "Meeting Portal"
       ],
       "class": "shared"
+    },
+    {
+      "path": "src/components/OrganisationalRelationshipSupport.jsx",
+      "portals": [
+        "Board Members Portal",
+        "Communication and Media Portal",
+        "Grants Intelligence and Funding Opportunities Portal",
+        "Invitation Portal",
+        "Meeting Portal",
+        "Members and Employees Portal",
+        "Signature Portal"
+      ],
+      "class": "shared"
     }
   ],
   "exclusions": [
