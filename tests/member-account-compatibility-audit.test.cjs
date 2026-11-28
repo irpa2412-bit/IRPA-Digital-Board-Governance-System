@@ -162,3 +162,45 @@ Module._load = function(request, parent, isMain) {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }
 });
+
+test("owner report encryption uses RSA-OAEP and AES-256-GCM and removes plaintext", () => {
+  const { execFileSync } = require("node:child_process");
+  const os = require("node:os");
+  const crypto = require("node:crypto");
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "irpa-owner-report-"));
+  const input = path.join(tempRoot, "identity-report.json");
+  const output = path.join(tempRoot, "identity-report.enc.json");
+  const pair = crypto.generateKeyPairSync("rsa", { modulusLength: 3072 });
+  const script = path.resolve(process.cwd(), "scripts/encrypt-member-account-report.cjs");
+  const payload = JSON.stringify({ auth: { uid: "private-uid", email: "private@example.test" } });
+  try {
+    fs.writeFileSync(input, payload, { mode: 0o600 });
+    execFileSync(process.execPath, [script, input, output], { env: { ...process.env, IRPA_MEMBER_AUDIT_REPORT_PUBLIC_KEY: pair.publicKey.export({ type: "spki", format: "pem" }) } });
+    assert.equal(fs.existsSync(input), false);
+    const envelope = JSON.parse(fs.readFileSync(output, "utf8"));
+    assert.equal(envelope.algorithm, "RSA-OAEP-SHA256+A256GCM");
+    assert.doesNotMatch(JSON.stringify(envelope), /private-uid|private@example/);
+    const key = crypto.privateDecrypt({ key: pair.privateKey, oaepHash: "sha256", padding: crypto.constants.RSA_PKCS1_OAEP_PADDING }, Buffer.from(envelope.wrappedKey, "base64"));
+    const decipher = crypto.createDecipheriv("aes-256-gcm", key, Buffer.from(envelope.iv, "base64"));
+    decipher.setAuthTag(Buffer.from(envelope.authTag, "base64"));
+    const decoded = Buffer.concat([decipher.update(Buffer.from(envelope.ciphertext, "base64")), decipher.final()]).toString("utf8");
+    assert.equal(decoded, payload);
+  } finally { fs.rmSync(tempRoot, { recursive: true, force: true }); }
+});
+
+test("owner report encryption fails closed when public key is missing", () => {
+  const { spawnSync } = require("node:child_process");
+  const script = path.resolve(process.cwd(), "scripts/encrypt-member-account-report.cjs");
+  const result = spawnSync(process.execPath, [script, "--check"], { encoding: "utf8", env: { ...process.env, IRPA_MEMBER_AUDIT_REPORT_PUBLIC_KEY: "" } });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /OWNER_REPORT_PUBLIC_KEY_NOT_CONFIGURED/);
+});
+
+test("workflow requires repository owner and explicit audit confirmation", () => {
+  const workflow = fs.readFileSync(path.resolve(process.cwd(), ".github/workflows/member-account-compatibility-dry-run.yml"), "utf8");
+  assert.match(workflow, /github\.actor == 'irpa2412-bit'/);
+  assert.match(workflow, /github\.triggering_actor == 'irpa2412-bit'/);
+  assert.match(workflow, /I_AUTHORIZE_IRPA_MEMBER_IDENTITY_AUDIT/);
+  assert.match(workflow, /vars\.IRPA_MEMBER_AUDIT_REPORT_PUBLIC_KEY/);
+  assert.doesNotMatch(workflow, /upload-artifact[\s\S]*?path: reports\/member-account-compatibility-dry-run\.json/);
+});
