@@ -207,7 +207,8 @@ guardTest("cross-portal relationship support is allowed only as a complete prote
     "docs/portal-protection/records/meeting-portal.json",
     "tests/working-relationship-portal-integration.test.mjs",
     ".github/workflows/firestore-rules-approval.yml",
-    "scripts/firestore-rules-approval.mjs"
+    "scripts/firestore-rules-approval.mjs",
+    "tests/firestore-rules-approval.test.mjs"
   ]) assert.ok(guard.includes(`"${path}"`), `missing cross-portal allowlist path: ${path}`);
   assert.match(guard, /!crossPortalRelationshipSupportIntegration/);
 });
