@@ -44,7 +44,12 @@
     "tests/org-structure-access-preservation.test.cjs",
     "tests/policies-strategic-plan-portal.test.mjs",
     "tests/staging-admin-access-preservation.test.cjs",
-    "src/components/OrganisationalRelationshipSupport.jsx"
+    "src/components/OrganisationalRelationshipSupport.jsx",
+    "src/pages/OrganisationalWorkingRelationships.jsx",
+    "src/governance/organisationalRelationships.js",
+    "src/pages/AuthorizationWorkflow.jsx",
+    "src/firebase/authorizationWorkflow.js",
+    "src/firebase/workflowLinks.js"
   ],
   "activityLog": [
     {
