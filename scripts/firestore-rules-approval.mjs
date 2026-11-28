@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 const API = "https://api.github.com";
 const LABEL = "firestore-rules-approved";
 
@@ -80,10 +81,8 @@ async function apiPages(url, token) {
   return all;
 }
 
-async function loadApprovers(base, token) {
-  const file = await apiJson(base + "/contents/.github/firestore-rules-approvers.txt?ref=main", token);
-  if (file.encoding !== "base64" || !file.content) throw new Error("Base-branch approver allow-list was not readable.");
-  const raw = Buffer.from(file.content, "base64").toString("utf8");
+function loadApprovers(baseSha) {
+  const raw = execFileSync("git", ["show", `${baseSha}:.github/firestore-rules-approvers.txt`], { encoding: "utf8" });
   const logins = raw.split(/\r?\n/).map(line => line.replace(/#.*$/, "").trim()).filter(Boolean);
   if (!logins.includes("irpa2412-bit")) throw new Error("Approver allow-list must include repository owner irpa2412-bit.");
   return [...new Set(logins)];
@@ -92,35 +91,34 @@ async function loadApprovers(base, token) {
 
 async function main() {
   const token = process.env.GH_TOKEN, repo = process.env.REPO, prNumber = process.env.PR_NUMBER;
-  if (!token || !repo || !/^\d+$/.test(prNumber || "")) throw new Error("GH_TOKEN, REPO and numeric PR_NUMBER are required.");
+  const baseSha = process.env.BASE_SHA;
+  let labels;
+  try { labels = JSON.parse(process.env.PR_LABELS || "[]").map(label => label.name).filter(Boolean); }
+  catch { throw new Error("PR_LABELS must be a JSON array supplied by the pull_request event."); }
+  if (!token || !repo || !/^\\d+$/.test(prNumber || "") || !/^[0-9a-f]{40}$/i.test(baseSha || "")) {
+    throw new Error("GH_TOKEN, REPO, numeric PR_NUMBER and exact BASE_SHA are required.");
+  }
   const [owner, name] = repo.split("/");
   const base = `${API}/repos/${owner}/${name}`;
   try {
-    const [changed, pr, events, commits, timeline] = await Promise.all([
-      apiPages(`${base}/pulls/${prNumber}/files?per_page=100`, token),
-      apiJson(`${base}/issues/${prNumber}`, token),
-      apiPages(`${base}/issues/${prNumber}/events?per_page=100`, token),
-      apiPages(`${base}/pulls/${prNumber}/commits?per_page=100`, token),
-      apiPages(`${base}/issues/${prNumber}/timeline?per_page=100`, token)
-    ]);
-    const changedFiles = changed.map(file => file.filename);
+    // Use the checked-out PR history and event payload for local evidence.
+    // Only label actor and ordered GitHub timeline events require API access.
+    execFileSync("git", ["cat-file", "-e", `${baseSha}^{commit}`], { stdio: "ignore" });
+    const changedFiles = execFileSync("git", ["diff", "--name-only", `${baseSha}...HEAD`], { encoding: "utf8" })
+      .trim().split("\\n").filter(Boolean);
     if (!changedFiles.includes("firestore.rules")) {
       console.log("PASS: firestore.rules unchanged.");
       return;
     }
-    const allowedActors = await loadApprovers(base, token);
-    const rulesCommitIds = [];
-    for (const commit of commits) {
-      const detail = await apiJson(`${base}/commits/${commit.sha}`, token);
-      if (!Array.isArray(detail.files)) throw new Error(`Commit ${commit.sha} did not return a files array.`);
-      if (detail.files.length >= 300 && !detail.files.some(file => file.filename === "firestore.rules")) {
-        throw new Error(`Commit ${commit.sha} may have a truncated file list; cannot verify rules history.`);
-      }
-      if (detail.files.some(file => file.filename === "firestore.rules")) rulesCommitIds.push(commit.sha);
-    }
+    const rulesCommitIds = execFileSync("git", ["log", "--format=%H", `${baseSha}..HEAD`, "--", "firestore.rules"], { encoding: "utf8" })
+      .trim().split("\\n").filter(Boolean);
+    const allowedActors = loadApprovers(baseSha);
+    const [events, timeline] = await Promise.all([
+      apiPages(`${base}/issues/${prNumber}/events?per_page=100`, token),
+      apiPages(`${base}/issues/${prNumber}/timeline?per_page=100`, token)
+    ]);
     const result = evaluateApproval({
-      changedFiles, labels: (pr.labels || []).map(label => label.name),
-      labelEvents: events, timeline, rulesCommitIds, allowedActors
+      changedFiles, labels, labelEvents: events, timeline, rulesCommitIds, allowedActors
     });
     if (result.pass) { console.log(`PASS: ${result.reason}`); return; }
     console.error(`FAIL: ${result.reason}`);
@@ -128,7 +126,6 @@ async function main() {
   } catch (error) {
     const reason = `GitHub API/evidence error; fail closed. ${error.message}`;
     console.error(`::error::${reason}`);
-
     process.exitCode = 1;
   }
 }
