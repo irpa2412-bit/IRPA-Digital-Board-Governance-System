@@ -6,7 +6,7 @@
   "lastActivityAt": "2026-11-27T19:17:59.933Z",
   "inactivityCloseHours": 72,
   "emergency": false,
-  "reason": "Owner-authorised Meeting Portal universal-access and meeting-scoped authority repair, separate from shared application-shell PR #995.",
+  "reason": "Owner-authorised coordinated shared-file protection cycle for src/App.jsx and the shared OrganisationalRelationshipSupport component. Independently verify this portal's navigation and security invariants; preserve all portal-specific controls.",
   "scope": [
     ".github/workflows/meeting-portal-fixture-browser.yml",
     "docs/portal-protection/records/meeting-portal.json",
@@ -43,7 +43,8 @@
     "tests/meeting-working-documents-security.test.mjs",
     "tests/org-structure-access-preservation.test.cjs",
     "tests/policies-strategic-plan-portal.test.mjs",
-    "tests/staging-admin-access-preservation.test.cjs"
+    "tests/staging-admin-access-preservation.test.cjs",
+    "src/components/OrganisationalRelationshipSupport.jsx"
   ],
   "activityLog": [
     {
