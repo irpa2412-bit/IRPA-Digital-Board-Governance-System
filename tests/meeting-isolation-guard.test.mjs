@@ -191,6 +191,25 @@ guardTest("Meeting Portal fixture runs on every repair branch and all Meeting Po
   assert.ok(guard.includes('"src/firebase/meetingAttendanceSigning.js"'));
 });
 
+guardTest("cross-portal relationship support is allowed only as a complete protected shared integration", () => {
+  assert.match(guard, /const relationshipSupportPaths = new Set\(\[/);
+  assert.match(guard, /const crossPortalRelationshipSupportIntegration =/);
+  assert.match(guard, /changed\.every\(path => allowed\.has\(path\) \|\| relationshipSupportPaths\.has\(path\)\)/);
+  for (const path of [
+    "src/components/OrganisationalRelationshipSupport.jsx",
+    "src/pages/OrganisationalWorkingRelationships.jsx",
+    "src/pages/AuthorizationWorkflow.jsx",
+    "src/firebase/authorizationWorkflow.js",
+    "src/firebase/workflowLinks.js",
+    "src/governance/organisationalRelationships.js",
+    "docs/portal-protection/portal-register.json",
+    "docs/portal-protection/windows/meeting-portal.json",
+    "docs/portal-protection/records/meeting-portal.json",
+    "tests/working-relationship-portal-integration.test.mjs"
+  ]) assert.ok(guard.includes(`"${path}"`), `missing cross-portal allowlist path: ${path}`);
+  assert.match(guard, /!crossPortalRelationshipSupportIntegration/);
+});
+
 guardTest("workflow delegates its source-isolation gate to the extracted guard script", () => {
   assert.ok(workflow.includes("bash scripts/meeting-portal-fixture-isolation-guard.sh"));
   assert.ok(workflow.includes("if grep -Fq 'BASE_REF=\"${GITHUB_BASE_REF:-main}\"'"));
