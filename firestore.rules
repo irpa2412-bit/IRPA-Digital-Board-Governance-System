@@ -141,6 +141,9 @@ service cloud.firestore {
   function activeEmployeeProfile(profileId){
     return profileId is string && profileId!="" &&
       exists(/databases/$(database)/documents/employees/$(profileId)) &&
+      get(/databases/$(database)/documents/employees/$(profileId)).data.get("recordOrigin","PRODUCTION")!="TRIAL" &&
+      get(/databases/$(database)/documents/employees/$(profileId)).data.get("trialData",false)!=true &&
+      get(/databases/$(database)/documents/employees/$(profileId)).data.get("isTrial",false)!=true &&
       (get(/databases/$(database)/documents/employees/$(profileId)).data.get("status","")=="Active" ||
        get(/databases/$(database)/documents/employees/$(profileId)).data.get("employmentStatus","")=="Active" ||
        get(/databases/$(database)/documents/employees/$(profileId)).data.get("registrationStatus","")=="Activated");
@@ -148,6 +151,9 @@ service cloud.firestore {
   function activeMemberProfile(profileId){
     return profileId is string && profileId!="" &&
       exists(/databases/$(database)/documents/members/$(profileId)) &&
+      get(/databases/$(database)/documents/members/$(profileId)).data.get("recordOrigin","PRODUCTION")!="TRIAL" &&
+      get(/databases/$(database)/documents/members/$(profileId)).data.get("trialData",false)!=true &&
+      get(/databases/$(database)/documents/members/$(profileId)).data.get("isTrial",false)!=true &&
       (get(/databases/$(database)/documents/members/$(profileId)).data.get("status","") in ["Active","Activated"] ||
        get(/databases/$(database)/documents/members/$(profileId)).data.get("registrationStatus","")=="Activated");
   }
