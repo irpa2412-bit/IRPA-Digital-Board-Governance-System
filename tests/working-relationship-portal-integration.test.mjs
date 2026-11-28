@@ -22,7 +22,7 @@ test("authorisation requests can reference only a relationship visible to the au
 });
 test("relationship context never provisions portal roles or Firebase claims",()=>{
  assert.match(rules,/permissionsActivated",true\)==false/);
- assert.match(rules,/grantedClaims",\[\]==\[\]/);
+ assert.match(rules,/grantedClaims",\[\]\)==\[\]/);
  assert.match(support,/Authenticated supervisory context/);
  assert.doesNotMatch(support,/setCustomUserClaims|adminClaims|grantRole/);
 });
