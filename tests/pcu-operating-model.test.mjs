@@ -41,8 +41,6 @@ test("every job description retains canonical role details and adds a complete o
   assert.equal(jd.status,"DRAFT_FOR_EXECUTIVE_DIRECTOR_REVIEW");
  });
 
-});
-
 test("PCU exposes additive import and custom entry creation without overwriting existing records",()=>{
  assert.match(pcu,/PcuMandateJobDescriptionManager/);
  assert.match(manager,/if\(snap\.exists\(\)\)\{existingMandates\+\+;continue;\}/);
