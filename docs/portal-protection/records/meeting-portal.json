@@ -330,12 +330,13 @@
     "affectedPortals": [
       "Meeting Portal"
     ],
-    "reason": "Owner-authorised shared application-shell support integration for authenticated organisational working relationships across all seven protected portals, with portal-specific workflows and authority controls unchanged.",
+    "reason": "Owner-authorised shared application-shell support integration for authenticated organisational working relationships across all seven protected portals, with portal-specific workflows and authority controls unchanged. Its fixture-isolation allowlist is extended for this complete cross-portal integration only; the isolated Meeting Portal browser regression remains mandatory.",
     "files": [
       "src/App.jsx",
       "scripts/meeting-portal-fixture-isolation-guard.sh",
       "scripts/portal-protection-smoke.mjs",
-      "src/components/OrganisationalRelationshipSupport.jsx"
+      "src/components/OrganisationalRelationshipSupport.jsx",
+      "tests/meeting-isolation-guard.test.mjs"
     ],
     "expectedEffect": "The common authenticated shell exposes a collapsible working-relationship support workspace in every portal. It allows named supervisors and assignees to manage responsibilities and progress reports and supplies authenticated relationship context to Authorization & Approvals. It does not grant portal permissions, financial authority, signing authority, meeting-specific powers or change any portal's internal mandate.",
     "prohibitedChanges": [
