@@ -44,18 +44,20 @@ jobs:
       pull-requests: read
       issues: read
     steps:
-      - name: Checkout PR source for the read-only gate
+      - name: Checkout exact PR head for the read-only gate
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
+          ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
           fetch-depth: 0
       - name: Run offline approval decision fixtures
         run: node --test tests/firestore-rules-approval.test.mjs
       - name: Evaluate owner-applied, current Firestore rules approval
         env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_ACTION: ${{ github.event.action }}
+          PR_ACTOR: ${{ github.actor }}
+          EVENT_LABEL_NAME: ${{ github.event.label.name || '' }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           PR_LABELS: ${{ toJson(github.event.pull_request.labels) }}
         run: node scripts/firestore-rules-approval.mjs
