@@ -137,7 +137,7 @@ async function verifyRealRunEvidence(record, affected) {
         try {
           const [pullResponse, commitsResponse] = await Promise.all([
             readEvidence(`${api}/repos/${repository}/pulls/${pullNumber}`),
-            readEvidence(`${api}/repos/${repository}/pulls/${pullNumber}/commits?per_page=100`)
+            readEvidence(`${api}/repos/${repository}/pulls/${pullNumber}/commits?per_page=250`)
           ]);
           if (pullResponse.ok && commitsResponse.ok) {
             const [pull, commits] = await Promise.all([pullResponse.json(), commitsResponse.json()]);
