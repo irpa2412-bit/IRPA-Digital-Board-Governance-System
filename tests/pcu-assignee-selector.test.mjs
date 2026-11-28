@@ -14,7 +14,9 @@ test("PCU named assignees are limited to active records with a linked UID",()=>{
   assert.match(source,/typeof x\.uid==="string"&&x\.uid\.trim\(\)/);
   assert.match(source,/isActiveIdentity\(x\)/);
   assert.match(source,/where\("status","==","Active"\)/);
-  assert.match(source,/where\("employmentStatus","==","Active"\)/);\n  assert.doesNotMatch(source,/getDocs\(collection\(db,"members"\)\)/);\n  assert.doesNotMatch(source,/getDocs\(collection\(db,"employees"\)\)/);
+  assert.match(source,/where\("employmentStatus","==","Active"\)/);
+  assert.doesNotMatch(source,/getDocs\(collection\(db,"members"\)\)/);
+  assert.doesNotMatch(source,/getDocs\(collection\(db,"employees"\)\)/);
   assert.match(source,/x\.firebaseAuthDisabled!==true/);
   assert.match(source,/staff\.map\(person=><option key=\{person\.uid\} value=\{person\.uid\}>/);
   assert.match(source,/Only active records with a verified linked Firebase UID are available/);
