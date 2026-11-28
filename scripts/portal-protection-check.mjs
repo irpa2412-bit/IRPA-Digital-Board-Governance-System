@@ -4,6 +4,7 @@ import { execFileSync } from "node:child_process";
 const HOURS_72 = 72 * 60 * 60 * 1000;
 const WARNING_12 = 12 * 60 * 60 * 1000;
 const BREAK_GLASS_24 = 24 * 60 * 60 * 1000;
+const evidenceResponseCache = new Map();
 const isWithin = (file, path) => file === path || (path.endsWith("/") && file.startsWith(path));
 const readJson = (path) => JSON.parse(fs.readFileSync(path, "utf8"));
 
@@ -102,8 +103,11 @@ async function verifyRealRunEvidence(record, affected) {
       // Retry public, read-only Actions evidence without a token when GitHub restricts workflow-token access.
       // Run identity, PR base SHA, job status and conclusion are still verified below.
       const readEvidence = async url => {
+        const cached = evidenceResponseCache.get(url);
+        if (cached) return cached.clone();
         let response = await fetch(url, { headers });
         if (response.status === 403) response = await fetch(url, { headers: { accept: "application/vnd.github+json", "x-github-api-version": "2022-11-28" } });
+        evidenceResponseCache.set(url, response.clone());
         return response;
       };
       let runResponse, jobsResponse;
