@@ -142,7 +142,7 @@ service cloud.firestore {
     return uid is string && uid!="" && profileId is string && profileId!="" &&
       profileCollection in ["members","employees"] &&
       exists(/databases/$(database)/documents/$(profileCollection)/$(profileId)) &&
-      get(/databases/$(database)/documents/$(profileCollection)/$(profileId)).data.get("uid",profileId)==uid &&
+      (get(/databases/$(database)/documents/$(profileCollection)/$(profileId)).data.get("uid",profileId)==uid || get(/databases/$(database)/documents/$(profileCollection)/$(profileId)).data.get("firebaseAuthUid","")==uid || get(/databases/$(database)/documents/$(profileCollection)/$(profileId)).data.get("authUid","")==uid || (request.auth.token.email is string && (get(/databases/$(database)/documents/$(profileCollection)/$(profileId)).data.get("email","")==request.auth.token.email || get(/databases/$(database)/documents/$(profileCollection)/$(profileId)).data.get("firebaseAuthEmail","")==request.auth.token.email))) &&
       ((profileCollection=="employees" &&
         (get(/databases/$(database)/documents/$(profileCollection)/$(profileId)).data.get("status","")=="Active" ||
          get(/databases/$(database)/documents/$(profileCollection)/$(profileId)).data.get("employmentStatus","")=="Active" ||
