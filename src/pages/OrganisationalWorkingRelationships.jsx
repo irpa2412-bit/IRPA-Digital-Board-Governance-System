@@ -6,7 +6,7 @@ const root="organisationalWorkingRelationships";
 const clean=v=>String(v??"").trim();
 const today=()=>new Date().toISOString().slice(0,10);
 export default function OrganisationalWorkingRelationships({user,isAdmin=false,selectedAuthority=""}){
- const uid=user?.uid||"",manager=isAdmin||String(selectedAuthority).toUpperCase()==="EXECUTIVE DIRECTOR";
+ const uid=user?.uid||"",manager=isAdmin;
  const[relationships,setRelationships]=useState([]),[responsibilities,setResponsibilities]=useState([]),[reports,setReports]=useState([]);
  const[busy,setBusy]=useState(false),[error,setError]=useState(""),[message,setMessage]=useState("");
  const[supervisorUid,setSupervisorUid]=useState(""),[supervisorName,setSupervisorName]=useState(""),[subordinateUid,setSubordinateUid]=useState(""),[subordinateName,setSubordinateName]=useState(""),[relationshipLabel,setRelationshipLabel]=useState(""),[scope,setScope]=useState(""),[effectiveFrom,setEffectiveFrom]=useState(today()),[effectiveTo,setEffectiveTo]=useState("");
