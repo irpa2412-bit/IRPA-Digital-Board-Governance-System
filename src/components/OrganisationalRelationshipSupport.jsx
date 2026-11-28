@@ -1,6 +1,6 @@
 import React,{useState}from"react";
 import OrganisationalWorkingRelationships from "../pages/OrganisationalWorkingRelationships";
-export default function OrganisationalRelationshipSupport({user,profile,employee,isAdmin=false,activePortal="",onNavigate}){
+export default function OrganisationalRelationshipSupport({user,isAdmin=false,activePortal="",onNavigate}){
  const[open,setOpen]=useState(false);
  return <section className="organisational-relationship-support" aria-label="Organisational working relationship support" style={{margin:"12px 0 16px",border:"1px solid var(--border-color,#cbd5e1)",borderRadius:12,background:"var(--surface,#fff)",color:"var(--text-primary,#172033)",overflow:"hidden"}}>
   <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,padding:"12px 14px",flexWrap:"wrap"}}>
