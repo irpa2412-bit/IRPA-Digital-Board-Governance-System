@@ -12,7 +12,7 @@
       "scripts/meeting-portal-fixture-isolation-guard.sh",
       "scripts/portal-protection-smoke.mjs"
     ],
-    "expectedEffect": "The shared application shell makes the complete Meeting Portal module set available to every identity with a Members or Employees register record, regardless of active status or selected authority. It does not change this portal's own data, workflows, permissions or role controls.",
+    "expectedEffect": "The shared application shell makes the complete Meeting Portal module set available to every identity with a Members or Employees register record, regardless of active status or selected authority. It does not change this portal's own data, workflows, permissions or role controls. The shared shell also exposes a collapsible, authenticated working-relationship support workspace across portal contexts; portal-specific permissions and mandates remain unchanged.",
     "prohibitedChanges": [
       "Do not change another portal's internals.",
       "Do not weaken authentication, signing, invitation, deletion or deployment controls.",
@@ -48,7 +48,8 @@
     ],
     "behaviourDifferences": [
       "The shared application shell exposes Meeting Portal navigation to all Members/Employees register identities independent of status or selected authority; no internal portal workflow or authorization boundary is changed.",
-      "The cross-portal browser fixture isolation guard is a shared validation dependency and changes no runtime portal behavior."
+      "The cross-portal browser fixture isolation guard is a shared validation dependency and changes no runtime portal behavior.",
+      "A shared authenticated-shell panel exposes the independent working-relationship and reporting workflow across all portal contexts; it does not modify portal-specific authority, permissions or business logic."
     ]
   },
   "renewals": [
@@ -67,13 +68,14 @@
     "affectedPortals": [
       "Grants Intelligence and Funding Opportunities Portal"
     ],
-    "reason": "Owner-authorised coordinated shared-file protection cycle for src/App.jsx. This portal independently verifies the shared navigation-shell change while preserving its own authorization, data, workflow and governance boundaries.",
+    "reason": "Owner-authorised shared application-shell support integration for authenticated organisational working relationships across all seven protected portals, with portal-specific workflows and authority controls unchanged.",
     "files": [
       "src/App.jsx",
       "scripts/meeting-portal-fixture-isolation-guard.sh",
-      "scripts/portal-protection-smoke.mjs"
+      "scripts/portal-protection-smoke.mjs",
+      "src/components/OrganisationalRelationshipSupport.jsx"
     ],
-    "expectedEffect": "The shared application shell makes the complete Meeting Portal module set available to every identity with a Members or Employees register record, regardless of active status or selected authority. It does not change this portal's own data, workflows, permissions or role controls.",
+    "expectedEffect": "The common authenticated shell exposes a collapsible working-relationship support workspace in every portal. It allows named supervisors and assignees to manage responsibilities and progress reports and supplies authenticated relationship context to Authorization & Approvals. It does not grant portal permissions, financial authority, signing authority, meeting-specific powers or change any portal's internal mandate.",
     "prohibitedChanges": [
       "Do not alter this portal's internal source, data model, business rules or role permissions.",
       "Do not weaken authentication, signing, invitation, deletion, audit, retention or deployment controls.",
