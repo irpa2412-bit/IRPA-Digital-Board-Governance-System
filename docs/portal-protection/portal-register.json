@@ -310,6 +310,110 @@
         "Meeting Portal"
       ],
       "class": "shared"
+    },
+    {
+      "path": "src/components/OrganisationalRelationshipSupport.jsx",
+      "portals": [
+        "Board Members Portal",
+        "Communication and Media Portal",
+        "Grants Intelligence and Funding Opportunities Portal",
+        "Invitation Portal",
+        "Meeting Portal",
+        "Members and Employees Portal",
+        "Signature Portal"
+      ],
+      "class": "shared"
+    },
+    {
+      "path": "firestore.rules",
+      "portals": [
+        "Invitation Portal",
+        "Grants Intelligence and Funding Opportunities Portal",
+        "Signature Portal",
+        "Board Members Portal",
+        "Members and Employees Portal",
+        "Communication and Media Portal",
+        "Meeting Portal"
+      ],
+      "class": "shared"
+    },
+    {
+      "path": "scripts/meeting-portal-fixture-isolation-guard.sh",
+      "portals": [
+        "Invitation Portal",
+        "Grants Intelligence and Funding Opportunities Portal",
+        "Signature Portal",
+        "Board Members Portal",
+        "Members and Employees Portal",
+        "Communication and Media Portal",
+        "Meeting Portal"
+      ],
+      "class": "shared"
+    },
+    {
+      "path": "src/pages/OrganisationalWorkingRelationships.jsx",
+      "portals": [
+        "Invitation Portal",
+        "Grants Intelligence and Funding Opportunities Portal",
+        "Signature Portal",
+        "Board Members Portal",
+        "Members and Employees Portal",
+        "Communication and Media Portal",
+        "Meeting Portal"
+      ],
+      "class": "shared"
+    },
+    {
+      "path": "src/governance/organisationalRelationships.js",
+      "portals": [
+        "Invitation Portal",
+        "Grants Intelligence and Funding Opportunities Portal",
+        "Signature Portal",
+        "Board Members Portal",
+        "Members and Employees Portal",
+        "Communication and Media Portal",
+        "Meeting Portal"
+      ],
+      "class": "shared"
+    },
+    {
+      "path": "src/pages/AuthorizationWorkflow.jsx",
+      "portals": [
+        "Invitation Portal",
+        "Grants Intelligence and Funding Opportunities Portal",
+        "Signature Portal",
+        "Board Members Portal",
+        "Members and Employees Portal",
+        "Communication and Media Portal",
+        "Meeting Portal"
+      ],
+      "class": "shared"
+    },
+    {
+      "path": "src/firebase/authorizationWorkflow.js",
+      "portals": [
+        "Invitation Portal",
+        "Grants Intelligence and Funding Opportunities Portal",
+        "Signature Portal",
+        "Board Members Portal",
+        "Members and Employees Portal",
+        "Communication and Media Portal",
+        "Meeting Portal"
+      ],
+      "class": "shared"
+    },
+    {
+      "path": "src/firebase/workflowLinks.js",
+      "portals": [
+        "Invitation Portal",
+        "Grants Intelligence and Funding Opportunities Portal",
+        "Signature Portal",
+        "Board Members Portal",
+        "Members and Employees Portal",
+        "Communication and Media Portal",
+        "Meeting Portal"
+      ],
+      "class": "shared"
     }
   ],
   "exclusions": [

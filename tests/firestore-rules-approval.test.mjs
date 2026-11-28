@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { evaluateApproval } from "../scripts/firestore-rules-approval.mjs";
+import { evaluateApproval, evaluateLabelEventApproval } from "../scripts/firestore-rules-approval.mjs";
 
 const base = {
   changedFiles: ["src/example.js", "firestore.rules"],
@@ -10,6 +10,47 @@ const base = {
   rulesCommitIds: ["abc123"],
   allowedActors: ["irpa2412-bit"]
 };
+
+
+const eventBase = {
+  action: "labeled",
+  actor: "irpa2412-bit",
+  labelName: "firestore-rules-approved",
+  labels: ["firestore-rules-approved"],
+  changedFiles: ["src/example.js", "firestore.rules"],
+  rulesCommitIds: ["abc123"],
+  allowedActors: ["irpa2412-bit"],
+  headSha: "a".repeat(40),
+  checkoutSha: "a".repeat(40)
+};
+
+test("owner label event approves the exact current PR head", () => {
+  assert.equal(evaluateLabelEventApproval(eventBase).pass, true);
+});
+
+test("synchronize after approval requires the owner to re-apply the label", () => {
+  const result = evaluateLabelEventApproval({ ...eventBase, action: "synchronize" });
+  assert.equal(result.pass, false);
+  assert.match(result.reason, /re-applied after the latest PR commit/);
+});
+
+test("non-allow-listed label actor cannot approve rules", () => {
+  const result = evaluateLabelEventApproval({ ...eventBase, actor: "automation-bot" });
+  assert.equal(result.pass, false);
+  assert.match(result.reason, /unauthorized actor/);
+});
+
+test("approval event must match the exact checked-out PR head", () => {
+  const result = evaluateLabelEventApproval({ ...eventBase, checkoutSha: "b".repeat(40) });
+  assert.equal(result.pass, false);
+  assert.match(result.reason, /exact checked-out PR head/);
+});
+
+test("missing approval label fails closed for changed rules", () => {
+  const result = evaluateLabelEventApproval({ ...eventBase, labels: [] });
+  assert.equal(result.pass, false);
+  assert.match(result.reason, /label is absent/);
+});
 
 test("unchanged firestore.rules passes without requiring a label", () => {
   const result = evaluateApproval({ ...base, changedFiles: ["src/example.js"], labels: [], labelEvents: [], timeline: [], rulesCommitIds: [] });

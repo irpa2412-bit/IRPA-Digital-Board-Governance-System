@@ -125,6 +125,18 @@ test("shared file is classified once and requires each owning portal's independe
   assert.ok(result.ownerResults.every(owner => owner.lockTests.length > 0));
 });
 
+test("registered shared paths default to all portal owners when owner metadata is absent", () => {
+  const fallbackRegistry = {
+    ...registry,
+    shared: registry.shared.map(entry => entry.path === sharedPath ? { ...entry, portals: [] } : entry)
+  };
+  const result = evaluatePolicy({ changedFiles: [sharedPath], registry: fallbackRegistry, now });
+  assert.equal(result.ok, true, result.reason);
+  assert.equal(result.needsOwnerPolicies, true);
+  assert.deepEqual(result.affected, Object.keys(registry.portals).sort());
+  assert.deepEqual(result.sharedFiles, [sharedPath]);
+});
+
 test("shared-file change fails when one owner's window or baseline evidence is missing", () => {
   const missingWindow = sharedOwnerPolicies();
   delete missingWindow["Meeting Portal"].windowState;

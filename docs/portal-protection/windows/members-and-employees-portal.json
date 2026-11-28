@@ -10,7 +10,7 @@
   "lastActivityAt": "2026-11-27T19:18:44.436Z",
   "emergency": false,
   "emergencyLimitHours": 24,
-  "reason": "Owner-authorised coordinated shared-file protection cycle for src/App.jsx. Independently verify this portal's navigation and security invariants while the common application shell exposes the Meeting Portal to every IRPA member/employee identity. Preserve all portal-specific controls. The cross-portal browser fixture isolation guard is also included as a shared validation dependency.",
+  "reason": "Owner-authorised coordinated shared-file protection cycle for src/App.jsx and the shared OrganisationalRelationshipSupport component. Independently verify this portal's navigation and security invariants; preserve all portal-specific controls.",
   "scope": [
     "src/pages/Members.jsx",
     "src/pages/Employees.jsx",
@@ -18,7 +18,14 @@
     "src/firebase/employee/",
     "src/App.jsx",
     "scripts/meeting-portal-fixture-isolation-guard.sh",
-    "scripts/portal-protection-smoke.mjs"
+    "scripts/portal-protection-smoke.mjs",
+    "src/components/OrganisationalRelationshipSupport.jsx",
+    "firestore.rules",
+    "src/pages/OrganisationalWorkingRelationships.jsx",
+    "src/governance/organisationalRelationships.js",
+    "src/pages/AuthorizationWorkflow.jsx",
+    "src/firebase/authorizationWorkflow.js",
+    "src/firebase/workflowLinks.js"
   ],
   "activityLog": [
     {

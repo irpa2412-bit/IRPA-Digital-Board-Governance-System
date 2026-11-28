@@ -4,6 +4,7 @@ import { execFileSync } from "node:child_process";
 const HOURS_72 = 72 * 60 * 60 * 1000;
 const WARNING_12 = 12 * 60 * 60 * 1000;
 const BREAK_GLASS_24 = 24 * 60 * 60 * 1000;
+const evidenceResponseCache = new Map();
 const isWithin = (file, path) => file === path || (path.endsWith("/") && file.startsWith(path));
 const readJson = (path) => JSON.parse(fs.readFileSync(path, "utf8"));
 
@@ -99,15 +100,18 @@ async function verifyRealRunEvidence(record, affected) {
       const ref = parseGitHubJobEvidence(item);
       if (!ref) { diagnostics.push("candidate URL could not be parsed"); continue; }
       if (ref.repository.toLowerCase() !== repository.toLowerCase()) { diagnostics.push("candidate repository does not match workflow repository"); continue; }
+      // Retry public, read-only Actions evidence without a token when GitHub restricts workflow-token access.
+      // Run identity, PR base SHA, job status and conclusion are still verified below.
+      const readEvidence = async url => {
+        const cached = evidenceResponseCache.get(url);
+        if (cached) return cached.clone();
+        let response = await fetch(url, { headers });
+        if (response.status === 403) response = await fetch(url, { headers: { accept: "application/vnd.github+json", "x-github-api-version": "2022-11-28" } });
+        evidenceResponseCache.set(url, response.clone());
+        return response;
+      };
       let runResponse, jobsResponse;
       try {
-        // Retry public, read-only Actions evidence without a token when GitHub restricts workflow-token access.
-        // Run identity, PR base SHA, job status and conclusion are still verified below.
-        const readEvidence = async url => {
-          let response = await fetch(url, { headers });
-          if (response.status === 403) response = await fetch(url, { headers: { accept: "application/vnd.github+json", "x-github-api-version": "2022-11-28" } });
-          return response;
-        };
         [runResponse, jobsResponse] = await Promise.all([
           readEvidence(`${api}/repos/${repository}/actions/runs/${ref.runId}`),
           readEvidence(`${api}/repos/${repository}/actions/runs/${ref.runId}/jobs?per_page=100`)
@@ -135,21 +139,32 @@ async function verifyRealRunEvidence(record, affected) {
       if (!baseCommitVerified && run.event === "pull_request" && Number.isInteger(Number(record.baseline.evidencePullRequest))) {
         const pullNumber = Number(record.baseline.evidencePullRequest);
         try {
-          const [pullResponse, commitsResponse] = await Promise.all([
+          const [pullResponse, ...commitResponses] = await Promise.all([
             readEvidence(`${api}/repos/${repository}/pulls/${pullNumber}`),
-            readEvidence(`${api}/repos/${repository}/pulls/${pullNumber}/commits?per_page=100`)
+            ...[1, 2, 3].map(page => readEvidence(`${api}/repos/${repository}/pulls/${pullNumber}/commits?per_page=100&page=${page}`))
           ]);
-          if (pullResponse.ok && commitsResponse.ok) {
-            const [pull, commits] = await Promise.all([pullResponse.json(), commitsResponse.json()]);
+          if (pullResponse.ok && commitResponses.every(response => response.ok)) {
+            const [pull, ...commitPages] = await Promise.all([
+              pullResponse.json(),
+              ...commitResponses.map(response => response.json())
+            ]);
+            const commits = commitPages.flat();
+            const commitFound = Array.isArray(commits) && commits.some(commit => commit.sha === run.head_sha);
             baseCommitVerified = pull.merged === true &&
               pull.base?.sha === record.baseline.commit &&
               pull.head?.ref === run.head_branch &&
               pull.head?.repo?.full_name?.toLowerCase() === repository.toLowerCase() &&
-              Array.isArray(commits) && commits.some(commit => commit.sha === run.head_sha);
+              commitFound;
+            if (!baseCommitVerified) diagnostics.push(`merged PR ${pullNumber} evidence: merged=${pull.merged}; base=${pull.base?.sha ?? "missing"}; expectedBase=${record.baseline.commit}; headRef=${pull.head?.ref ?? "missing"}; runBranch=${run.head_branch}; headRepo=${pull.head?.repo?.full_name ?? "missing"}; commitFound=${commitFound}; commitsChecked=${commits.length}`);
+          } else {
+            diagnostics.push(`merged PR evidence HTTP: pull=${pullResponse.status}; commitPages=${commitResponses.map(response => response.status).join(",")}`);
           }
-        } catch {
+        } catch (error) {
           baseCommitVerified = false;
+          diagnostics.push(`merged PR ${pullNumber} evidence lookup failed: ${error instanceof Error ? error.message : String(error)}`);
         }
+      } else if (!baseCommitVerified) {
+        diagnostics.push(`merged PR fallback not eligible: event=${run.event}; evidencePullRequest=${record.baseline.evidencePullRequest ?? "missing"}`);
       }
       if (run.id === ref.runId && run.event === "pull_request" && baseCommitVerified &&
           job?.run_id === ref.runId && job.name === expectedJobName &&
@@ -199,7 +214,8 @@ export function evaluatePolicy({ changedFiles, registry, windowState, record, ow
     const owners = new Set();
     for (const shared of registry.shared ?? []) {
       if (isWithin(file, shared.path)) {
-        shared.portals.forEach(portal => owners.add(portal));
+        const sharedOwners = Array.isArray(shared.portals) && shared.portals.length ? shared.portals : Object.keys(registry.portals);
+        sharedOwners.forEach(portal => owners.add(portal));
       }
     }
     if (owners.size) {

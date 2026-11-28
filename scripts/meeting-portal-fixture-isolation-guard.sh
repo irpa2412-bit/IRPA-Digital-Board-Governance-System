@@ -34,6 +34,9 @@ const allowed = new Set([
   "tests/portal-protection-policy.test.mjs",
   "docs/portal-protection/change-record.json",
   "scripts/meeting-portal-fixture-isolation-guard.sh",
+  ".github/workflows/firestore-rules-approval.yml",
+  "scripts/firestore-rules-approval.mjs",
+  "tests/firestore-rules-approval.test.mjs",
   "scripts/portal-repair-window-guard-policy.mjs",
   ".github/workflows/finance-production-reset.yml",
   "docs/ACTUAL_DATA_ACCESS_GATE.md",
@@ -420,8 +423,50 @@ const emailSigningRebuildIntegration = changed.includes("drive-gateway/src/signi
   changed.includes("drive-gateway/tests/email-signing-contract.test.mjs") &&
   changed.some(path => path.startsWith("drive-gateway/src/emailSigning/")) &&
   changed.every(path => emailSigningRebuildPaths.has(path) || path.startsWith("drive-gateway/src/emailSigning/"));
+// Coordinated cross-portal relationship support is allowed only as one complete,
+// authenticated integration. The shared portal-protection guard independently
+// validates every affected portal's open window, owner record and lock tests.
+const relationshipSupportPaths = new Set([
+  "docs/portal-protection/portal-register.json",
+  "docs/portal-protection/windows/board-members-portal.json",
+  "docs/portal-protection/windows/communication-and-media-portal.json",
+  "docs/portal-protection/windows/grants-intelligence-and-funding-opportunities-portal.json",
+  "docs/portal-protection/windows/invitation-portal.json",
+  "docs/portal-protection/windows/meeting-portal.json",
+  "docs/portal-protection/windows/members-and-employees-portal.json",
+  "docs/portal-protection/windows/signature-portal.json",
+  "docs/portal-protection/records/board-members-portal.json",
+  "docs/portal-protection/records/communication-and-media-portal.json",
+  "docs/portal-protection/records/grants-intelligence-and-funding-opportunities-portal.json",
+  "docs/portal-protection/records/invitation-portal.json",
+  "docs/portal-protection/records/meeting-portal.json",
+  "docs/portal-protection/records/members-and-employees-portal.json",
+  "docs/portal-protection/records/signature-portal.json",
+  "scripts/meeting-portal-fixture-isolation-guard.sh",
+  "src/components/OrganisationalRelationshipSupport.jsx",
+  "src/pages/OrganisationalWorkingRelationships.jsx",
+  "src/pages/AuthorizationWorkflow.jsx",
+  "src/firebase/authorizationWorkflow.js",
+  "src/firebase/workflowLinks.js",
+  "src/governance/organisationalRelationships.js",
+  "tests/organisational-working-relationships.test.mjs",
+  "tests/organisational-working-relationships-rules.test.mjs",
+  "tests/working-relationship-portal-integration.test.mjs",
+  "tests/meeting-isolation-guard.test.mjs"
+]);
+const crossPortalRelationshipSupportIntegration =
+  changed.includes("src/components/OrganisationalRelationshipSupport.jsx") &&
+  changed.includes("src/App.jsx") &&
+  changed.includes("src/pages/OrganisationalWorkingRelationships.jsx") &&
+  changed.includes("src/pages/AuthorizationWorkflow.jsx") &&
+  changed.includes("src/firebase/authorizationWorkflow.js") &&
+  changed.includes("src/firebase/workflowLinks.js") &&
+  changed.includes("src/governance/organisationalRelationships.js") &&
+  changed.includes("firestore.rules") &&
+  changed.includes("tests/working-relationship-portal-integration.test.mjs") &&
+  changed.every(path => allowed.has(path) || relationshipSupportPaths.has(path));
 const unexpected = changed.filter(path =>
-  !allowed.has(path) && !(path === ".github/workflows/firebase-deploy.yml" && (signatureGatewayIntegration || actualDataGateIntegration || controlledDocumentTrialUploadFix)) &&
+  !allowed.has(path) && !(crossPortalRelationshipSupportIntegration && relationshipSupportPaths.has(path)) && !(path === ".github/workflows/firebase-deploy.yml" && (signatureGatewayIntegration || actualDataGateIntegration || controlledDocumentTrialUploadFix)) &&
   !(communicationMediaIntegration && communicationMediaPaths.has(path)) &&
   !(communicationMediaArchiveIntegration && communicationMediaArchivePaths.has(path)) &&
   !(path === "drive-gateway/tests/esign-storage-multipart.test.mjs" && signatureGatewayIntegration) &&
@@ -532,7 +577,7 @@ if (!isMainPush && eventName !== "workflow_dispatch" &&
     !changed.includes("src/pages/Meetings.jsx") &&
     !changed.includes("src/pages/OperationalGatewaysParticipants.jsx") &&
     !testOnlySignatureNavigation && !testOnlyRegisterScope && !invitationRemovalIntegration && !invitationMailResendIntegration &&
-    !signatureGatewayIntegration && !signaturePathwayContractRepair && !actualDataGateIntegration && !controlledDocumentTrialUploadFix && !signatureSignerPickerRepair && !signatureSignerListVisibilityRepair && !signaturePdfPaletteRepair && !signaturePaletteDirectAssignmentRepair && !signaturePdfUrlHandoffRepair && !signatureDocumentPaletteAssignmentRepair && !signaturePaletteLifecycleSourceRepair && !signaturePdfArchivePaletteRepair && !signatureEmailLinkIdentityRepair && !guardOnlyWorkflowRepair && !communicationMediaOnly && !readabilityOnlyChange && !grantAssistantPersistence && !meetingTrialDeletionGuard && !parallelWindowRecordAmendment && !signatureEmailLinkSessionRepair && !emailSigningRebuildIntegration) {
+    !signatureGatewayIntegration && !signaturePathwayContractRepair && !actualDataGateIntegration && !controlledDocumentTrialUploadFix && !signatureSignerPickerRepair && !signatureSignerListVisibilityRepair && !signaturePdfPaletteRepair && !signaturePaletteDirectAssignmentRepair && !signaturePdfUrlHandoffRepair && !signatureDocumentPaletteAssignmentRepair && !signaturePaletteLifecycleSourceRepair && !signaturePdfArchivePaletteRepair && !signatureEmailLinkIdentityRepair && !guardOnlyWorkflowRepair && !communicationMediaOnly && !readabilityOnlyChange && !grantAssistantPersistence && !meetingTrialDeletionGuard && !crossPortalRelationshipSupportIntegration && !parallelWindowRecordAmendment && !signatureEmailLinkSessionRepair && !emailSigningRebuildIntegration) {
   throw new Error("Meeting/participant source change or an explicitly paired isolated regression/guard test is missing.");
 }
 console.log(JSON.stringify({ result: "PASS", changedFiles: changed, unrelatedPortalSourceChanges: 0 }));

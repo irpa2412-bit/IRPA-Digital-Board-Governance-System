@@ -1,4 +1,5 @@
-const API = "https://api.github.com";
+import { execFileSync } from "node:child_process";
+
 const LABEL = "firestore-rules-approved";
 
 function latestByTime(items) {
@@ -8,8 +9,9 @@ function latestByTime(items) {
   }).at(-1);
 }
 
+// Retained as an offline decision fixture for the timeline-based policy contract.
 export function evaluateApproval({ changedFiles, labels, labelEvents, timeline, rulesCommitIds, allowedActors, apiError }) {
-  if (apiError) return { pass: false, reason: `GitHub API verification failed; failing closed: ${apiError}` };
+  if (apiError) return { pass: false, reason: "GitHub API verification failed; failing closed: " + apiError };
   if (!Array.isArray(changedFiles) || !Array.isArray(labels) || !Array.isArray(labelEvents) ||
       !Array.isArray(timeline) || !Array.isArray(rulesCommitIds) || !Array.isArray(allowedActors)) {
     return { pass: false, reason: "Required approval evidence is incomplete; failing closed." };
@@ -24,7 +26,7 @@ export function evaluateApproval({ changedFiles, labels, labelEvents, timeline, 
   }
   const actor = latestLabelEvent.actor?.login;
   if (!actor || !allowedActors.includes(actor)) {
-    return { pass: false, reason: `Approval label was applied by unauthorized actor: ${actor || "unknown"}.` };
+    return { pass: false, reason: "Approval label was applied by unauthorized actor: " + (actor || "unknown") + "." };
   }
   if (!latestLabelEvent.id || rulesCommitIds.length === 0) {
     return { pass: false, reason: "Cannot establish the PR event order for the approval and rules commits; failing closed." };
@@ -37,100 +39,78 @@ export function evaluateApproval({ changedFiles, labels, labelEvents, timeline, 
   if (labelIndex <= Math.max(...rulesCommitIndexes)) {
     return { pass: false, reason: "approval is stale; re-apply the label after reviewing the latest diff" };
   }
-  return { pass: true, reason: `Valid approval by @${actor} after the latest firestore.rules commit.` };
+  return { pass: true, reason: "Valid approval by @" + actor + " after the latest firestore.rules commit." };
 }
 
-function apiHeaders(token) {
-  return { accept: "application/vnd.github+json", authorization: `Bearer ${token}`, "x-github-api-version": "2022-11-28" };
-}
-
-async function apiJson(url, token, method = "GET", body) {
-  const response = await fetch(url, {
-    method, headers: { ...apiHeaders(token), ...(body ? { "content-type": "application/json" } : {}) },
-    ...(body ? { body: JSON.stringify(body) } : {})
-  });
-  const raw = await response.text();
-  if (!response.ok) throw new Error(`GitHub API ${method} ${url} returned HTTP ${response.status}: ${raw.slice(0, 500)}`);
-  try { return raw ? JSON.parse(raw) : null; } catch { throw new Error(`GitHub API returned invalid JSON for ${url}`); }
-}
-
-function nextLink(linkHeader) {
-  if (!linkHeader) return null;
-  for (const part of linkHeader.split(",")) {
-    const match = part.match(/<([^>]+)>;\s*rel="([^"]+)"/);
-    if (match?.[2] === "next") return match[1];
+// Event-bound approval: the label event is tied to the exact PR head.
+// Any later synchronize event requires the owner to re-apply the label.
+export function evaluateLabelEventApproval({ action, actor, labelName, labels, changedFiles, rulesCommitIds, allowedActors, headSha, checkoutSha }) {
+  if (!Array.isArray(labels) || !Array.isArray(changedFiles) || !Array.isArray(rulesCommitIds) || !Array.isArray(allowedActors)) {
+    return { pass: false, reason: "Required approval event evidence is incomplete; failing closed." };
   }
-  return null;
-}
-
-async function apiPages(url, token) {
-  const all = [];
-  let next = url, pages = 0;
-  while (next) {
-    if (++pages > 100) throw new Error("GitHub API pagination exceeded 100 pages.");
-    const response = await fetch(next, { headers: apiHeaders(token) });
-    const raw = await response.text();
-    if (!response.ok) throw new Error(`GitHub API GET ${next} returned HTTP ${response.status}: ${raw.slice(0, 500)}`);
-    let page;
-    try { page = JSON.parse(raw); } catch { throw new Error(`GitHub API returned invalid JSON for ${next}`); }
-    if (!Array.isArray(page)) throw new Error(`Expected a paginated array from ${next}`);
-    all.push(...page);
-    next = nextLink(response.headers.get("link"));
+  if (!changedFiles.includes("firestore.rules")) return { pass: true, reason: "firestore.rules unchanged." };
+  if (rulesCommitIds.length === 0) return { pass: false, reason: "No rules-changing commit was found in the checked-out PR history; failing closed." };
+  if (!labels.includes(LABEL)) return { pass: false, reason: "firestore.rules changed but the required approval label is absent." };
+  if (action !== "labeled" || labelName !== LABEL) {
+    return { pass: false, reason: "Owner approval must be applied or re-applied after the latest PR commit; failing closed." };
   }
-  return all;
+  if (!actor || !allowedActors.includes(actor)) {
+    return { pass: false, reason: "Approval label was applied by unauthorized actor: " + (actor || "unknown") + "." };
+  }
+  if (!headSha || !checkoutSha || headSha !== checkoutSha) {
+    return { pass: false, reason: "Approval event does not match the exact checked-out PR head; failing closed." };
+  }
+  return { pass: true, reason: "Valid current-head Firestore rules approval by @" + actor + "." };
 }
 
-async function loadApprovers(base, token) {
-  const file = await apiJson(base + "/contents/.github/firestore-rules-approvers.txt?ref=main", token);
-  if (file.encoding !== "base64" || !file.content) throw new Error("Base-branch approver allow-list was not readable.");
-  const raw = Buffer.from(file.content, "base64").toString("utf8");
+function loadApprovers(baseSha) {
+  const raw = execFileSync("git", ["show", baseSha + ":.github/firestore-rules-approvers.txt"], { encoding: "utf8" });
   const logins = raw.split(/\r?\n/).map(line => line.replace(/#.*$/, "").trim()).filter(Boolean);
   if (!logins.includes("irpa2412-bit")) throw new Error("Approver allow-list must include repository owner irpa2412-bit.");
   return [...new Set(logins)];
 }
 
-
 async function main() {
-  const token = process.env.GH_TOKEN, repo = process.env.REPO, prNumber = process.env.PR_NUMBER;
-  if (!token || !repo || !/^\d+$/.test(prNumber || "")) throw new Error("GH_TOKEN, REPO and numeric PR_NUMBER are required.");
-  const [owner, name] = repo.split("/");
-  const base = `${API}/repos/${owner}/${name}`;
+  const action = process.env.PR_ACTION || "";
+  const actor = process.env.PR_ACTOR || "";
+  const labelName = process.env.EVENT_LABEL_NAME || "";
+  const headSha = process.env.PR_HEAD_SHA || "";
+  const baseSha = process.env.BASE_SHA || "";
+  let labels;
   try {
-    const [changed, pr, events, commits, timeline] = await Promise.all([
-      apiPages(`${base}/pulls/${prNumber}/files?per_page=100`, token),
-      apiJson(`${base}/issues/${prNumber}`, token),
-      apiPages(`${base}/issues/${prNumber}/events?per_page=100`, token),
-      apiPages(`${base}/pulls/${prNumber}/commits?per_page=100`, token),
-      apiPages(`${base}/issues/${prNumber}/timeline?per_page=100`, token)
-    ]);
-    const changedFiles = changed.map(file => file.filename);
+    labels = JSON.parse(process.env.PR_LABELS || "[]").map(label => label.name).filter(Boolean);
+  } catch {
+    throw new Error("PR_LABELS must be a JSON array supplied by the pull_request event.");
+  }
+  if (!/^[0-9a-f]{40}$/i.test(baseSha) || !/^[0-9a-f]{40}$/i.test(headSha)) {
+    throw new Error("Exact BASE_SHA and PR_HEAD_SHA values are required.");
+  }
+  try {
+    execFileSync("git", ["cat-file", "-e", baseSha + "^{commit}"], { stdio: "ignore" });
+    const checkoutSha = execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
+    const changedRaw = execFileSync("git", ["diff", "--name-only", baseSha + "...HEAD"], { encoding: "utf8" }).trim();
+    const changedFiles = changedRaw ? changedRaw.split(/\r?\n/).filter(Boolean) : [];
     if (!changedFiles.includes("firestore.rules")) {
       console.log("PASS: firestore.rules unchanged.");
       return;
     }
-    const allowedActors = await loadApprovers(base, token);
-    const rulesCommitIds = [];
-    for (const commit of commits) {
-      const detail = await apiJson(`${base}/commits/${commit.sha}`, token);
-      if (!Array.isArray(detail.files)) throw new Error(`Commit ${commit.sha} did not return a files array.`);
-      if (detail.files.length >= 300 && !detail.files.some(file => file.filename === "firestore.rules")) {
-        throw new Error(`Commit ${commit.sha} may have a truncated file list; cannot verify rules history.`);
-      }
-      if (detail.files.some(file => file.filename === "firestore.rules")) rulesCommitIds.push(commit.sha);
-    }
-    const result = evaluateApproval({
-      changedFiles, labels: (pr.labels || []).map(label => label.name),
-      labelEvents: events, timeline, rulesCommitIds, allowedActors
+    const rulesRaw = execFileSync("git", ["log", "--format=%H", baseSha + "..HEAD", "--", "firestore.rules"], { encoding: "utf8" }).trim();
+    const rulesCommitIds = rulesRaw ? rulesRaw.split(/\r?\n/).filter(Boolean) : [];
+    const allowedActors = loadApprovers(baseSha);
+    const result = evaluateLabelEventApproval({
+      action, actor, labelName, labels, changedFiles, rulesCommitIds, allowedActors, headSha, checkoutSha
     });
-    if (result.pass) { console.log(`PASS: ${result.reason}`); return; }
-    console.error(`FAIL: ${result.reason}`);
+    if (result.pass) {
+      console.log("PASS: " + result.reason);
+      return;
+    }
+    console.error("FAIL: " + result.reason);
     process.exitCode = 1;
   } catch (error) {
-    const reason = `GitHub API/evidence error; fail closed. ${error.message}`;
-    console.error(`::error::${reason}`);
-
+    const reason = "Local PR evidence error; fail closed. " + error.message;
+    console.error("::error::" + reason);
     process.exitCode = 1;
   }
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) await main();
+if (import.meta.url === "file://" + process.argv[1]) await main();

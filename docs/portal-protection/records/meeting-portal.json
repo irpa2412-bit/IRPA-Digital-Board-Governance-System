@@ -48,7 +48,7 @@
       "tests/meeting-room-authorization-boundary.test.mjs",
       "tests/meeting-working-documents-security.test.mjs"
     ],
-    "expectedEffect": "Every IRPA member or employee identity can access the complete Meeting Portal and initiate/register meetings regardless of status, title, department, membership/employment category, invitation or participant listing. Access to an ongoing meeting, meeting-specific leadership, live-room admission, voting, quorum, resolutions, formal approvals and Board-restricted records remain governed by their existing meeting-specific controls.",
+    "expectedEffect": "Every IRPA member or employee identity can access the complete Meeting Portal and initiate/register meetings regardless of status, title, department, membership/employment category, invitation or participant listing. Access to an ongoing meeting, meeting-specific leadership, live-room admission, voting, quorum, resolutions, formal approvals and Board-restricted records remain governed by their existing meeting-specific controls. The shared shell also exposes a collapsible, authenticated working-relationship support workspace across portal contexts; portal-specific permissions and mandates remain unchanged.",
     "prohibitedChanges": [
       "Do not create portal-wide meeting leadership roles.",
       "Do not allow Meeting Administrator to chair, vote, establish quorum, approve resolutions or approve minutes by virtue of that role.",
@@ -87,7 +87,8 @@
       "Access to ongoing meetings, live-room admission, meeting-specific leadership, voting, quorum, resolutions, formal approvals and Board-restricted records remain governed by their existing meeting-specific controls; external invitees remain limited to their invited meeting.",
       "The shared application shell exposes the complete Meeting Portal module set to all Members and Employees register identities without selected-authority gating.",
       "Meeting environment is immutable after creation; only the exact TRIAL marker at creation qualifies for safeguarded deletion.",
-      "The cross-portal browser fixture isolation guard remains mandatory and does not weaken unrelated portal protections."
+      "The cross-portal browser fixture isolation guard remains mandatory and does not weaken unrelated portal protections.",
+      "A shared authenticated-shell panel exposes the independent working-relationship and reporting workflow across all portal contexts; it does not modify portal-specific authority, permissions or business logic."
     ],
     "evidence": [
       "Owner's exact conditional approval is recorded in PR #845 issue comment 7068716176.",
@@ -329,13 +330,21 @@
     "affectedPortals": [
       "Meeting Portal"
     ],
-    "reason": "Owner-authorised coordinated shared-file protection cycle for src/App.jsx. This portal independently verifies the shared navigation-shell change while preserving its own authorization, data, workflow and governance boundaries.",
+    "reason": "Owner-authorised shared application-shell support integration for authenticated organisational working relationships across all seven protected portals, with portal-specific workflows and authority controls unchanged. Its fixture-isolation allowlist is extended for this complete cross-portal integration only; the isolated Meeting Portal browser regression remains mandatory.",
     "files": [
       "src/App.jsx",
       "scripts/meeting-portal-fixture-isolation-guard.sh",
-      "scripts/portal-protection-smoke.mjs"
+      "scripts/portal-protection-smoke.mjs",
+      "src/components/OrganisationalRelationshipSupport.jsx",
+      "tests/meeting-isolation-guard.test.mjs",
+      "firestore.rules",
+      "src/pages/OrganisationalWorkingRelationships.jsx",
+      "src/governance/organisationalRelationships.js",
+      "src/pages/AuthorizationWorkflow.jsx",
+      "src/firebase/authorizationWorkflow.js",
+      "src/firebase/workflowLinks.js"
     ],
-    "expectedEffect": "The shared application shell makes the complete Meeting Portal module set available to every identity with a Members or Employees register record, regardless of active status or selected authority. It does not change this portal's own data, workflows, permissions or role controls.",
+    "expectedEffect": "The common authenticated shell exposes a collapsible working-relationship support workspace in every portal. It allows named supervisors and assignees to manage responsibilities and progress reports and supplies authenticated relationship context to Authorization & Approvals. It does not grant portal permissions, financial authority, signing authority, meeting-specific powers or change any portal's internal mandate.",
     "prohibitedChanges": [
       "Do not alter this portal's internal source, data model, business rules or role permissions.",
       "Do not weaken authentication, signing, invitation, deletion, audit, retention or deployment controls.",
