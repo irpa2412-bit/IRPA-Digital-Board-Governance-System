@@ -101,29 +101,3 @@ export function summarizePcuAudit(events=[]){
  const byAction={};for(const e of events){const key=clean(e.action)||"UNKNOWN";byAction[key]=(byAction[key]||0)+1;}
  return Object.freeze({total:events.length,byAction:Object.freeze(byAction),actors:new Set(events.map(x=>x.actorUid).filter(Boolean)).size,latest:[...events].sort((a,b)=>new Date(b.occurredAt||0)-new Date(a.occurredAt||0)).slice(0,25)});
 }
-
-
-export function createReportingRelationship(input){
- const tenantId=validId(input?.tenantId,"tenantId"),supervisorNodeId=validId(input?.supervisorNodeId,"supervisorNodeId"),subordinateNodeId=validId(input?.subordinateNodeId,"subordinateNodeId"),supervisorUid=validId(input?.supervisorUid,"supervisorUid"),subordinateUid=validId(input?.subordinateUid,"subordinateUid");
- if(supervisorNodeId===subordinateNodeId||supervisorUid===subordinateUid)throw new PcuValidationError("A reporting relationship must connect distinct positions and identities","INVALID_REPORTING_RELATIONSHIP");
- const effectiveFrom=new Date(input.effectiveFrom),effectiveTo=input.effectiveTo?new Date(input.effectiveTo):null;
- if(!Number.isFinite(effectiveFrom.getTime())||(effectiveTo&&(!Number.isFinite(effectiveTo.getTime())||effectiveTo<=effectiveFrom)))throw new PcuValidationError("Reporting relationship dates are invalid","INVALID_REPORTING_DATES");
- const evidenceReference=clean(input.evidenceReference);if(!evidenceReference)throw new PcuValidationError("Approved appointment or delegation evidence is required","REPORTING_EVIDENCE_REQUIRED");
- return Object.freeze({id:validId(input.id,"relationship id"),tenantId,supervisorNodeId,subordinateNodeId,supervisorUid,subordinateUid,effectiveFrom:effectiveFrom.toISOString(),effectiveTo:effectiveTo?.toISOString()||null,evidenceReference,status:"PENDING_VERIFICATION",createdBy:validId(input.createdBy,"createdBy"),permissionsActivated:false,grantedClaims:[]});
-}
-export function createResponsibilityReport(input){
- const tenantId=validId(input?.tenantId,"tenantId"),assignmentId=validId(input.assignmentId,"assignmentId"),assigneeUid=validId(input.assigneeUid,"assigneeUid"),supervisorUid=validId(input.supervisorUid,"supervisorUid"),summary=clean(input.summary);
- if(assigneeUid===supervisorUid)throw new PcuValidationError("A report author cannot review their own report","REPORT_SELF_REVIEW");
- if(!summary||summary.length>10000)throw new PcuValidationError("A report summary is required and must be at most 10000 characters","INVALID_REPORT_SUMMARY");
- const periodStart=new Date(input.periodStart),periodEnd=new Date(input.periodEnd);
- if(!Number.isFinite(periodStart.getTime())||!Number.isFinite(periodEnd.getTime())||periodEnd<periodStart)throw new PcuValidationError("Report period is invalid","INVALID_REPORT_PERIOD");
- const evidenceReferences=[...new Set((input.evidenceReferences||[]).map(clean).filter(Boolean))];
- return Object.freeze({id:validId(input.id,"report id"),tenantId,assignmentId,assigneeUid,supervisorUid,periodStart:periodStart.toISOString(),periodEnd:periodEnd.toISOString(),summary,outputs:clean(input.outputs),blockers:clean(input.blockers),evidenceReferences,status:"SUBMITTED",submittedAt:clean(input.submittedAt)||new Date().toISOString(),review:null,permissionsActivated:false,grantedClaims:[]});
-}
-export function reviewResponsibilityReport(report,actorUid,decision,note=""){
- if(!report||report.status!=="SUBMITTED")throw new PcuValidationError("Only submitted reports can be reviewed","INVALID_REPORT_STATE");
- if(clean(actorUid)!==report.supervisorUid)throw new PcuValidationError("Only the assigned supervisor may review this report","REPORT_REVIEW_FORBIDDEN");
- if(!["ACCEPTED","RETURNED","REJECTED"].includes(decision))throw new PcuValidationError("Invalid report review decision","INVALID_REPORT_DECISION");
- if(!clean(note)&&decision!=="ACCEPTED")throw new PcuValidationError("A reason is required when returning or rejecting a report","REPORT_REVIEW_NOTE_REQUIRED");
- return Object.freeze({...report,status:decision,review:Object.freeze({actorUid:clean(actorUid),decision,note:clean(note),reviewedAt:new Date().toISOString()}),permissionsActivated:false,grantedClaims:[]});
-}
