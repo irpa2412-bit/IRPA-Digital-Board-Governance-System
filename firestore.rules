@@ -774,6 +774,9 @@ service cloud.firestore {
       &&request.resource.data.get("scope","") is string
       &&request.resource.data.get("scope","").size()>0
       &&request.resource.data.get("status","")=="ACTIVE"
+      &&request.resource.data.get("effectiveFromAt",null) is timestamp
+      &&request.resource.data.get("effectiveFromAt",null)<=request.time
+      &&(request.resource.data.get("effectiveToAt",null)==null||request.resource.data.get("effectiveToAt",null) is timestamp&&request.resource.data.get("effectiveToAt",null)>request.time)
       &&request.resource.data.get("permissionsActivated",true)==false
       &&request.resource.data.get("grantedClaims",[])==[]
       &&request.resource.data.get("recordOrigin","")=="ACTUAL";
@@ -797,6 +800,8 @@ service cloud.firestore {
       &&get(/databases/$(database)/documents/organisationalWorkingRelationships/$(request.resource.data.get("relationshipId",""))).data.get("status","")=="ACTIVE"
       &&get(/databases/$(database)/documents/organisationalWorkingRelationships/$(request.resource.data.get("relationshipId",""))).data.get("supervisorUid","")==request.auth.uid
       &&get(/databases/$(database)/documents/organisationalWorkingRelationships/$(request.resource.data.get("relationshipId",""))).data.get("subordinateUid","")==request.resource.data.get("assigneeUid","")
+      &&get(/databases/$(database)/documents/organisationalWorkingRelationships/$(request.resource.data.get("relationshipId",""))).data.get("effectiveFromAt",null)<=request.time
+      &&(get(/databases/$(database)/documents/organisationalWorkingRelationships/$(request.resource.data.get("relationshipId",""))).data.get("effectiveToAt",null)==null||get(/databases/$(database)/documents/organisationalWorkingRelationships/$(request.resource.data.get("relationshipId",""))).data.get("effectiveToAt",null)>request.time)
       &&activeIdentity(request.auth.uid)&&activeIdentity(request.resource.data.get("assigneeUid",""));
     allow update:if false;
     allow delete:if false;
