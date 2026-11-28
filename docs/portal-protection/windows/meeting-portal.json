@@ -6,7 +6,7 @@
   "lastActivityAt": "2026-11-27T19:17:59.933Z",
   "inactivityCloseHours": 72,
   "emergency": false,
-  "reason": "Owner-authorised coordinated shared-file protection cycle for src/App.jsx and the shared OrganisationalRelationshipSupport component. Independently verify this portal's navigation and security invariants; preserve all portal-specific controls.",
+  "reason": "Owner-authorised coordinated shared-file protection cycle for src/App.jsx and the shared OrganisationalRelationshipSupport component. Independently verify this portal's navigation and security invariants; preserve all portal-specific controls. The Meeting Portal fixture isolation guard and its regression test are updated only to recognize the complete, independently protected cross-portal relationship-support integration; Meeting Portal business logic remains unchanged.",
   "scope": [
     ".github/workflows/meeting-portal-fixture-browser.yml",
     "docs/portal-protection/records/meeting-portal.json",
