@@ -45,15 +45,7 @@ function apiHeaders(token) {
   return { accept: "application/vnd.github+json", authorization: `Bearer ${token}`, "x-github-api-version": "2022-11-28" };
 }
 
-async function apiJson(url, token, method = "GET", body) {
-  const response = await fetch(url, {
-    method, headers: { ...apiHeaders(token), ...(body ? { "content-type": "application/json" } : {}) },
-    ...(body ? { body: JSON.stringify(body) } : {})
-  });
-  const raw = await response.text();
-  if (!response.ok) throw new Error(`GitHub API ${method} ${url} returned HTTP ${response.status}: ${raw.slice(0, 500)}`);
-  try { return raw ? JSON.parse(raw) : null; } catch { throw new Error(`GitHub API returned invalid JSON for ${url}`); }
-}
+
 
 function nextLink(linkHeader) {
   if (!linkHeader) return null;
@@ -95,7 +87,7 @@ async function main() {
   let labels;
   try { labels = JSON.parse(process.env.PR_LABELS || "[]").map(label => label.name).filter(Boolean); }
   catch { throw new Error("PR_LABELS must be a JSON array supplied by the pull_request event."); }
-  if (!token || !repo || !/^\\d+$/.test(prNumber || "") || !/^[0-9a-f]{40}$/i.test(baseSha || "")) {
+  if (!token || !repo || !/^\d+$/.test(prNumber || "") || !/^[0-9a-f]{40}$/i.test(baseSha || "")) {
     throw new Error("GH_TOKEN, REPO, numeric PR_NUMBER and exact BASE_SHA are required.");
   }
   const [owner, name] = repo.split("/");
@@ -105,7 +97,7 @@ async function main() {
     // Only label actor and ordered GitHub timeline events require API access.
     execFileSync("git", ["cat-file", "-e", `${baseSha}^{commit}`], { stdio: "ignore" });
     const changedFiles = execFileSync("git", ["diff", "--name-only", `${baseSha}...HEAD`], { encoding: "utf8" })
-      .trim().split("\\n").filter(Boolean);
+      .trim().split("\n").filter(Boolean);
     if (!changedFiles.includes("firestore.rules")) {
       console.log("PASS: firestore.rules unchanged.");
       return;
