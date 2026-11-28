@@ -6,7 +6,7 @@ const root="organisationalWorkingRelationships";
 const clean=v=>String(v??"").trim();
 const displayName=x=>String(x.name||x.fullName||x.displayName||[x.firstName,x.middleName,x.lastName].filter(Boolean).join(" ")||x.email||x.uid||"Unnamed account").trim();
 const today=()=>new Date().toISOString().slice(0,10);
-export default function OrganisationalWorkingRelationships({user,isAdmin=false,selectedAuthority=""}){
+export default function OrganisationalWorkingRelationships({user,isAdmin=false}){
  const uid=user?.uid||"",manager=isAdmin;
  const[relationships,setRelationships]=useState([]),[responsibilities,setResponsibilities]=useState([]),[reports,setReports]=useState([]),[identities,setIdentities]=useState([]);
  const[busy,setBusy]=useState(false),[error,setError]=useState(""),[message,setMessage]=useState("");
