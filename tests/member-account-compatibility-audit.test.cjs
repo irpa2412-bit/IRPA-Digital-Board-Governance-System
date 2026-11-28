@@ -204,3 +204,16 @@ test("workflow requires repository owner and explicit audit confirmation", () =>
   assert.match(workflow, /vars\.IRPA_MEMBER_AUDIT_REPORT_PUBLIC_KEY/);
   assert.doesNotMatch(workflow, /upload-artifact[\s\S]*?path: reports\/member-account-compatibility-dry-run\.json/);
 });
+
+
+test("owner-gated WIF smoke authenticates only the dedicated recovery service account and masks its token", () => {
+  const workflow = fs.readFileSync(path.resolve(process.cwd(), ".github/workflows/member-account-compatibility-dry-run.yml"), "utf8");
+  assert.match(workflow, /id-token:\s*write/);
+  assert.match(workflow, /projects\/217055978789\/locations\/global\/workloadIdentityPools\/github-actions-irpa\/providers\/github-irpa/);
+  assert.match(workflow, /irpa-member-recovery@irpa-digital-board-governance\.iam\.gserviceaccount\.com/);
+  assert.match(workflow, /token_format:\s*access_token/);
+  assert.match(workflow, /WIF_ACCESS_TOKEN:\s*\$\{\{\s*steps\.wif\.outputs\.access_token\s*\}\}/);
+  assert.match(workflow, /echo "::add-mask::\$WIF_ACCESS_TOKEN"/);
+  assert.match(workflow, /WIF_SERVICE_ACCOUNT_IMPERSONATION=PASS/);
+  assert.doesNotMatch(workflow, /echo\s+"\$WIF_ACCESS_TOKEN"/);
+});
