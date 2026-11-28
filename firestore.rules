@@ -138,7 +138,20 @@ service cloud.firestore {
   function authorizationReviewerRole(uid){return (exists(/databases/$(database)/documents/members/$(uid))&&get(/databases/$(database)/documents/members/$(uid)).data.status=="Active"&&get(/databases/$(database)/documents/members/$(uid)).data.get("role","") in ["Director Internal Oversight","Internal Oversight Officer","Director Human Resources","HR Manager","Director Finance & Administration","Finance Manager","Programme/Technical Officer","Operations Manager"])||(exists(/databases/$(database)/documents/employees/$(uid))&&(get(/databases/$(database)/documents/employees/$(uid)).data.get("status","")=="Active"||get(/databases/$(database)/documents/employees/$(uid)).data.get("employmentStatus","")=="Active"||get(/databases/$(database)/documents/employees/$(uid)).data.get("registrationStatus","")=="Activated")&&get(/databases/$(database)/documents/employees/$(uid)).data.get("role","") in ["Director Internal Oversight","Internal Oversight Officer","Director Human Resources","HR Manager","Director Finance & Administration","Finance Manager","Programme/Technical Officer","Operations Manager"]);}
   function authorizationApproverRole(uid){return (exists(/databases/$(database)/documents/members/$(uid))&&get(/databases/$(database)/documents/members/$(uid)).data.status=="Active"&&get(/databases/$(database)/documents/members/$(uid)).data.get("role","")=="Executive Director")||(exists(/databases/$(database)/documents/employees/$(uid))&&(get(/databases/$(database)/documents/employees/$(uid)).data.get("status","")=="Active"||get(/databases/$(database)/documents/employees/$(uid)).data.get("employmentStatus","")=="Active"||get(/databases/$(database)/documents/employees/$(uid)).data.get("registrationStatus","")=="Activated")&&get(/databases/$(database)/documents/employees/$(uid)).data.get("role","")=="Executive Director");}
   function authorizationImplementerRole(uid){return (exists(/databases/$(database)/documents/members/$(uid))&&get(/databases/$(database)/documents/members/$(uid)).data.status=="Active"&&get(/databases/$(database)/documents/members/$(uid)).data.get("role","") in ["Executive Director","Director Finance & Administration","Finance Manager","Operations Manager","Programme/Technical Officer","Director Human Resources","HR Manager"])||(exists(/databases/$(database)/documents/employees/$(uid))&&(get(/databases/$(database)/documents/employees/$(uid)).data.get("status","")=="Active"||get(/databases/$(database)/documents/employees/$(uid)).data.get("employmentStatus","")=="Active"||get(/databases/$(database)/documents/employees/$(uid)).data.get("registrationStatus","")=="Activated")&&get(/databases/$(database)/documents/employees/$(uid)).data.get("role","") in ["Executive Director","Director Finance & Administration","Finance Manager","Operations Manager","Programme/Technical Officer","Director Human Resources","HR Manager"]);}
-  function validAuthorizationRelationshipLink(){return !request.resource.data.keys().hasAny(["workingRelationshipId"])||(request.resource.data.get("workingRelationshipId","") is string&&exists(/databases/$(database)/documents/organisationalWorkingRelationships/$(request.resource.data.get("workingRelationshipId","")))&&get(/databases/$(database)/documents/organisationalWorkingRelationships/$(request.resource.data.get("workingRelationshipId",""))).data.get("status","")=="ACTIVE"&&get(/databases/$(database)/documents/organisationalWorkingRelationships/$(request.resource.data.get("workingRelationshipId",""))).data.get("effectiveFromAt",null) is timestamp&&get(/databases/$(database)/documents/organisationalWorkingRelationships/$(request.resource.data.get("workingRelationshipId",""))).data.get("effectiveFromAt",null)<=request.time&&(get(/databases/$(database)/documents/organisationalWorkingRelationships/$(request.resource.data.get("workingRelationshipId",""))).data.get("effectiveToAt",null)==null||get(/databases/$(database)/documents/organisationalWorkingRelationships/$(request.resource.data.get("workingRelationshipId",""))).data.get("effectiveToAt",null)>request.time)&&get(/databases/$(database)/documents/organisationalWorkingRelationships/$(request.resource.data.get("workingRelationshipId",""))).data.get("permissionsActivated",true)==false&&(get(/databases/$(database)/documents/organisationalWorkingRelationships/$(request.resource.data.get("workingRelationshipId",""))).data.get("supervisorUid","")==request.auth.uid||get(/databases/$(database)/documents/organisationalWorkingRelationships/$(request.resource.data.get("workingRelationshipId",""))).data.get("subordinateUid","")==request.auth.uid));}
+  function activeRelationshipIdentity(uid, profileCollection, profileId){
+    return uid is string && uid!="" && profileId is string && profileId!="" &&
+      profileCollection in ["members","employees"] &&
+      exists(/databases/$(database)/documents/$(profileCollection)/$(profileId)) &&
+      get(/databases/$(database)/documents/$(profileCollection)/$(profileId)).data.get("uid",profileId)==uid &&
+      ((profileCollection=="employees" &&
+        (get(/databases/$(database)/documents/$(profileCollection)/$(profileId)).data.get("status","")=="Active" ||
+         get(/databases/$(database)/documents/$(profileCollection)/$(profileId)).data.get("employmentStatus","")=="Active" ||
+         get(/databases/$(database)/documents/$(profileCollection)/$(profileId)).data.get("registrationStatus","")=="Activated")) ||
+       (profileCollection=="members" &&
+        (get(/databases/$(database)/documents/$(profileCollection)/$(profileId)).data.get("status","") in ["Active","Activated"] ||
+         get(/databases/$(database)/documents/$(profileCollection)/$(profileId)).data.get("registrationStatus","")=="Activated"));
+  }
+  function validAuthorizationRelationshipLink(){return !request.resource.data.keys().hasAny(["workingRelationshipId"])||(request.resource.data.get("workingRelationshipId","") is string&&exists(/databases/$(database)/documents/organisationalWorkingRelationships/$(request.resource.data.get("workingRelationshipId","")))&&get(/databases/$(database)/documents/organisationalWorkingRelationships/$(request.resource.data.get("workingRelationshipId",""))).data.get("status","")=="ACTIVE"&&get(/databases/$(database)/documents/organisationalWorkingRelationships/$(request.resource.data.get("workingRelationshipId",""))).data.get("effectiveFromAt",null) is timestamp&&get(/databases/$(database)/documents/organisationalWorkingRelationships/$(request.resource.data.get("workingRelationshipId",""))).data.get("effectiveFromAt",null)<=request.time&&(get(/databases/$(database)/documents/organisationalWorkingRelationships/$(request.resource.data.get("workingRelationshipId",""))).data.get("effectiveToAt",null)==null||get(/databases/$(database)/documents/organisationalWorkingRelationships/$(request.resource.data.get("workingRelationshipId",""))).data.get("effectiveToAt",null)>request.time)&&get(/databases/$(database)/documents/organisationalWorkingRelationships/$(request.resource.data.get("workingRelationshipId",""))).data.get("permissionsActivated",true)==false&&((get(/databases/$(database)/documents/organisationalWorkingRelationships/$(request.resource.data.get("workingRelationshipId",""))).data.get("supervisorUid","")==request.auth.uid&&activeRelationshipIdentity(request.auth.uid,get(/databases/$(database)/documents/organisationalWorkingRelationships/$(request.resource.data.get("workingRelationshipId",""))).data.get("supervisorCollection",""),get(/databases/$(database)/documents/organisationalWorkingRelationships/$(request.resource.data.get("workingRelationshipId",""))).data.get("supervisorProfileId","")))||(get(/databases/$(database)/documents/organisationalWorkingRelationships/$(request.resource.data.get("workingRelationshipId",""))).data.get("subordinateUid","")==request.auth.uid&&activeRelationshipIdentity(request.auth.uid,get(/databases/$(database)/documents/organisationalWorkingRelationships/$(request.resource.data.get("workingRelationshipId",""))).data.get("subordinateCollection",""),get(/databases/$(database)/documents/organisationalWorkingRelationships/$(request.resource.data.get("workingRelationshipId",""))).data.get("subordinateProfileId","")))));}
   function validAuthorizationCreate(){return authorizationUser()&&request.resource.data.workflowType=="Authorization"&&request.resource.data.module=="Authorization & Approvals"&&request.resource.data.status=="Draft"&&request.resource.data.stageIndex==0&&request.resource.data.requestedByUid==request.auth.uid&&request.resource.data.requestedByUid!=request.resource.data.approverUid&&request.resource.data.reviewerUid is string&&request.resource.data.approverUid is string&&authorizationReviewerRole(request.resource.data.reviewerUid)&&authorizationApproverRole(request.resource.data.approverUid)&&request.resource.data.involvedUids is list&&request.resource.data.involvedUids.hasAll([request.auth.uid,request.resource.data.reviewerUid,request.resource.data.approverUid])&&validAuthorizationRelationshipLink()&&(!request.resource.data.keys().hasAny(["implementerUid"])||request.resource.data.implementerUid==null||authorizationImplementerRole(request.resource.data.implementerUid));}
   function authorizationImmutable(){return request.resource.data.workflowType==resource.data.workflowType&&request.resource.data.module==resource.data.module&&request.resource.data.reference==resource.data.reference&&request.resource.data.title==resource.data.title&&request.resource.data.requestedByUid==resource.data.requestedByUid&&request.resource.data.requestedByEmail==resource.data.requestedByEmail&&request.resource.data.reviewerUid==resource.data.reviewerUid&&request.resource.data.approverUid==resource.data.approverUid&&request.resource.data.implementerUid==resource.data.implementerUid&&request.resource.data.involvedUids==resource.data.involvedUids&&request.resource.data.get("workingRelationshipId",null)==resource.data.get("workingRelationshipId",null)&&request.resource.data.get("workingRelationshipReference",null)==resource.data.get("workingRelationshipReference",null);}
   function authorizationTransitionAllowed(){return authorizationImmutable()&&((resource.data.status=="Draft"&&request.resource.data.status=="Submitted"&&request.resource.data.stageIndex==1&&resource.data.requestedByUid==request.auth.uid)||(resource.data.status=="Submitted"&&request.resource.data.status=="Under Review"&&request.resource.data.stageIndex==2&&resource.data.reviewerUid==request.auth.uid&&authorizationReviewerRole(request.auth.uid))||(resource.data.status in ["Submitted","Under Review"]&&request.resource.data.status=="Returned"&&request.resource.data.stageIndex==5&&resource.data.reviewerUid==request.auth.uid&&authorizationReviewerRole(request.auth.uid)&&request.resource.data.decisionReason is string&&request.resource.data.decisionReason.size()>0)||(resource.data.status=="Under Review"&&request.resource.data.status=="Approved"&&request.resource.data.stageIndex==3&&resource.data.approverUid==request.auth.uid&&authorizationApproverRole(request.auth.uid)&&resource.data.requestedByUid!=request.auth.uid)||(resource.data.status=="Under Review"&&request.resource.data.status=="Rejected"&&request.resource.data.stageIndex==4&&resource.data.approverUid==request.auth.uid&&authorizationApproverRole(request.auth.uid)&&resource.data.requestedByUid!=request.auth.uid&&request.resource.data.decisionReason is string&&request.resource.data.decisionReason.size()>0)||(resource.data.status=="Returned"&&request.resource.data.status=="Submitted"&&request.resource.data.stageIndex==1&&resource.data.requestedByUid==request.auth.uid)||(resource.data.status=="Approved"&&request.resource.data.status=="Completed"&&request.resource.data.stageIndex==6&&resource.data.implementerUid==request.auth.uid&&authorizationImplementerRole(request.auth.uid)));}
@@ -751,18 +764,7 @@ service cloud.firestore {
     }
   }
   // Independent working relationships are authenticated workflow context, never portal permissions.
-  function activeRelationshipIdentity(uid){
-    return uid is string && uid!="" && (
-      (exists(/databases/$(database)/documents/employees/$(uid)) &&
-        (get(/databases/$(database)/documents/employees/$(uid)).data.get("status","")=="Active" ||
-         get(/databases/$(database)/documents/employees/$(uid)).data.get("employmentStatus","")=="Active" ||
-         get(/databases/$(database)/documents/employees/$(uid)).data.get("registrationStatus","")=="Activated"))
-      ||
-      (exists(/databases/$(database)/documents/members/$(uid)) &&
-        (get(/databases/$(database)/documents/members/$(uid)).data.get("status","") in ["Active","Activated"] ||
-         get(/databases/$(database)/documents/members/$(uid)).data.get("registrationStatus","")=="Activated"))
-    );
-  }
+  // Independent working relationships are authenticated workflow context, never portal permissions.
   function relationshipIsCurrent(data){
     return data.get("status","")=="ACTIVE" &&
       data.get("effectiveFromAt",null) is timestamp &&
@@ -771,15 +773,20 @@ service cloud.firestore {
        (data.get("effectiveToAt",null) is timestamp && data.get("effectiveToAt",null)>request.time));
   }
   match /organisationalWorkingRelationships/{relationshipId}{
-    allow read:if admin() || (signedIn() && activeRelationshipIdentity(request.auth.uid) &&
-      (resource.data.get("supervisorUid","")==request.auth.uid || resource.data.get("subordinateUid","")==request.auth.uid));
+    allow read:if admin() || (signedIn() &&
+      ((resource.data.get("supervisorUid","")==request.auth.uid && activeRelationshipIdentity(request.auth.uid,resource.data.get("supervisorCollection",""),resource.data.get("supervisorProfileId",""))) ||
+       (resource.data.get("subordinateUid","")==request.auth.uid && activeRelationshipIdentity(request.auth.uid,resource.data.get("subordinateCollection",""),resource.data.get("subordinateProfileId","")))));
     allow create:if admin() && actualCreateAllowed() &&
       request.resource.data.get("id","")==relationshipId &&
       request.resource.data.get("supervisorUid","") is string &&
       request.resource.data.get("subordinateUid","") is string &&
       request.resource.data.get("supervisorUid","")!=request.resource.data.get("subordinateUid","") &&
-      activeRelationshipIdentity(request.resource.data.get("supervisorUid","")) &&
-      activeRelationshipIdentity(request.resource.data.get("subordinateUid","")) &&
+      request.resource.data.get("supervisorProfileId","") is string &&
+      request.resource.data.get("subordinateProfileId","") is string &&
+      request.resource.data.get("supervisorCollection","") in ["members","employees"] &&
+      request.resource.data.get("subordinateCollection","") in ["members","employees"] &&
+      activeRelationshipIdentity(request.resource.data.get("supervisorUid",""),request.resource.data.get("supervisorCollection",""),request.resource.data.get("supervisorProfileId","")) &&
+      activeRelationshipIdentity(request.resource.data.get("subordinateUid",""),request.resource.data.get("subordinateCollection",""),request.resource.data.get("subordinateProfileId","")) &&
       request.resource.data.get("relationshipLabel","") is string &&
       request.resource.data.get("relationshipLabel","").size()>0 &&
       request.resource.data.get("scope","") is string &&
@@ -791,6 +798,10 @@ service cloud.firestore {
     allow update:if admin() && actualUpdateAllowed() &&
       request.resource.data.get("supervisorUid","")==resource.data.get("supervisorUid","") &&
       request.resource.data.get("subordinateUid","")==resource.data.get("subordinateUid","") &&
+      request.resource.data.get("supervisorProfileId","")==resource.data.get("supervisorProfileId","") &&
+      request.resource.data.get("subordinateProfileId","")==resource.data.get("subordinateProfileId","") &&
+      request.resource.data.get("supervisorCollection","")==resource.data.get("supervisorCollection","") &&
+      request.resource.data.get("subordinateCollection","")==resource.data.get("subordinateCollection","") &&
       request.resource.data.get("permissionsActivated",true)==false &&
       request.resource.data.get("grantedClaims",[])==[] &&
       request.resource.data.get("status","") in ["ACTIVE","ENDED","SUSPENDED"] &&
@@ -799,8 +810,9 @@ service cloud.firestore {
     allow delete:if false;
   }
   match /organisationalResponsibilities/{responsibilityId}{
-    allow read:if admin() || (signedIn() && activeRelationshipIdentity(request.auth.uid) &&
-      (resource.data.get("supervisorUid","")==request.auth.uid || resource.data.get("assigneeUid","")==request.auth.uid));
+    allow read:if admin() || (signedIn() &&
+      ((resource.data.get("supervisorUid","")==request.auth.uid && activeRelationshipIdentity(request.auth.uid,resource.data.get("supervisorCollection",""),resource.data.get("supervisorProfileId",""))) ||
+       (resource.data.get("assigneeUid","")==request.auth.uid && activeRelationshipIdentity(request.auth.uid,resource.data.get("assigneeCollection",""),resource.data.get("assigneeProfileId","")))));
     allow create:if signedIn() && actualCreateAllowed() &&
       request.resource.data.get("id","")==responsibilityId &&
       request.resource.data.get("supervisorUid","")==request.auth.uid &&
@@ -811,14 +823,19 @@ service cloud.firestore {
       relationshipIsCurrent(get(/databases/$(database)/documents/organisationalWorkingRelationships/$(request.resource.data.get("relationshipId",""))).data) &&
       get(/databases/$(database)/documents/organisationalWorkingRelationships/$(request.resource.data.get("relationshipId",""))).data.get("supervisorUid","")==request.auth.uid &&
       get(/databases/$(database)/documents/organisationalWorkingRelationships/$(request.resource.data.get("relationshipId",""))).data.get("subordinateUid","")==request.resource.data.get("assigneeUid","") &&
-      activeRelationshipIdentity(request.auth.uid) &&
-      activeRelationshipIdentity(request.resource.data.get("assigneeUid",""));
+      request.resource.data.get("supervisorProfileId","")==get(/databases/$(database)/documents/organisationalWorkingRelationships/$(request.resource.data.get("relationshipId",""))).data.get("supervisorProfileId","") &&
+      request.resource.data.get("supervisorCollection","")==get(/databases/$(database)/documents/organisationalWorkingRelationships/$(request.resource.data.get("relationshipId",""))).data.get("supervisorCollection","") &&
+      request.resource.data.get("assigneeProfileId","")==get(/databases/$(database)/documents/organisationalWorkingRelationships/$(request.resource.data.get("relationshipId",""))).data.get("subordinateProfileId","") &&
+      request.resource.data.get("assigneeCollection","")==get(/databases/$(database)/documents/organisationalWorkingRelationships/$(request.resource.data.get("relationshipId",""))).data.get("subordinateCollection","") &&
+      activeRelationshipIdentity(request.auth.uid,request.resource.data.get("supervisorCollection",""),request.resource.data.get("supervisorProfileId","")) &&
+      activeRelationshipIdentity(request.resource.data.get("assigneeUid",""),request.resource.data.get("assigneeCollection",""),request.resource.data.get("assigneeProfileId",""));
     allow update:if false;
     allow delete:if false;
   }
   match /organisationalResponsibilityReports/{reportId}{
-    allow read:if admin() || (signedIn() && activeRelationshipIdentity(request.auth.uid) &&
-      (resource.data.get("supervisorUid","")==request.auth.uid || resource.data.get("assigneeUid","")==request.auth.uid));
+    allow read:if admin() || (signedIn() &&
+      ((resource.data.get("supervisorUid","")==request.auth.uid && activeRelationshipIdentity(request.auth.uid,resource.data.get("supervisorCollection",""),resource.data.get("supervisorProfileId",""))) ||
+       (resource.data.get("assigneeUid","")==request.auth.uid && activeRelationshipIdentity(request.auth.uid,resource.data.get("assigneeCollection",""),resource.data.get("assigneeProfileId","")))));
     allow create:if signedIn() && actualCreateAllowed() &&
       request.resource.data.get("id","")==reportId &&
       request.resource.data.get("assigneeUid","")==request.auth.uid &&
@@ -831,11 +848,16 @@ service cloud.firestore {
       get(/databases/$(database)/documents/organisationalResponsibilities/$(request.resource.data.get("responsibilityId",""))).data.get("assigneeUid","")==request.auth.uid &&
       get(/databases/$(database)/documents/organisationalResponsibilities/$(request.resource.data.get("responsibilityId",""))).data.get("supervisorUid","")==request.resource.data.get("supervisorUid","") &&
       get(/databases/$(database)/documents/organisationalResponsibilities/$(request.resource.data.get("responsibilityId",""))).data.get("relationshipId","")==request.resource.data.get("relationshipId","") &&
+      request.resource.data.get("assigneeProfileId","")==get(/databases/$(database)/documents/organisationalResponsibilities/$(request.resource.data.get("responsibilityId",""))).data.get("assigneeProfileId","") &&
+      request.resource.data.get("assigneeCollection","")==get(/databases/$(database)/documents/organisationalResponsibilities/$(request.resource.data.get("responsibilityId",""))).data.get("assigneeCollection","") &&
+      request.resource.data.get("supervisorProfileId","")==get(/databases/$(database)/documents/organisationalResponsibilities/$(request.resource.data.get("responsibilityId",""))).data.get("supervisorProfileId","") &&
+      request.resource.data.get("supervisorCollection","")==get(/databases/$(database)/documents/organisationalResponsibilities/$(request.resource.data.get("responsibilityId",""))).data.get("supervisorCollection","") &&
       exists(/databases/$(database)/documents/organisationalWorkingRelationships/$(request.resource.data.get("relationshipId",""))) &&
       relationshipIsCurrent(get(/databases/$(database)/documents/organisationalWorkingRelationships/$(request.resource.data.get("relationshipId",""))).data) &&
-      activeRelationshipIdentity(request.auth.uid);
-    allow update:if signedIn() && activeRelationshipIdentity(request.auth.uid) && actualUpdateAllowed() &&
+      activeRelationshipIdentity(request.auth.uid,request.resource.data.get("assigneeCollection",""),request.resource.data.get("assigneeProfileId",""));
+    allow update:if signedIn() && actualUpdateAllowed() &&
       resource.data.get("supervisorUid","")==request.auth.uid &&
+      activeRelationshipIdentity(request.auth.uid,resource.data.get("supervisorCollection",""),resource.data.get("supervisorProfileId","")) &&
       resource.data.get("status","")=="SUBMITTED" &&
       request.resource.data.get("status","") in ["ACCEPTED","RETURNED","REJECTED"] &&
       request.resource.data.get("review",{}).get("actorUid","")==request.auth.uid &&
