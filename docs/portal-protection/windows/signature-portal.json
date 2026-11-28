@@ -10,7 +10,7 @@
   "lastActivityAt": "2026-11-27T19:18:44.436Z",
   "emergency": false,
   "emergencyLimitHours": 24,
-  "reason": "Owner-authorised coordinated shared-file protection cycle for src/App.jsx. Independently verify this portal's navigation and security invariants while the common application shell exposes the Meeting Portal to every IRPA member/employee identity. Preserve all portal-specific controls. The cross-portal browser fixture isolation guard is also included as a shared validation dependency.",
+  "reason": "Owner-authorised coordinated shared-file protection cycle for src/App.jsx and the shared OrganisationalRelationshipSupport component. Independently verify this portal's navigation and security invariants; preserve all portal-specific controls.",
   "scope": [
     "src/pages/SignaturePlatform.jsx",
     "src/pages/SignaturePlatformWithUpload.jsx",
@@ -42,7 +42,8 @@
     "docs/signature-recovery/signature-email-link-distribution-change-record-2026-11-24.md",
     "src/App.jsx",
     "scripts/meeting-portal-fixture-isolation-guard.sh",
-    "scripts/portal-protection-smoke.mjs"
+    "scripts/portal-protection-smoke.mjs",
+    "src/components/OrganisationalRelationshipSupport.jsx"
   ],
   "activityLog": [
     {
