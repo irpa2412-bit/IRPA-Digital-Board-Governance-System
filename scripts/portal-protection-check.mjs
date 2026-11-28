@@ -382,6 +382,11 @@ async function main() {
     changedFiles = execFileSync("git", ["diff", "--name-only", "HEAD^...HEAD"], { encoding: "utf8" }).trim().split("\n").filter(Boolean);
   }
   const registry = readJson("docs/portal-protection/portal-register.json");
+  console.log("PORTAL_PROTECTION_DISCOVERY_INPUT", JSON.stringify({
+    changedFiles,
+    sharedPaths: (registry.shared ?? []).map(entry => entry.path),
+    sharedMatches: changedFiles.filter(file => (registry.shared ?? []).some(entry => isWithin(file, entry.path)))
+  }));
   const maintenanceApproval = await findOwnerMaintenanceApproval();
   const maintenanceClassification = classifyProtectionOnlyChange(changedFiles, maintenanceApproval);
   if (maintenanceClassification.eligible) {
